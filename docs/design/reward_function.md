@@ -4,9 +4,9 @@ The robot needs to know whether its movements contribute to the ultimate goal of
 inputs must be distributed fairly to guarantee an objective comparison between different architectures.
 
 - The distance from the robot to the target and/or the light intensity are treated as global inputs.
-- Positions and joints, normalized to floating-point values between 0 and 1 are considered local inputs.
+- Positions and joints, which are normalized to floating-point values between 0 and 1, are considered local inputs.
 - The reward function is centered around minimizing the distance to the goal or maximizing the movement towards the goal
-within a finite number of timesteps $T$.
+  within a finite number of timesteps $T$.
 
 ## Rationale
 
