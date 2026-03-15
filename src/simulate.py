@@ -43,6 +43,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
+    # ======= ENVIRONMENT SETUP =======
+
     backend = Backend.MJC
     task = Task(args.task)
 
@@ -50,12 +52,14 @@ def main() -> None:
     arena_cfg = ArenaConfig(attach_target=(task == Task.DIRECTED_LOCOMOTION))
     env_cfg = EnvConfig(task=task)
 
-    factory = BrittleStarEnvFactory(backend=backend)
-    raw_env = factory.create_environment(morphology_cfg, arena_cfg, env_cfg)
+    factory = BrittleStarEnvFactory()
+    raw_env = factory.create_environment(backend, morphology_cfg, arena_cfg, env_cfg)
     env = BrittleStarEnv(raw_env, backend=backend, config=env_cfg)
 
     seed_for_env = int(args.seed) if args.seed is not None else 0
     state = env.reset(seed=seed_for_env)
+
+    # ======= MODEL SETUP =======
 
     nu = int(state.mj_model.nu)
 
@@ -73,6 +77,8 @@ def main() -> None:
     default_seed = int(getattr(policy, "seed", seed_for_env))
     if args.seed is not None and hasattr(policy, "reset"):
         policy.reset(int(args.seed))
+
+    # ======= SIMULATION =======
 
     rollout_cfg = SimulationConfig(
         realtime=True,
