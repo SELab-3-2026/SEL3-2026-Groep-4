@@ -1,3 +1,6 @@
+# Model files
+artifacts/*
+
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -491,7 +494,8 @@ pip-selfcheck.json
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
