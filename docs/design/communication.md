@@ -37,5 +37,7 @@ just two passes. For very large or long morphologies, this would be much more sc
 By rejecting SMP, we accept that our model might learn slower or require more computational power for highly segmented,
 extended morphologies.
 
+**References**
+
 - Wang, Tingwu, Renjie Liao, Jimmy Ba, en S. Fidler. ‘NerveNet: Learning Structured Policy with Graph Neural Networks’. Conference paper presented bij International Conference on Learning Representations. 15 februari 2018. https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613.
 - Huang, Wenlong, Igor Mordatch, en Deepak Pathak. ‘One Policy to Control Them All: Shared Modular Policies for Agent-Agnostic Control’. arXiv:2007.04976. Preprint, arXiv, 9 juli 2020. https://doi.org/10.48550/arXiv.2007.04976.
