@@ -17,6 +17,5 @@ class Backend(str, Enum):
 class Task(str, Enum):
     """Which brittle-star task/environment to instantiate."""
 
-    UNDIRECTED_LOCOMOTION = "undirected_locomotion"
     DIRECTED_LOCOMOTION = "directed_locomotion"
     LIGHT_ESCAPE = "light_escape"

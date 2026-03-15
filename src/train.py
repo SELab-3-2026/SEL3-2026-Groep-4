@@ -12,7 +12,7 @@ from brittle_star_project import (
     MorphologyConfig,
     Task,
 )
-from brittle_star_project.rl import RLModel, RandomPolicyModel
+from brittle_star_project.rl import RandomPolicyModel
 
 MODEL_OPTIONS = ["random"]
 MODEL_BY_NAME = {
@@ -29,6 +29,7 @@ def parse_args() -> argparse.Namespace:
         help="Which model to create.",
     )
     p.add_argument("--task", choices=[t.value for t in Task], default=Task.DIRECTED_LOCOMOTION.value)
+    p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--seed", type=int, default=0)
     return p.parse_args()
 
@@ -36,10 +37,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
+    # ======= ENVIRONMENT SETUP =======
+    
     backend = Backend.MJC
     task = Task(args.task)
 
-    # Keep training headless/renderer-agnostic by default.
     env_cfg = EnvConfig(task=task)
     morphology_cfg = MorphologyConfig()
     arena_cfg = ArenaConfig(attach_target=(task == Task.DIRECTED_LOCOMOTION))
@@ -48,18 +50,18 @@ def main() -> None:
     raw_env = factory.create_environment(morphology_cfg, arena_cfg, env_cfg)
     env = BrittleStarEnv(raw_env, backend=backend, config=env_cfg)
 
-    state = env.reset(seed=args.seed)
+    env.reset(seed=args.seed)
 
-    if not hasattr(state, "mj_model"):
-        raise RuntimeError("Expected reset() to return a state with mj_model")
+    # ======= MODEL SETUP & TRAINING =======
 
-    nu = int(state.mj_model.nu)
+    # Infer the model class and initialize a model instance.
     model_cls = MODEL_BY_NAME[str(args.model_type)]
     model = model_cls(seed=int(args.seed))
-    if hasattr(model, "nu"):
-        model.nu = nu
-    model = model  # keep name stable for type checkers
-    model: RLModel = model
+
+    # Train the model in the environment for a number of epochs.
+    model.train(env=env, num_epochs=args.epochs)
+
+    # Save the trained model parameters to a file.
     out_path = model.save(Path(args.out))
     print(f"Wrote model artifact: {out_path}")
 

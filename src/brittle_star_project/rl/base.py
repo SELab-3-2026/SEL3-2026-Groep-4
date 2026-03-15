@@ -92,6 +92,9 @@ class RLModel(ABC):
     def act(self, *, obs: Any | None = None, t: float = 0.0) -> Any:
         raise NotImplementedError
 
+    def train(self, *, env: Any, num_epochs: int = 1) -> None:
+        """Optional training loop. Can be a no-op for non-learning models."""
+
     def to_payload(self) -> dict[str, Any]:
         """Return JSON-serializable model parameters."""
 

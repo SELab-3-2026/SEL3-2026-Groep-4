@@ -64,9 +64,6 @@ class BrittleStarEnvFactory:
         )
 
         # TODO: replace with match statement?
-        if config.task == Task.UNDIRECTED_LOCOMOTION:
-            return BrittleStarUndirectedLocomotionEnvironmentConfiguration(**common)
-
         if config.task == Task.DIRECTED_LOCOMOTION:
             return BrittleStarDirectedLocomotionEnvironmentConfiguration(
                 target_distance=config.target_distance,
@@ -88,17 +85,12 @@ class BrittleStarEnvFactory:
         from biorobot.brittle_star.environment.light_escape.dual import (
             BrittleStarLightEscapeEnvironment,
         )
-        from biorobot.brittle_star.environment.undirected_locomotion.dual import (
-            BrittleStarUndirectedLocomotionEnvironment,
-        )
 
         morphology = self.create_morphology(morphology_config)
         arena = self.create_arena(arena_config)
         env_configuration = self.create_environment_configuration(env_config)
 
-        if env_config.task == Task.UNDIRECTED_LOCOMOTION:
-            env_class = BrittleStarUndirectedLocomotionEnvironment
-        elif env_config.task == Task.DIRECTED_LOCOMOTION:
+        if env_config.task == Task.DIRECTED_LOCOMOTION:
             env_class = BrittleStarDirectedLocomotionEnvironment
         elif env_config.task == Task.LIGHT_ESCAPE:
             env_class = BrittleStarLightEscapeEnvironment

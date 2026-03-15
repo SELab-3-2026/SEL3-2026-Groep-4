@@ -9,7 +9,6 @@ import numpy as np
 
 @dataclass()
 class SimulationConfig:
-    duration_s: float = 10.0
     realtime: bool = True
     seed: int = 0
 
@@ -117,7 +116,7 @@ def simulate_policy(
 
     start = time.time()
     with mujoco.viewer.launch_passive(model, data) as viewer:
-        while viewer.is_running() and (time.time() - start) < config.duration_s:
+        while viewer.is_running():
             step_start = time.time()
 
             t = time.time() - start
