@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from moojoco.environment.dual import DualMuJoCoEnvironment
+
 from .env_config import ArenaConfig, EnvConfig, MorphologyConfig
 from .env_types import Backend, Task
 
@@ -9,14 +11,8 @@ from .env_types import Backend, Task
 class BrittleStarEnvFactory:
     """Creates brittle-star morphology, arena, and task environment instances."""
 
-    def __init__(self, backend: Backend) -> None:
-        self._backend = backend
-
-    @property
-    def backend(self) -> Backend:
-        return self._backend
-
-    def create_morphology(self, config: MorphologyConfig):
+    @staticmethod
+    def create_morphology(config: MorphologyConfig):
         from biorobot.brittle_star.mjcf.morphology.morphology import (
             MJCFBrittleStarMorphology,
         )
@@ -32,7 +28,8 @@ class BrittleStarEnvFactory:
         )
         return MJCFBrittleStarMorphology(specification=spec)
 
-    def create_arena(self, config: ArenaConfig):
+    @staticmethod
+    def create_arena(config: ArenaConfig):
         from biorobot.brittle_star.mjcf.arena.aquarium import (
             AquariumArenaConfiguration,
             MJCFAquariumArena,
@@ -41,7 +38,8 @@ class BrittleStarEnvFactory:
         arena_config = AquariumArenaConfiguration(**asdict(config))
         return MJCFAquariumArena(configuration=arena_config)
 
-    def create_environment_configuration(self, config: EnvConfig):
+    @staticmethod
+    def create_environment_configuration(config: EnvConfig):
         # Import locally so the project can still be imported without these deps.
         from biorobot.brittle_star.environment.directed_locomotion.shared import (
             BrittleStarDirectedLocomotionEnvironmentConfiguration,
@@ -81,7 +79,13 @@ class BrittleStarEnvFactory:
 
         raise ValueError(f"Unsupported task: {config.task}")
 
-    def create_environment(self, morphology_config: MorphologyConfig, arena_config: ArenaConfig, env_config: EnvConfig):
+    @staticmethod
+    def create_environment(
+            backend: Backend,
+            morphology_config: MorphologyConfig,
+            arena_config: ArenaConfig,
+            env_config: EnvConfig
+    ) -> DualMuJoCoEnvironment:
         from biorobot.brittle_star.environment.directed_locomotion.dual import (
             BrittleStarDirectedLocomotionEnvironment,
         )
@@ -92,9 +96,9 @@ class BrittleStarEnvFactory:
             BrittleStarUndirectedLocomotionEnvironment,
         )
 
-        morphology = self.create_morphology(morphology_config)
-        arena = self.create_arena(arena_config)
-        env_configuration = self.create_environment_configuration(env_config)
+        morphology = BrittleStarEnvFactory.create_morphology(morphology_config)
+        arena = BrittleStarEnvFactory.create_arena(arena_config)
+        env_configuration = BrittleStarEnvFactory.create_environment_configuration(env_config)
 
         if env_config.task == Task.UNDIRECTED_LOCOMOTION:
             env_class = BrittleStarUndirectedLocomotionEnvironment
@@ -109,5 +113,5 @@ class BrittleStarEnvFactory:
             morphology=morphology,
             arena=arena,
             configuration=env_configuration,
-            backend=self._backend.value,
+            backend=backend.value,
         )
