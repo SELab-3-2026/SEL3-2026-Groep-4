@@ -46,8 +46,7 @@ def main() -> None:
     morphology_cfg = MorphologyConfig()
     arena_cfg = ArenaConfig(attach_target=(task == Task.DIRECTED_LOCOMOTION))
 
-    factory = BrittleStarEnvFactory(backend=backend)
-    raw_env = factory.create_environment(morphology_cfg, arena_cfg, env_cfg)
+    raw_env = BrittleStarEnvFactory.create_environment(backend, morphology_cfg, arena_cfg, env_cfg)
     env = BrittleStarEnv(raw_env, backend=backend, config=env_cfg)
 
     env.reset(seed=args.seed)
