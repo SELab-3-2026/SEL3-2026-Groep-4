@@ -47,9 +47,6 @@ class BrittleStarEnvFactory:
         from biorobot.brittle_star.environment.light_escape.shared import (
             BrittleStarLightEscapeEnvironmentConfiguration,
         )
-        from biorobot.brittle_star.environment.undirected_locomotion.shared import (
-            BrittleStarUndirectedLocomotionEnvironmentConfiguration,
-        )
 
         common = dict(
             joint_randomization_noise_scale=config.joint_randomization_noise_scale,
@@ -61,20 +58,19 @@ class BrittleStarEnvFactory:
             render_size=config.render_size,
         )
 
-        # TODO: replace with match statement?
-        if config.task == Task.DIRECTED_LOCOMOTION:
-            return BrittleStarDirectedLocomotionEnvironmentConfiguration(
-                target_distance=config.target_distance,
-                **common,
-            )
-
-        if config.task == Task.LIGHT_ESCAPE:
-            return BrittleStarLightEscapeEnvironmentConfiguration(
-                light_perlin_noise_scale=config.light_perlin_noise_scale,
-                **common,
-            )
-
-        raise ValueError(f"Unsupported task: {config.task}")
+        match config.task:
+            case Task.DIRECTED_LOCOMOTION:
+                return BrittleStarDirectedLocomotionEnvironmentConfiguration(
+                    target_distance=config.target_distance,
+                    **common,
+                )
+            case Task.LIGHT_ESCAPE:
+                return BrittleStarLightEscapeEnvironmentConfiguration(
+                    light_perlin_noise_scale=config.light_perlin_noise_scale,
+                    **common,
+                )
+            case _:
+                raise ValueError(f"Unsupported task: {config.task}")
 
     @staticmethod
     def create_environment(
@@ -94,12 +90,13 @@ class BrittleStarEnvFactory:
         arena = BrittleStarEnvFactory.create_arena(arena_config)
         env_configuration = BrittleStarEnvFactory.create_environment_configuration(env_config)
 
-        if env_config.task == Task.DIRECTED_LOCOMOTION:
-            env_class = BrittleStarDirectedLocomotionEnvironment
-        elif env_config.task == Task.LIGHT_ESCAPE:
-            env_class = BrittleStarLightEscapeEnvironment
-        else:
-            raise ValueError(f"Unsupported task: {env_config.task}")
+        match env_config.task:
+            case Task.DIRECTED_LOCOMOTION:
+                env_class = BrittleStarDirectedLocomotionEnvironment
+            case Task.LIGHT_ESCAPE:
+                env_class = BrittleStarLightEscapeEnvironment
+            case _:
+                raise ValueError(f"Unsupported task: {env_config.task}")
 
         return env_class.from_morphology_and_arena(
             morphology=morphology,
