@@ -144,6 +144,9 @@ flycheck_*.el
 .idea/**/dictionaries
 .idea/**/shelf
 
+# IDEA
+/.idea/
+
 # AWS User-specific
 .idea/**/aws.xml
 
