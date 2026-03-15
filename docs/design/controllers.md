@@ -6,16 +6,16 @@ once, whereas modular controllers divide the brains across the body, inspired by
 We define four architectures to compare:
 
 1. **Centralized, monolithic**: A single Multi Layer Perceptron per robot that receives all observations and outputs
-all actions.
+   all actions.
 2. **Fully connected arm-level**: Each arm contains an MLP that processes the inputs for that arm, an MLP that processes
-the communicated inner-states, and an MLP that outputs the actions for that arm. One policy for these MLPs is shared
-across the arms. The controllers in each arm are connected to each other and form a fully connected graph. There is no
-central disk, but the controllers are fully connected.
+   the communicated inner-states, and an MLP that outputs the actions for that arm. One policy for these MLPs is shared
+   across the arms. The controllers in each arm are connected to each other and form a fully connected graph. There is
+   no central disk, but the controllers are fully connected.
 3. **Ring arm-level**: Identical setup to the fully connected arm-level, but the controllers are connected in a ring
-structure. This setup is considered less centralized than the fully connected graph.
+   structure. This setup is considered less centralized than the fully connected graph.
 4. **Segment-level**: Each segment contains the three MLPs discussed above. The base segments, attached to the body,
-form a ring structure, with the remaining segments attached as extended "strings". Segments can only communicate with
-segments that are physically connected to it.
+   form a ring structure, with the remaining segments attached as extended "strings". Segments can only communicate with
+   segments that are physically connected to it.
 
 ## Rationale
 

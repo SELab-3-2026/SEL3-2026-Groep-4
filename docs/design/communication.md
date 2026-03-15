@@ -31,8 +31,8 @@ Choosing NerveNet introduces a scalability issue as the morphology grows. In Ner
 segment or node per propagation step. When dealing with long arms (e.g., > 5 segments), this requires a large number of
 propagation steps to transmit information from one tip of an arm to another.
 
-If we would alternatively use SMP - which is possible - the inner states of nodes are shared across the entire graph in
-just two passes. For very large or long morphologies, this would be much more scalable.
+If we were to use SMP instead - which is possible - the inner states of nodes are shared across the entire graph in just
+two passes. For very large or long morphologies, this would be much more scalable.
 
 By rejecting SMP, we accept that our model might learn slower or require more computational power for highly segmented,
 extended morphologies.

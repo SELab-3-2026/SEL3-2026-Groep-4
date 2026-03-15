@@ -17,11 +17,11 @@ failures.
 Alternative learning algorithms include:
 
 - **Twin Delayed DDPG (Fujimoto et al., 2018)**: TD3 is a strong off-policy alternative used in the SMP paper (Huang et
-al., 2020). It is highly sample-efficient and reportedly excels at zero-shot adaptations. However, this approach would be
-more complex and error-prone than with PPO.
+  al., 2020). It is highly sample-efficient and reportedly excels at zero-shot adaptations. However, this approach would
+  be more complex and error-prone than with PPO.
 - **Evolution strategies (ES)**: Evolution strategies are useful for optimizing Central Pattern Generators (CPGs), e.g.
-CMA-ES, OpenAI-ES. While this method is easier to distribute and parallelize, ES typically scales worse with
-exceptionally large observation spaces compared to gradient-based RL methods like PPO.
+  CMA-ES, OpenAI-ES. While this method is easier to distribute and parallelize, ES typically scales worse with
+  exceptionally large observation spaces compared to gradient-based RL methods like PPO.
 
 **References**
 
