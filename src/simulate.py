@@ -22,7 +22,9 @@ MODEL_BY_NAME = {
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Simulate a trained policy in the MuJoCo viewer.")
+    p = argparse.ArgumentParser(
+        description="Simulate a trained policy in the MuJoCo viewer."
+    )
     p.add_argument(
         "--model",
         type=str,
@@ -35,7 +37,11 @@ def parse_args() -> argparse.Namespace:
         default="random",
         help="Which model class to instantiate when --model is omitted.",
     )
-    p.add_argument("--task", choices=[t.value for t in Task], default=Task.DIRECTED_LOCOMOTION.value)
+    p.add_argument(
+        "--task",
+        choices=[t.value for t in Task],
+        default=Task.DIRECTED_LOCOMOTION.value,
+    )
     p.add_argument("--seed", type=int, default=None)
     return p.parse_args()
 
@@ -61,6 +67,7 @@ def main() -> None:
 
     # ======= MODEL SETUP =======
 
+    # Extract the number of actuators (nu) from the environment's model, so we can pass it to the policy/model.
     nu = int(state.mj_model.nu)
 
     if args.model is not None:
@@ -74,6 +81,7 @@ def main() -> None:
         if hasattr(policy, "nu"):
             policy.nu = nu
 
+    # If the policy/model has a `seed` attribute, use the provided seed (or default) to reset it.
     default_seed = int(getattr(policy, "seed", seed_for_env))
     if args.seed is not None and hasattr(policy, "reset"):
         policy.reset(int(args.seed))
@@ -85,7 +93,8 @@ def main() -> None:
         seed=int(args.seed) if args.seed is not None else default_seed,
     )
 
-    simulate_policy(env.raw, state=state, config=rollout_cfg, policy=policy)
+    simulate_policy(state, rollout_cfg, policy)
+
     env.close()
 
 

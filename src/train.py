@@ -19,6 +19,7 @@ MODEL_BY_NAME = {
     "random": RandomPolicyModel,
 }
 
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Create a policy model artifact.")
     p.add_argument("--out", type=str, default="artifacts/model.json")
@@ -28,7 +29,11 @@ def parse_args() -> argparse.Namespace:
         default="random",
         help="Which model to create.",
     )
-    p.add_argument("--task", choices=[t.value for t in Task], default=Task.DIRECTED_LOCOMOTION.value)
+    p.add_argument(
+        "--task",
+        choices=[t.value for t in Task],
+        default=Task.DIRECTED_LOCOMOTION.value,
+    )
     p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--seed", type=int, default=0)
     return p.parse_args()
@@ -38,7 +43,7 @@ def main() -> None:
     args = parse_args()
 
     # ======= ENVIRONMENT SETUP =======
-    
+
     backend = Backend.MJC
     task = Task(args.task)
 
@@ -46,7 +51,9 @@ def main() -> None:
     morphology_cfg = MorphologyConfig()
     arena_cfg = ArenaConfig(attach_target=(task == Task.DIRECTED_LOCOMOTION))
 
-    raw_env = BrittleStarEnvFactory.create_environment(backend, morphology_cfg, arena_cfg, env_cfg)
+    raw_env = BrittleStarEnvFactory.create_environment(
+        backend, morphology_cfg, arena_cfg, env_cfg
+    )
     env = BrittleStarEnv(raw_env, backend=backend, config=env_cfg)
 
     env.reset(seed=args.seed)
