@@ -25,11 +25,7 @@ class Transition:
 
 
 class RLAlgorithm(ABC):
-    """Insertable RL algorithm interface.
-
-    Implementations should be pure-Python orchestration; you can keep the heavy
-    compute in JAX/PyTorch/etc.
-    """
+    """Insertable RL algorithm interface."""
 
     @abstractmethod
     def select_action(self, *, obs: Any, rng: Any | None = None) -> Any:
@@ -65,12 +61,32 @@ def create_model(type_name: str, *, payload: dict[str, Any]) -> "RLModel":
     return model_cls.from_payload(payload)
 
 
-def register_rl_model(type_name: str):
-    """Decorator to register an `RLModel` for generic loading."""
+def get_rl_model_registry() -> dict[str, type["RLModel"]]:
+    """Return a copy of the current RLModel registry.
+
+    The registry is populated by importing concrete model modules that use the
+    `@register_rl_model(...)` decorator.
+    """
+
+    return dict(_RL_MODEL_REGISTRY)
+
+
+def register_rl_model(*type_names: str):
+    """Decorator to register an `RLModel` for generic loading.
+
+    Concrete model modules should apply this decorator, so `base.py` never needs
+    to import concrete models (avoids circular imports).
+    """
+
+    if not type_names:
+        raise TypeError("register_rl_model() requires at least one type name")
+
+    primary = type_names[0]
 
     def _decorator(cls: type[RLModel]):
-        _RL_MODEL_REGISTRY[type_name] = cls
-        cls.type_name = type_name
+        for name in type_names:
+            _RL_MODEL_REGISTRY[name] = cls
+        cls.type_name = primary
         return cls
 
     return _decorator
@@ -93,7 +109,12 @@ class RLModel(ABC):
         raise NotImplementedError
 
     def train(self, *, env: Any, num_epochs: int = 1) -> None:
-        """Optional training loop. Can be a no-op for non-learning models."""
+        """Optional training hook.
+
+        Many models won't learn; for those this can be a no-op.
+        """
+
+        _ = (env, num_epochs)
 
     def to_payload(self) -> dict[str, Any]:
         """Return JSON-serializable model parameters."""
@@ -121,6 +142,7 @@ class RLModel(ABC):
     def load(cls, path: str | Path) -> "RLModel":
         p = Path(path)
         doc = json.loads(p.read_text())
+
         type_name = doc.get("type")
         if not isinstance(type_name, str):
             raise ValueError("Model artifact missing string field 'type'")

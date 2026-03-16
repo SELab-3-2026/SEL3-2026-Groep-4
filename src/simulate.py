@@ -12,13 +12,12 @@ from brittle_star_project import (
     MorphologyConfig,
     Task,
 )
-from brittle_star_project.rl import RLModel, RandomPolicyModel
+from brittle_star_project.rl import RLModel  # imports concrete models via rl.__init__
+from brittle_star_project.rl.base import get_rl_model_registry
 from brittle_star_project.renderer import SimulationConfig, simulate_policy
 
-MODEL_OPTIONS = ["random"]
-MODEL_BY_NAME = {
-    "random": RandomPolicyModel,
-}
+MODEL_BY_NAME = get_rl_model_registry()
+MODEL_OPTIONS = sorted(MODEL_BY_NAME)
 
 
 def parse_args() -> argparse.Namespace:
@@ -93,7 +92,7 @@ def main() -> None:
         seed=int(args.seed) if args.seed is not None else default_seed,
     )
 
-    simulate_policy(state, rollout_cfg, policy)
+    simulate_policy(policy, rollout_cfg, state)
 
     env.close()
 

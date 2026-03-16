@@ -7,7 +7,7 @@ import numpy as np
 from .base import RLModel, register_rl_model
 
 
-@register_rl_model("RandomPolicyModel")
+@register_rl_model("random")
 @dataclass(slots=True)
 class RandomPolicyModel(RLModel):
     """A minimal, serializable policy model that outputs random controls.
