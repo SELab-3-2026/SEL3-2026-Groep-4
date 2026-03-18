@@ -61,7 +61,6 @@ class BrittleStarEnv:
     def close(self) -> None:
         self._env.close()
 
-    # maybe a bit over-engineered... TODO: simplify?
     def step(self, *, state: Any, action: Any, rng: Any | None = None) -> StepResult:
         """Best-effort step wrapper.
 
@@ -85,26 +84,4 @@ class BrittleStarEnv:
         else:
             out = step_fn(state, action)
 
-        if isinstance(out, StepResult):
-            return out
-
-        if isinstance(out, tuple) or isinstance(out, list):
-            if len(out) == 1:
-                return StepResult(state=out[0])
-            if len(out) == 2:
-                state2, reward = out
-                return StepResult(state=state2, reward=float(reward))
-            if len(out) == 4:
-                state2, reward, done, info = out
-                return StepResult(state=state2, reward=float(reward), terminated=bool(done), info=dict(info))
-            if len(out) == 5:
-                state2, reward, terminated, truncated, info = out
-                return StepResult(
-                    state=state2,
-                    reward=float(reward),
-                    terminated=bool(terminated),
-                    truncated=bool(truncated),
-                    info=dict(info),
-                )
-
-        return StepResult(state=out)
+        return out

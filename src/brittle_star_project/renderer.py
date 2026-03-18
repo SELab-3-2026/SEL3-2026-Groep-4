@@ -7,7 +7,7 @@ from typing import Any, Protocol
 import numpy as np
 
 
-@dataclass()
+@dataclass
 class SimulationConfig:
     realtime: bool = True
     seed: int = 0
@@ -34,7 +34,6 @@ def simulate_policy(
     as `data.ctrl`.
     """
 
-    import mujoco
     import mujoco.viewer
 
     model = state.mj_model
