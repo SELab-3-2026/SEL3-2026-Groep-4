@@ -1,0 +1,47 @@
+{
+    "name": "Brittle Star JAX/CUDA",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    // Standardize workspace folder to /workspaces/project for IDE parity
+    "workspaceFolder": "/workspaces/project",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "charliermarsh.ruff",
+                "ms-python.vscode-pylance",
+                "ms-toolsai.jupyter"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/workspaces/project/.venv/bin/python",
+                "python.analysis.localRoot": "/workspaces/project",
+                "python.analysis.extraPaths": [
+                    "/workspaces/project/.venv/lib/python3.12/site-packages"
+                ]
+            }
+        },
+        "jetbrains": {
+            "plugins": [
+                "Pythonid",
+                "fleet.python",
+                "com.koxudaxi.ruff"
+            ]
+        }
+    },
+    "remoteUser": "vscode",
+    "runArgs": [
+        "--gpus",
+        "all"
+    ],
+    // Ensure the .venv persists using a named volume for performance and parity
+    "mounts": [
+        "source=brittle_star-venv,target=/workspaces/project/.venv,type=volume"
+    ],
+    // Invoke the hardware-aware sync script
+    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:1": {}
+    }
+}
