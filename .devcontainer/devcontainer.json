@@ -2,10 +2,12 @@
     "name": "Brittle Star JAX/CUDA",
     "build": {
         "dockerfile": "Dockerfile",
-        "context": ".."
+        "context": "..",
+        "args": {
+            "WORKSPACE_PATH": "/workspaces/${localWorkspaceFolderBasename}"
+        }
     },
-    // Standardize workspace folder to /workspaces/project for IDE parity
-    "workspaceFolder": "/workspaces/project",
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
     "customizations": {
         "vscode": {
             "extensions": [
@@ -15,10 +17,10 @@
                 "ms-toolsai.jupyter"
             ],
             "settings": {
-                "python.defaultInterpreterPath": "/workspaces/project/.venv/bin/python",
-                "python.analysis.localRoot": "/workspaces/project",
+                "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+                "python.analysis.localRoot": "${containerWorkspaceFolder}",
                 "python.analysis.extraPaths": [
-                    "/workspaces/project/.venv/lib/python3.12/site-packages"
+                    "${containerWorkspaceFolder}/.venv/lib/python3.12/site-packages"
                 ]
             }
         },
@@ -37,10 +39,10 @@
     ],
     // Ensure the .venv persists using a named volume for performance and parity
     "mounts": [
-        "source=brittle_star-venv,target=/workspaces/project/.venv,type=volume"
+        "source=${localWorkspaceFolderBasename}-venv,target=${containerWorkspaceFolder}/.venv,type=volume"
     ],
     // Invoke the hardware-aware sync script
-    "postCreateCommand": "bash .devcontainer/post-create.sh",
+    "postCreateCommand": "bash ./.devcontainer/post-create.sh",
     "features": {
         "ghcr.io/devcontainers/features/common-utils:1": {}
     }

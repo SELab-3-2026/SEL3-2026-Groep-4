@@ -17,13 +17,14 @@ ENV LD_LIBRARY_PATH=/usr/lib/nvidia
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
 
-# Set the standardized workspace path
-ENV WORKSPACE_PATH=/workspaces/project
+# Set the workspace path (defaults to /workspaces/project but can be overridden)
+ARG WORKSPACE_PATH=/workspaces/project
+ENV WORKSPACE_PATH=$WORKSPACE_PATH
 ENV PATH="$WORKSPACE_PATH/.venv/bin:$PATH"
 
-# Ensure the workspace directory exists and is owned by the vscode user
+# Ensure the workspace and .venv directories exist and are owned by the vscode user
 # This prevents permission errors when the postCreateCommand runs uv sync
-RUN mkdir -p $WORKSPACE_PATH && chown vscode:vscode $WORKSPACE_PATH
+RUN mkdir -p $WORKSPACE_PATH/.venv && chown -R vscode:vscode $WORKSPACE_PATH
 
 USER vscode
 WORKDIR $WORKSPACE_PATH
