@@ -1,3 +1,4 @@
+[lint]
 extend-select = [
   # "PLC0103",  # invalid-name
   # "PLC0104",  # disallowed-name
@@ -43,7 +44,7 @@ extend-select = [
   "PLC2801",  # unnecessary-dunder-call
   # "PLC3001",  # unnecessary-lambda-assignment
   "PLC3002",  # unnecessary-direct-lambda-call
-  "E999",  # syntax-error
+  # "E999",  # syntax-error (removed from ruff)
   # "PLE0011",  # unrecognized-inline-option
   # "PLE0013",  # bad-plugin-value
   # "PLE0014",  # bad-configuration-section
@@ -298,7 +299,7 @@ extend-select = [
   # "PLW4906",  # deprecated-attribute
 ]
 
-ignore = [
+extend-ignore = [
   # "PLC0116",  # missing-function-docstring
   # "PLC0200",  # consider-using-enumerate
   # "PLC0305",  # trailing-newlines
