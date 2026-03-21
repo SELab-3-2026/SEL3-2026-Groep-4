@@ -24,7 +24,7 @@ Code readability is paramount, as code is read far more frequently than it is wr
 
 * **Git Practices:** Commits must be frequent and small. Each commit should relate to exactly one piece of functionality.
 * **Branching Strategy:** The `dev` branch serves as the integration branch for pushing and merging code. Only stable releases may be pushed to the `main` branch.
-* **Artifact Management:** Data files, trained models, and large datasets must never be committed directly to Git. Git Large File Storage (LFS) must be used for tracking large files.
+* **Artifact Management:** Data files, trained models, and large datasets must never be committed directly to Git. Git Large File Storage (LFS) must be used for tracking large files. **All developers must have `git-lfs` installed locally** (see `DEVELOPMENT.md` for setup).
 * **Repository Layout:** The repository must maintain the following core directories: `src/` for algorithms, `env/` for MuJoCo wrappers, `config/` for experiment configurations, `experiments/` for scripts, `docs/` for Doxygen or ReadTheDocs documentation, and `tests/` for unit tests.
 
 ## 4. Architecture & Tooling

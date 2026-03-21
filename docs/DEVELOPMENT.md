@@ -13,6 +13,13 @@ This project uses [uv](https://github.com/astral-sh/uv) to manage dependencies a
 - To update dependencies, run `uv lock --upgrade`.
 - To sync your environment with the lockfile, run `uv sync --frozen`.
 
+## Git LFS (Critical)
+
+**All developers must have Git LFS installed locally.** This repository tracks model weights (`.pt`, `.safetensors`, etc.), recordings (`.mp4`), and datasets using Git LFS.
+
+- **Setup:** Run `git lfs install` after cloning this repository. If you are using the `.devcontainer` or `flake.nix`, LFS is typically available automatically.
+- If you clone without LFS installed, run `git lfs pull` after installation to fetch the actual data files instead of the small pointer files.
+
 ## Devcontainer Setup (Recommended)
 
 The devcontainer provides an identical experience to local development but with all system dependencies pre-configured. It automatically detects your hardware (GPU vs CPU) and syncs the appropriate dependencies.

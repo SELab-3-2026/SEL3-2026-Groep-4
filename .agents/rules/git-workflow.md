@@ -13,7 +13,7 @@ When performing Git operations and managing the repository layout, follow these 
 - **Feature Branches**: Organize distinct work into logical feature branches when pushing to the remote server, maintaining an organized Git history.
 
 ## 3. Artifact Management & Exclusions
-- **LFS Only**: Data files, trained models, and large datasets must **never** be committed directly to Git. Ensure they are tracked with Git Large File Storage (LFS).
+- **LFS Only**: Data files, trained models, and large datasets must **never** be committed directly to Git. Ensure they are tracked with Git Large File Storage (LFS). **CRITICAL**: Every developer and AI agent must have `git-lfs` installed locally for the repository hooks to successfully pull these large files. Run `git lfs install` after cloning or setting up your environment.
 
 ## 4. Repository Layout Strictness
 Ensure generated code is meticulously placed in the correct directories:
