@@ -1,0 +1,52 @@
+{
+    "name": "Brittle Star JAX/CUDA",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": "../..",
+        "args": {
+            "WORKSPACE_PATH": "/workspaces/${localWorkspaceFolderBasename}"
+        }
+    },
+    "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "charliermarsh.ruff",
+                "ms-python.vscode-pylance",
+                "ms-toolsai.jupyter"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+                "python.analysis.localRoot": "${containerWorkspaceFolder}",
+                "python.analysis.extraPaths": [
+                    "${containerWorkspaceFolder}/.venv/lib/python3.12/site-packages"
+                ]
+            }
+        },
+        "jetbrains": {
+            "plugins": [
+                "Pythonid",
+                "fleet.python",
+                "com.koxudaxi.ruff"
+            ]
+        }
+    },
+    "remoteUser": "vscode",
+    "containerEnv": {
+        "DEVCONTAINER_TYPE": "cuda"
+    },
+    "runArgs": [
+        "--gpus",
+        "all"
+    ],
+    // Ensure the .venv persists using a named volume for performance and parity
+    "mounts": [
+        "source=${localWorkspaceFolderBasename}-venv,target=${containerWorkspaceFolder}/.venv,type=volume"
+    ],
+    // Invoke the hardware-aware sync script
+    "postCreateCommand": "bash ./.devcontainer/post-create.sh",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:1": {}
+    }
+}

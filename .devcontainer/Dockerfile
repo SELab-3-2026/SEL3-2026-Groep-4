@@ -12,10 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     patchelf \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables for hardware acceleration and rendering
-ENV LD_LIBRARY_PATH=/usr/lib/nvidia
-ENV NVIDIA_VISIBLE_DEVICES=all
-ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+# Note: NVIDIA environment variables (LD_LIBRARY_PATH, NVIDIA_VISIBLE_DEVICES, etc.)
+# are automatically injected by the NVIDIA Container Toolkit when --gpus is used.
+# ROCm devices are passed via --device flags in the jax-rocm devcontainer config.
 
 # Set the workspace path (defaults to /workspaces/project but can be overridden)
 ARG WORKSPACE_PATH=/workspaces/project

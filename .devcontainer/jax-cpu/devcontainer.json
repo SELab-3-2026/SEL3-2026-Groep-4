@@ -1,8 +1,8 @@
 {
-    "name": "Brittle Star JAX/CUDA",
+    "name": "Brittle Star JAX/CPU",
     "build": {
-        "dockerfile": "Dockerfile",
-        "context": "..",
+        "dockerfile": "../Dockerfile",
+        "context": "../..",
         "args": {
             "WORKSPACE_PATH": "/workspaces/${localWorkspaceFolderBasename}"
         }
@@ -33,10 +33,11 @@
         }
     },
     "remoteUser": "vscode",
-    "runArgs": [
-        "--gpus",
-        "all"
-    ],
+    "containerEnv": {
+        "DEVCONTAINER_TYPE": "cpu"
+    },
+    // No GPU support needed for CPU-only devcontainer
+    "runArgs": [],
     // Ensure the .venv persists using a named volume for performance and parity
     "mounts": [
         "source=${localWorkspaceFolderBasename}-venv,target=${containerWorkspaceFolder}/.venv,type=volume"

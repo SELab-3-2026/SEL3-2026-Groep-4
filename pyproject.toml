@@ -20,6 +20,9 @@ dependencies = [
 cuda = [
     "jax[cuda13]==0.9.0.1",
 ]
+rocm = [
+    "jax[rocm7-local]==0.9.0.1",
+]
 
 [dependency-groups]
 dev = [
