@@ -13,3 +13,6 @@ else
 fi
 
 echo "Environment synced successfully."
+
+# Install pre-commit hooks so they are active in the devcontainer
+uv run pre-commit install

@@ -23,5 +23,6 @@ cuda = [
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.0.0",
     "ruff>=0.15.2",
 ]

@@ -29,6 +29,10 @@
         # Editor of your choice
         (nix-jetbrains-plugins.lib.buildIdeWithPlugins pkgs "pycharm" pluginList)
       ];
+
+      shellHook = ''
+        uv run pre-commit install
+      '';
     };
   });
 }
