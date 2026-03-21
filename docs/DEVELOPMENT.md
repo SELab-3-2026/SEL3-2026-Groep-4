@@ -53,9 +53,9 @@ If you prefer not to use Docker:
 
 ## Hardware Acceleration (JAX)
 
-Verify your setup by running:
+Verify your setup by running the JAX initialization test:
 
 ```bash
-python -c "import jax; print(jax.devices())"
+uv run pytest tests/test_jax_init.py
 ```
-In the devcontainer, this will report a `GpuDevice` if a GPU is detected and the `cuda` extra was installed.
+In the devcontainer, this will succeed on both CPU and GPU. A `GpuDevice` is expected if a GPU is detected and the `cuda` extra was installed.
