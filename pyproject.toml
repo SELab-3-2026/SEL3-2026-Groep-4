@@ -3,11 +3,10 @@ name = "2026sel3-project"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11, < 3.12" # todo: temporarily set to 3.11 to get a working start
+requires-python = ">= 3.12, < 3.13"
 dependencies = [
     "biorobot==0.4.2",
     "cleanrl>=0.4.8",
-    "envpool>=0.8.4",
     "evosax==0.2.0",
     "flax>=0.12.2",
     "gymnasium>=1.2.3",
