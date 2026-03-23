@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Self
 
 from .env_types import Task
 
@@ -47,3 +48,7 @@ class EnvConfig:
     # Light escape
     # Per docs in upstream env config: integer factors of 200.
     light_perlin_noise_scale: int = 0
+
+    @staticmethod
+    def from_json(path: str) -> EnvConfig:
+        pass
