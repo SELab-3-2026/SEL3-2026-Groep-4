@@ -1,3 +1,4 @@
+[lint]
 extend-select = [
   # "PLC0103",  # invalid-name
   # "PLC0104",  # disallowed-name
@@ -40,10 +41,10 @@ extend-select = [
   "PLC2401",  # non-ascii-name
   # "PLC2403",  # non-ascii-module-import
   # "PLC2503",  # bad-file-encoding
-  "PLC2801",  # unnecessary-dunder-call
+  # "PLC2801",  # unnecessary-dunder-call (requires preview)
   # "PLC3001",  # unnecessary-lambda-assignment
   "PLC3002",  # unnecessary-direct-lambda-call
-  "E999",  # syntax-error
+  # "E999",  # syntax-error (removed from ruff)
   # "PLE0011",  # unrecognized-inline-option
   # "PLE0013",  # bad-plugin-value
   # "PLE0014",  # bad-configuration-section
@@ -130,7 +131,7 @@ extend-select = [
   # "PLE1137",  # unsupported-assignment-operation
   # "PLE1138",  # unsupported-delete-operation
   # "PLE1139",  # invalid-metaclass
-  "PLE1141",  # dict-iter-missing-items
+  # "PLE1141",  # dict-iter-missing-items (requires preview)
   "PLE1142",  # await-outside-async
   # "PLE1143",  # unhashable-member
   # "PLE1144",  # invalid-slice-step
@@ -168,7 +169,7 @@ extend-select = [
   # "PLE3102",  # positional-only-dataclasses-expected
   # "PLE3701",  # invalid-field-call
   # "PLE4702",  # modified-iterating-dict
-  "PLE4703",  # modified-iterating-set
+  # "PLE4703",  # modified-iterating-set (requires preview)
   # "PLF0001",  # fatal
   # "PLF0002",  # astroid-error
   # "PLF0010",  # parse-error
@@ -210,7 +211,7 @@ extend-select = [
   # "PLW0238",  # unused-private-member
   # "PLW0239",  # overridden-final-method
   # "PLW0240",  # subclassed-final-class
-  "PLW0244",  # redefined-slots-in-subclass
+  # "PLW0244",  # redefined-slots-in-subclass (requires preview)
   "PLW0245",  # super-without-brackets
   # "PLW0246",  # useless-parent-delegation
   # "PLW0301",  # unnecessary-semicolon
@@ -274,7 +275,7 @@ extend-select = [
   "PLW1508",  # invalid-envvar-default
   "PLW1509",  # subprocess-popen-preexec-fn
   # "PLW1510",  # subprocess-run-check
-  "PLW1514",  # unspecified-encoding
+  # "PLW1514",  # unspecified-encoding (requires preview)
   # "PLW1515",  # forgotten-debug-statement
   # "PLW1518",  # method-cache-max-size-none
   "PLW2101",  # useless-with-lock
@@ -298,7 +299,7 @@ extend-select = [
   # "PLW4906",  # deprecated-attribute
 ]
 
-ignore = [
+extend-ignore = [
   # "PLC0116",  # missing-function-docstring
   # "PLC0200",  # consider-using-enumerate
   # "PLC0305",  # trailing-newlines
