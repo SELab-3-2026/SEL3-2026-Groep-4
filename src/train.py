@@ -1,5 +1,6 @@
 import random
 import time
+from dataclasses import asdict
 from functools import partial
 from typing import Callable
 
@@ -11,14 +12,17 @@ import optax
 import torch
 import tqdm
 import tyro
-from flax.nnx import TrainState
+from flax.training.train_state import TrainState
 from torch.utils.tensorboard import SummaryWriter
-import flax.linen as nn
 
 from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from brittle_star_project.rl import Network, Actor, Critic, AgentParams, Storage
+
+
+def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
+   return jnp.concatenate([v.flatten() for v in obs_dict.values() if v.size > 0])
 
 
 def make_env(num_envs: int) -> Callable:
@@ -30,7 +34,7 @@ def make_env(num_envs: int) -> Callable:
 def train(args: PPOArgs):
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
-    args.num_iterations = args.total_timesteps // args.batch_size
+    args.num_iterations = 10 if True else args.total_timesteps // args.batch_size # todo: debug
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     print(f"running name: {run_name}")
 
@@ -97,14 +101,16 @@ def train(args: PPOArgs):
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
     critic = Critic()
 
-    sample_obs = np.array([env.single_observation_space.sample(rng=jax.random.PRNGKey(0))])
+    sample_obs = convert_obs_dict_to_array(
+        env.single_observation_space.sample(rng=jax.random.PRNGKey(0))
+    )
     network_params = network.init(network_key, sample_obs)
     actor_params = actor.init(actor_key, network.apply(network_params, sample_obs))
     critic_params = critic.init(critic_key, network.apply(network_params, sample_obs))
 
     agent_state = TrainState.create(
         apply_fn=None,
-        params=AgentParams(network_params, actor_params, critic_params),
+        params=asdict(AgentParams(network_params, actor_params, critic_params)),
         tx=optax.chain(
             optax.clip_by_global_norm(args.max_grad_norm),
             optax.inject_hyperparams(optax.adam)(
@@ -121,32 +127,32 @@ def train(args: PPOArgs):
     @jax.jit
     def get_action_and_value(
             agent_state: TrainState,
-            next_obs: np.ndarray,
+            next_obs: jnp.ndarray,
             key: jax.random.PRNGKey,
     ):
-        hidden = network.apply(agent_state.params.network_params, next_obs)
+        hidden = network.apply(agent_state.params["network_params"], next_obs)
         # Continuous actions: sample from a Gaussian parameterized by the actor
-        mean, log_std = actor.apply(agent_state.params.actor_params, hidden)
+        mean, log_std = actor.apply(agent_state.params["actor_params"], hidden)
         key, subkey = jax.random.split(key)
         noise = jax.random.normal(subkey, shape=mean.shape)
         std = jnp.exp(log_std)
         action = mean + noise * std
         logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
-        value = critic.apply(agent_state.params.critic_params, hidden)
+        value = critic.apply(agent_state.params["critic_params"], hidden)
         return action, logprob, value.squeeze(-1), key
 
     @jax.jit
     def get_action_and_value2(
             params: flax.core.FrozenDict,
-            x: np.ndarray,
+            x: jnp.ndarray,
             action: np.ndarray,
     ):
-        hidden = network.apply(params.network_params, x)
-        mean, log_std = actor.apply(params.actor_params, hidden)
+        hidden = network.apply(params["network_params"], x)
+        mean, log_std = actor.apply(params["actor_params"], hidden)
         std = jnp.exp(log_std)
         logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
         entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(-1)
-        value = critic.apply(params.critic_params, hidden).squeeze(-1)
+        value = critic.apply(params["critic_params"], hidden).squeeze(-1)
         return logprob, entropy, value
 
     def compute_gae_once(carry, inp, gamma, gae_lambda):
@@ -161,7 +167,7 @@ def train(args: PPOArgs):
     def compute_gae(agent_state, next_obs, next_done, storage):
         next_value = critic.apply(
             agent_state.params.critic_params,
-            network.apply(agent_state.params.network_params, next_obs)
+            network.apply(agent_state.params["network_params"], next_obs)
         ).squeeze(-1)
 
         advantages = jnp.zeros((args.num_envs,))
@@ -260,7 +266,7 @@ def train(args: PPOArgs):
 
     # Reset once to get initial state
     next_env_state = env.reset(seed=args.seed)
-    next_obs = next_env_state.obs                               # (num_envs, obs_dim)
+    next_obs = convert_obs_dict_to_array(next_env_state.observations)
     next_done = jnp.zeros(args.num_envs, dtype=jnp.bool_)
 
     def step_once(carry, _, env_step_fn):
@@ -296,12 +302,14 @@ def train(args: PPOArgs):
         max_steps=args.num_steps
     )
 
-    for iteration in tqdm.tqdm(range(1, args.num_iterations + 1)):
+    for _ in tqdm.tqdm(range(1, args.num_iterations + 1)):
         iteration_time_start = time.time()
 
         agent_state, episode_stats, next_obs, next_done, storage, key, next_env_state = rollout(
             agent_state, episode_stats, next_obs, next_done, key, next_env_state
         )
+
+        next_obs = convert_obs_dict_to_array(next_obs)
 
         global_step += args.num_steps * args.num_envs
         storage = compute_gae(agent_state, next_obs, next_done, storage)
