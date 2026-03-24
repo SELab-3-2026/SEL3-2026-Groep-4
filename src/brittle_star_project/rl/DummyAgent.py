@@ -12,12 +12,13 @@ from flax.linen.initializers import constant, orthogonal
 
 # inspired by: https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_atari_envpool_xla_jax_scan.py
 class Network(nn.Module):
+    hidden_dim: int = 195
+
     @nn.compact
     def __call__(self, x):
-        print(f"type of x: {type(x)}")
-        x = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
+        x = nn.Dense(self.hidden_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
         x = nn.relu(x)
-        x = nn.Dense(256, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
+        x = nn.Dense(self.hidden_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(x)
         x = nn.relu(x)
         return x
 
@@ -29,11 +30,13 @@ class Critic(nn.Module):
 
 
 class Actor(nn.Module):
-    action_dim: Sequence[int]
+    action_dim: int
 
     @nn.compact
     def __call__(self, x):
-        return nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
+        mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
+        log_std = self.param('log_std', nn.initializers.zeros, (self.action_dim,))
+        return mean, log_std
 
 
 @jax.tree_util.register_dataclass
@@ -54,3 +57,7 @@ class Storage:
     advantages: jnp.array
     returns: jnp.array
     rewards: jnp.array
+
+    def replace(self, **kwargs) -> "Storage":
+        fs = fields(self)
+        return Storage(**{f.name: kwargs.get(f.name, getattr(self, f.name)) for f in fs})

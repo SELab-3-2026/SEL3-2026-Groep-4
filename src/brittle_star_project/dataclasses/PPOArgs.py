@@ -48,7 +48,7 @@ class PPOArgs:
     learning_rate: float = 2.5e-4
 
     # the number of parallel game environments
-    num_envs: int = 8
+    num_envs: int = 16
 
     # the number of steps to run in each environment per policy rollout
     num_steps: int = 128

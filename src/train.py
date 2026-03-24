@@ -22,19 +22,22 @@ from brittle_star_project.rl import Network, Actor, Critic, AgentParams, Storage
 
 
 def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
-   return jnp.concatenate([v.flatten() for v in obs_dict.values() if v.size > 0])
+    return jax.vmap(
+        lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0])
+    )(obs_dict)
 
 
 def make_env(num_envs: int) -> Callable:
     def thunk():
         return BrittleStarJaxEnvWrapper.default(num_envs=num_envs)
+
     return thunk
 
 
 def train(args: PPOArgs):
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
-    args.num_iterations = 10 if True else args.total_timesteps // args.batch_size # todo: debug
+    args.num_iterations = args.total_timesteps // args.batch_size
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     print(f"running name: {run_name}")
 
@@ -64,6 +67,7 @@ def train(args: PPOArgs):
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     print(f"Running on device: {device}")
 
+    print("Creating the environment...")
     env = make_env(num_envs=args.num_envs)()
 
     episode_stats = EpisodeStatistics(
@@ -77,10 +81,10 @@ def train(args: PPOArgs):
         next_env_state = env.step(env_state, action)
 
         # Extract per-environment signals from the state object
-        reward = next_env_state.reward                  # (num_envs,)
-        terminated = next_env_state.terminated          # (num_envs,)
-        truncated = next_env_state.truncated            # (num_envs,)
-        done = terminated | truncated                   # (num_envs,)
+        reward = next_env_state.reward  # (num_envs,)
+        terminated = next_env_state.terminated  # (num_envs,)
+        truncated = next_env_state.truncated  # (num_envs,)
+        done = terminated | truncated  # (num_envs,)
 
         new_episode_return = episode_stats.episode_returns + reward
         new_episode_length = episode_stats.episode_lengths + 1
@@ -91,19 +95,21 @@ def train(args: PPOArgs):
             returned_episode_returns=jnp.where(done, new_episode_return, episode_stats.returned_episode_returns),
             returned_episode_lengths=jnp.where(done, new_episode_length, episode_stats.returned_episode_lengths),
         )
-        return episode_stats, next_env_state, (next_env_state.obs, reward, done)
+        return episode_stats, next_env_state, (convert_obs_dict_to_array(next_env_state.observations), reward, done)
 
     def linear_schedule(count):
         frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / args.num_iterations
         return args.learning_rate * frac
 
+    print("Initializing the models...")
     network = Network()
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
     critic = Critic()
 
-    sample_obs = convert_obs_dict_to_array(
-        env.single_observation_space.sample(rng=jax.random.PRNGKey(0))
-    )
+    sample_obs = jnp.concatenate([
+        v.flatten() for v in env.single_observation_space.sample(rng=jax.random.PRNGKey(0)).values()
+        if v.size > 0
+    ])
     network_params = network.init(network_key, sample_obs)
     actor_params = actor.init(actor_key, network.apply(network_params, sample_obs))
     critic_params = critic.init(critic_key, network.apply(network_params, sample_obs))
@@ -166,7 +172,7 @@ def train(args: PPOArgs):
     @jax.jit
     def compute_gae(agent_state, next_obs, next_done, storage):
         next_value = critic.apply(
-            agent_state.params.critic_params,
+            agent_state.params["critic_params"],
             network.apply(agent_state.params["network_params"], next_obs)
         ).squeeze(-1)
 
@@ -187,17 +193,18 @@ def train(args: PPOArgs):
                 lambda logratio, ratio, approx_kl: (
                     lambda mb_advantages: (
                         lambda pg_loss1, pg_loss2, pg_loss, v_loss, entropy_loss:
-                            (pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef,
-                             (pg_loss, v_loss, entropy_loss, jax.lax.stop_gradient(approx_kl)))
+                        (pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef,
+                         (pg_loss, v_loss, entropy_loss, jax.lax.stop_gradient(approx_kl)))
                     )(
                         (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
                         if args.norm_adv else mb_advantages
                     ) if False else (
                         lambda mb_advantages: (
                             lambda pg_loss1, pg_loss2:
-                                (-mb_advantages * jnp.maximum(pg_loss1 / (-mb_advantages + 1e-8),
-                                                               pg_loss2 / (-mb_advantages + 1e-8))).mean()
-                        )(-mb_advantages * ratio, -mb_advantages * jnp.clip(ratio, 1 - args.clip_coef, 1 + args.clip_coef))
+                            (-mb_advantages * jnp.maximum(pg_loss1 / (-mb_advantages + 1e-8),
+                                                          pg_loss2 / (-mb_advantages + 1e-8))).mean()
+                        )(-mb_advantages * ratio,
+                          -mb_advantages * jnp.clip(ratio, 1 - args.clip_coef, 1 + args.clip_coef))
                     )
                 )
             )
@@ -237,8 +244,8 @@ def train(args: PPOArgs):
                 x = jax.random.permutation(subkey, x)
                 return jnp.reshape(x, (args.num_minibatches, -1) + x.shape[1:])
 
-            flatten_storage = jax.tree_map(flatten, storage)
-            shuffled_storage = jax.tree_map(convert_data, flatten_storage)
+            flatten_storage = jax.tree.map(flatten, storage)
+            shuffled_storage = jax.tree.map(convert_data, flatten_storage)
 
             def update_minibatch(agent_state, minibatch):
                 (loss, (pg_loss, v_loss, entropy_loss, approx_kl)), grads = ppo_loss_grad_fn(
@@ -265,6 +272,7 @@ def train(args: PPOArgs):
     start_time = time.time()
 
     # Reset once to get initial state
+    print("Resetting the environment...")
     next_env_state = env.reset(seed=args.seed)
     next_obs = convert_obs_dict_to_array(next_env_state.observations)
     next_done = jnp.zeros(args.num_envs, dtype=jnp.bool_)
@@ -302,21 +310,21 @@ def train(args: PPOArgs):
         max_steps=args.num_steps
     )
 
-    for _ in tqdm.tqdm(range(1, args.num_iterations + 1)):
+    print("Starting training...")
+    iters_bar = tqdm.tqdm(range(1, args.num_iterations + 1))
+    for _ in iters_bar:
         iteration_time_start = time.time()
 
         agent_state, episode_stats, next_obs, next_done, storage, key, next_env_state = rollout(
             agent_state, episode_stats, next_obs, next_done, key, next_env_state
         )
 
-        next_obs = convert_obs_dict_to_array(next_obs)
-
         global_step += args.num_steps * args.num_envs
         storage = compute_gae(agent_state, next_obs, next_done, storage)
         agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = update_ppo(agent_state, storage, key)
 
         avg_episodic_return = np.mean(jax.device_get(episode_stats.returned_episode_returns))
-        print(f"global_step={global_step}, avg_episodic_return={avg_episodic_return}")
+        iters_bar.set_postfix_str(f"global_step={global_step}, avg_episodic_return={avg_episodic_return}")
 
         writer.add_scalar("charts/avg_episodic_return", avg_episodic_return, global_step)
         writer.add_scalar("charts/avg_episodic_length",
@@ -328,7 +336,9 @@ def train(args: PPOArgs):
         writer.add_scalar("losses/entropy", entropy_loss[-1, -1].item(), global_step)
         writer.add_scalar("losses/approx_kl", approx_kl[-1, -1].item(), global_step)
         writer.add_scalar("losses/loss", loss[-1, -1].item(), global_step)
-        print("SPS:", int(global_step / (time.time() - start_time)))
+
+        # iters_bar.set_postfix_str(f"SPS: {int(global_step / (time.time() - start_time))}")
+
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
         writer.add_scalar("charts/SPS_update",
                           int(args.num_envs * args.num_steps / (time.time() - iteration_time_start)), global_step)
