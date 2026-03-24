@@ -1,0 +1,23 @@
+name: Lint
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    branches:
+      - main
+      - dev
+
+jobs:
+  ruff:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Ruff check
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: "check"
+      - name: Run Ruff format check
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: "format --check"
