@@ -29,7 +29,7 @@ class PPOArgs:
     capture_video: bool = False
 
     # whether to save model into the `runs/{run_name}` folder
-    save_model: bool = False
+    save_model: bool = True
 
     # whether to upload the saved model to huggingface
     upload_model: bool = False
