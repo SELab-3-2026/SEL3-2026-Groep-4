@@ -37,7 +37,7 @@ def make_env(num_envs: int) -> Callable:
 def train(args: PPOArgs):
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
-    args.num_iterations = args.total_timesteps // args.batch_size
+    args.num_iterations = 10 if True else args.total_timesteps // args.batch_size
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     print(f"running name: {run_name}")
 
@@ -188,31 +188,6 @@ def train(args: PPOArgs):
         )
         return storage.replace(advantages=advantages, returns=advantages + storage.values)
 
-    ppo_loss_grad_fn = jax.value_and_grad(
-        lambda params, x, a, logp, mb_adv, mb_ret: (
-            lambda newlogprob, entropy, newvalue: (
-                lambda logratio, ratio, approx_kl: (
-                    lambda mb_advantages: (
-                        lambda pg_loss1, pg_loss2, pg_loss, v_loss, entropy_loss:
-                        (pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef,
-                         (pg_loss, v_loss, entropy_loss, jax.lax.stop_gradient(approx_kl)))
-                    )(
-                        (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
-                        if args.norm_adv else mb_advantages
-                    ) if False else (
-                        lambda mb_advantages: (
-                            lambda pg_loss1, pg_loss2:
-                            (-mb_advantages * jnp.maximum(pg_loss1 / (-mb_advantages + 1e-8),
-                                                          pg_loss2 / (-mb_advantages + 1e-8))).mean()
-                        )(-mb_advantages * ratio,
-                          -mb_advantages * jnp.clip(ratio, 1 - args.clip_coef, 1 + args.clip_coef))
-                    )
-                )
-            )
-        ), has_aux=True
-    )
-
-    # Simpler, cleaner ppo_loss instead of the lambda mess above:
     def ppo_loss(params, x, a, logp, mb_advantages, mb_returns):
         newlogprob, entropy, newvalue = get_action_and_value2(params, x, a)
         logratio = newlogprob - logp
