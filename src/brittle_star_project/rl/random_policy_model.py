@@ -33,7 +33,6 @@ class RandomPolicyModel(RLModel):
         self._rng = np.random.RandomState(self.seed)
 
     def act(self, *, obs: np.ndarray | None = None, t: float = 0.0) -> np.ndarray:
-        _ = (obs, t)
         if self.nu <= 0:
             return np.zeros((0,), dtype=np.float32)
         ctrl = self.ctrl_noise_scale * self._rng.randn(self.nu)

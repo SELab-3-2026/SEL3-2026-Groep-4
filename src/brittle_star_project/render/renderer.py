@@ -54,7 +54,8 @@ def simulate_policy(
             ctrl = policy.act(obs=obs, t=t)
 
             # Check if the policy output vector give an input for each actuator (nu)
-            # TODO: what if model trained on full morphology but we want to test on a damaged one? (nu mismatch)
+            # TODO: what if model trained on full morphology but we want to test on a damaged one?
+            # (nu mismatch)
             if model.nu > 0:
                 ctrl = np.asarray(ctrl, dtype=np.float32).ravel()
                 if ctrl.shape != (model.nu,):

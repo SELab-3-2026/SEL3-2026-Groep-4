@@ -1,5 +1,3 @@
-from brittle_star_project.environment import env_config
-
 from .environment.env_types import Backend, Task
 from .environment.env_config import ArenaConfig, EnvConfig, MorphologyConfig
 from .environment.factory import BrittleStarEnvFactory

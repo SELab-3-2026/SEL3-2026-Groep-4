@@ -22,9 +22,9 @@ from brittle_star_project.rl import Network, Actor, Critic, AgentParams, Storage
 
 
 def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
-    return jax.vmap(
-        lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0])
-    )(obs_dict)
+    return jax.vmap(lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0]))(
+        obs_dict
+    )
 
 
 def make_env(num_envs: int) -> Callable:
@@ -43,19 +43,20 @@ def train(args: PPOArgs):
 
     if args.track:
         import wandb
+
         wandb.init(
             project=args.wandb_project_name,
             entity=args.wandb_entity,
             sync_tensorboard=True,
             config=vars(args),
             name=run_name,
-            save_code=True
+            save_code=True,
         )
 
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
-        "|param|value|\n|---|---|\n" + "\n".join(f"|{k}|{v}|" for k, v in vars(args).items())
+        "|param|value|\n|---|---|\n" + "\n".join(f"|{k}|{v}|" for k, v in vars(args).items()),
     )
 
     random.seed(args.seed)
@@ -92,10 +93,18 @@ def train(args: PPOArgs):
         episode_stats = episode_stats.replace(
             episode_returns=new_episode_return * (1 - done),
             episode_lengths=new_episode_length * (1 - done),
-            returned_episode_returns=jnp.where(done, new_episode_return, episode_stats.returned_episode_returns),
-            returned_episode_lengths=jnp.where(done, new_episode_length, episode_stats.returned_episode_lengths),
+            returned_episode_returns=jnp.where(
+                done, new_episode_return, episode_stats.returned_episode_returns
+            ),
+            returned_episode_lengths=jnp.where(
+                done, new_episode_length, episode_stats.returned_episode_lengths
+            ),
         )
-        return episode_stats, next_env_state, (convert_obs_dict_to_array(next_env_state.observations), reward, done)
+        return (
+            episode_stats,
+            next_env_state,
+            (convert_obs_dict_to_array(next_env_state.observations), reward, done),
+        )
 
     def linear_schedule(count):
         frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / args.num_iterations
@@ -106,10 +115,13 @@ def train(args: PPOArgs):
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
     critic = Critic()
 
-    sample_obs = jnp.concatenate([
-        v.flatten() for v in env.single_observation_space.sample(rng=jax.random.PRNGKey(0)).values()
-        if v.size > 0
-    ])
+    sample_obs = jnp.concatenate(
+        [
+            v.flatten()
+            for v in env.single_observation_space.sample(rng=jax.random.PRNGKey(0)).values()
+            if v.size > 0
+        ]
+    )
     network_params = network.init(network_key, sample_obs)
     actor_params = actor.init(actor_key, network.apply(network_params, sample_obs))
     critic_params = critic.init(critic_key, network.apply(network_params, sample_obs))
@@ -120,8 +132,7 @@ def train(args: PPOArgs):
         tx=optax.chain(
             optax.clip_by_global_norm(args.max_grad_norm),
             optax.inject_hyperparams(optax.adam)(
-                learning_rate=linear_schedule if args.anneal_lr else args.learning_rate,
-                eps=1e-5
+                learning_rate=linear_schedule if args.anneal_lr else args.learning_rate, eps=1e-5
             ),
         ),
     )
@@ -132,9 +143,9 @@ def train(args: PPOArgs):
 
     @jax.jit
     def get_action_and_value(
-            agent_state: TrainState,
-            next_obs: jnp.ndarray,
-            key: jax.random.PRNGKey,
+        agent_state: TrainState,
+        next_obs: jnp.ndarray,
+        key: jax.random.PRNGKey,
     ):
         hidden = network.apply(agent_state.params["network_params"], next_obs)
         # Continuous actions: sample from a Gaussian parameterized by the actor
@@ -149,9 +160,9 @@ def train(args: PPOArgs):
 
     @jax.jit
     def get_action_and_value2(
-            params: flax.core.FrozenDict,
-            x: jnp.ndarray,
-            action: np.ndarray,
+        params: flax.core.FrozenDict,
+        x: jnp.ndarray,
+        action: np.ndarray,
     ):
         hidden = network.apply(params["network_params"], x)
         mean, log_std = actor.apply(params["actor_params"], hidden)
@@ -174,7 +185,7 @@ def train(args: PPOArgs):
     def compute_gae(agent_state, next_obs, next_done, storage):
         next_value = critic.apply(
             agent_state.params["critic_params"],
-            network.apply(agent_state.params["network_params"], next_obs)
+            network.apply(agent_state.params["network_params"], next_obs),
         ).squeeze(-1)
 
         advantages = jnp.zeros((args.num_envs,))
@@ -184,7 +195,7 @@ def train(args: PPOArgs):
             partial(compute_gae_once, gamma=args.gamma, gae_lambda=args.gae_lambda),
             advantages,
             (dones[1:], values[1:], values[:-1], storage.rewards),
-            reverse=True
+            reverse=True,
         )
         return storage.replace(advantages=advantages, returns=advantages + storage.values)
 
@@ -257,7 +268,9 @@ def train(args: PPOArgs):
         agent_state, episode_stats, obs, done, key, env_state = carry
         action, logprob, value, key = get_action_and_value(agent_state, obs, key)
 
-        episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(episode_stats, env_state, action)
+        episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
+            episode_stats, env_state, action
+        )
 
         storage = Storage(
             obs=obs,
@@ -271,19 +284,21 @@ def train(args: PPOArgs):
         )
         return (agent_state, episode_stats, next_obs, next_done, key, env_state), storage
 
-    def rollout(agent_state, episode_stats, next_obs, next_done, key, env_state, step_once_fn, max_steps):
+    def rollout(
+        agent_state, episode_stats, next_obs, next_done, key, env_state, step_once_fn, max_steps
+    ):
         (agent_state, episode_stats, next_obs, next_done, key, env_state), storage = jax.lax.scan(
             step_once_fn,
             (agent_state, episode_stats, next_obs, next_done, key, env_state),
             (),
-            max_steps
+            max_steps,
         )
         return agent_state, episode_stats, next_obs, next_done, storage, key, env_state
 
     rollout = partial(
         rollout,
         step_once_fn=partial(step_once, env_step_fn=step_env_wrapped),
-        max_steps=args.num_steps
+        max_steps=args.num_steps,
     )
 
     print("Starting training...")
@@ -297,16 +312,26 @@ def train(args: PPOArgs):
 
         global_step += args.num_steps * args.num_envs
         storage = compute_gae(agent_state, next_obs, next_done, storage)
-        agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = update_ppo(agent_state, storage, key)
+        agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = update_ppo(
+            agent_state, storage, key
+        )
 
         avg_episodic_return = np.mean(jax.device_get(episode_stats.returned_episode_returns))
-        iters_bar.set_postfix_str(f"global_step={global_step}, avg_episodic_return={avg_episodic_return}")
+        iters_bar.set_postfix_str(
+            f"global_step={global_step}, avg_episodic_return={avg_episodic_return}"
+        )
 
         writer.add_scalar("charts/avg_episodic_return", avg_episodic_return, global_step)
-        writer.add_scalar("charts/avg_episodic_length",
-                          np.mean(jax.device_get(episode_stats.returned_episode_lengths)), global_step)
-        writer.add_scalar("charts/learning_rate",
-                          agent_state.opt_state[1].hyperparams["learning_rate"].item(), global_step)
+        writer.add_scalar(
+            "charts/avg_episodic_length",
+            np.mean(jax.device_get(episode_stats.returned_episode_lengths)),
+            global_step,
+        )
+        writer.add_scalar(
+            "charts/learning_rate",
+            agent_state.opt_state[1].hyperparams["learning_rate"].item(),
+            global_step,
+        )
         writer.add_scalar("losses/value_loss", v_loss[-1, -1].item(), global_step)
         writer.add_scalar("losses/policy_loss", pg_loss[-1, -1].item(), global_step)
         writer.add_scalar("losses/entropy", entropy_loss[-1, -1].item(), global_step)
@@ -316,16 +341,27 @@ def train(args: PPOArgs):
         # iters_bar.set_postfix_str(f"SPS: {int(global_step / (time.time() - start_time))}")
 
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
-        writer.add_scalar("charts/SPS_update",
-                          int(args.num_envs * args.num_steps / (time.time() - iteration_time_start)), global_step)
+        writer.add_scalar(
+            "charts/SPS_update",
+            int(args.num_envs * args.num_steps / (time.time() - iteration_time_start)),
+            global_step,
+        )
 
     if args.save_model:
         model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
         with open(model_path, "wb") as f:
-            f.write(flax.serialization.to_bytes([
-                vars(args),
-                [agent_state.params.network_params, agent_state.params.actor_params, agent_state.params.critic_params]
-            ]))
+            f.write(
+                flax.serialization.to_bytes(
+                    [
+                        vars(args),
+                        [
+                            agent_state.params["network_params"],
+                            agent_state.params["actor_params"],
+                            agent_state.params["critic_params"],
+                        ],
+                    ]
+                )
+            )
         print(f"model saved to {model_path}")
 
     env.close()

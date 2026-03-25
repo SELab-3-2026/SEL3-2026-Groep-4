@@ -1,3 +1,4 @@
+from .DummyAgent import Network, Critic, Actor, AgentParams, Storage
 from .base import (
     RLAlgorithm,
     RLModel,
@@ -7,7 +8,6 @@ from .base import (
     registered_model_types,
 )
 from .random_policy_model import RandomPolicyModel
-from .DummyAgent import *
 
 __all__ = [
     "RLAlgorithm",

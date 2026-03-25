@@ -1,3 +1,5 @@
+line-length = 100
+
 [lint]
 extend-select = [
   # "PLC0103",  # invalid-name

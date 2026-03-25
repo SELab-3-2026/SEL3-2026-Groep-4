@@ -21,9 +21,7 @@ MODEL_OPTIONS = sorted(MODEL_BY_NAME)
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Simulate a trained policy in the MuJoCo viewer."
-    )
+    p = argparse.ArgumentParser(description="Simulate a trained policy in the MuJoCo viewer.")
     p.add_argument(
         "--model",
         type=str,
@@ -66,7 +64,8 @@ def main() -> None:
 
     # ======= MODEL SETUP =======
 
-    # Extract the number of actuators (nu) from the environment's model, so we can pass it to the policy/model.
+    # Extract the number of actuators (nu) from the environment's model, so we can pass it to the
+    # policy/model.
     nu = int(state.mj_model.nu)
 
     if args.model is not None:

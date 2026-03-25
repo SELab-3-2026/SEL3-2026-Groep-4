@@ -1,12 +1,24 @@
 import jax
 import jax.numpy as jnp
 
-from brittle_star_project import EnvConfig, BrittleStarEnvFactory, MorphologyConfig, ArenaConfig, Backend
+from brittle_star_project import (
+    EnvConfig,
+    BrittleStarEnvFactory,
+    MorphologyConfig,
+    ArenaConfig,
+    Backend,
+)
 
 
 class BrittleStarJaxEnvWrapper:
-    def __init__(self, morphology: MorphologyConfig, arena: ArenaConfig, env_config: EnvConfig, num_envs: int,
-                 backend: Backend = Backend.MJX):
+    def __init__(
+        self,
+        morphology: MorphologyConfig,
+        arena: ArenaConfig,
+        env_config: EnvConfig,
+        num_envs: int,
+        backend: Backend = Backend.MJX,
+    ):
         self._morphology = morphology
         self._arena = arena
         self._env_config = env_config
@@ -45,7 +57,9 @@ class BrittleStarJaxEnvWrapper:
 
     def sample_actions(self):
         assert self._action_rng is not None, "Call reset() before sample_actions()"
-        self._action_rng, *sub_rngs = jnp.array(jax.random.split(self._action_rng, self._num_envs + 1))
+        self._action_rng, *sub_rngs = jnp.array(
+            jax.random.split(self._action_rng, self._num_envs + 1)
+        )
         return self._vectorized_action_sample(rng=jnp.array(sub_rngs))
 
     def step(self, state, action):
@@ -59,4 +73,6 @@ class BrittleStarJaxEnvWrapper:
         morphology = MorphologyConfig()
         arena = ArenaConfig()
         env_config = EnvConfig()
-        return BrittleStarJaxEnvWrapper(morphology, arena, env_config, num_envs=num_envs, backend=backend)
+        return BrittleStarJaxEnvWrapper(
+            morphology, arena, env_config, num_envs=num_envs, backend=backend
+        )
