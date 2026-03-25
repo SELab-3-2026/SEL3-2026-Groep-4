@@ -19,6 +19,6 @@ The Backend enum specifies either an MJC or MJX backend.
 * MJC: runs on CPU
 * MJX: uses jax on the gpu
 
-The Task enum specifies which task to use. 3 items are present:
+The Task enum specifies which task to use. 2 items are present:
 * DIRECTED_LOCOMOTION: move to a target location
 * LIGHT_ESCAPE: situation where the robot must move to a darker location
