@@ -7,7 +7,7 @@
 To set up the UV module, you can run the following command:
 
 ```bash
-uv sync
+uv sync --frozen
 ```
 
 example command:

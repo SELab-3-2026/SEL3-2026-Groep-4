@@ -1,6 +1,4 @@
 from dataclasses import dataclass, fields
-from functools import partial
-from typing import Sequence
 
 import flax
 import flax.linen as nn

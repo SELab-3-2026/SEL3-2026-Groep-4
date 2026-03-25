@@ -166,7 +166,7 @@ extend-select = [
   "PLE2513",  # invalid-character-esc
   "PLE2514",  # invalid-character-nul
   "PLE2515",  # invalid-character-zero-width-space
-  # "PLE3102",  # positional-only-dataclasses-expected
+  # "PLE3102",  # positional-only-arguments-expected
   # "PLE3701",  # invalid-field-call
   # "PLE4702",  # modified-iterating-dict
   # "PLE4703",  # modified-iterating-set (requires preview)
@@ -207,7 +207,7 @@ extend-select = [
   # "PLW0231",  # super-init-not-called
   # "PLW0233",  # non-parent-init-called
   # "PLW0236",  # invalid-overridden-method
-  # "PLW0237",  # dataclasses-renamed
+  # "PLW0237",  # arguments-renamed
   # "PLW0238",  # unused-private-member
   # "PLW0239",  # overridden-final-method
   # "PLW0240",  # subclassed-final-class
@@ -246,7 +246,7 @@ extend-select = [
   # "PLW0718",  # broad-exception-caught
   # "PLW0719",  # broad-exception-raised
   # "PLW1113",  # keyword-arg-before-vararg
-  # "PLW1114",  # dataclasses-out-of-order
+  # "PLW1114",  # arguments-out-of-order
   # "PLW1115",  # non-str-assignment-to-dunder-name
   # "PLW1116",  # isinstance-second-argument-not-valid-type
   # "PLW1117",  # kwarg-superseded-by-positional-arg
@@ -335,11 +335,11 @@ extend-ignore = [
   "PLR0904",  # too-many-public-methods
   "PLR0911",  # too-many-return-statements
   "PLR0912",  # too-many-branches
-  "PLR0913",  # too-many-dataclasses
+  "PLR0913",  # too-many-arguments
   "PLR0914",  # too-many-locals
   "PLR0915",  # too-many-statements
   "PLR0916",  # too-many-boolean-expressions
-  "PLR0917",  # too-many-positional-dataclasses
+  "PLR0917",  # too-many-positional-arguments
   # "PLR1701",  # consider-merging-isinstance
   "PLR1702",  # too-many-nested-blocks
   # "PLR1703",  # simplifiable-if-statement
@@ -364,7 +364,7 @@ extend-ignore = [
   # "PLR1722",  # consider-using-sys-exit
   # "PLR1723",  # no-else-break
   # "PLR1724",  # no-else-continue
-  # "PLR1725",  # super-with-dataclasses
+  # "PLR1725",  # super-with-arguments
   # "PLR1726",  # simplifiable-condition
   # "PLR1727",  # condition-evals-to-constant
   # "PLR1728",  # consider-using-generator
@@ -383,7 +383,7 @@ extend-ignore = [
   # "PLW0107",  # unnecessary-pass
   "PLW0120",  # useless-else-on-loop
   # "PLW0201",  # attribute-defined-outside-init
-  # "PLW0221",  # dataclasses-differ
+  # "PLW0221",  # arguments-differ
   # "PLW0222",  # signature-differs
   # "PLW0223",  # abstract-method
   "PLW0406",  # import-self

@@ -161,6 +161,7 @@ def train(args: PPOArgs):
         value = critic.apply(params["critic_params"], hidden).squeeze(-1)
         return logprob, entropy, value
 
+    @jax.jit
     def compute_gae_once(carry, inp, gamma, gae_lambda):
         advantages = carry
         nextdone, nextvalues, curvalues, reward = inp
