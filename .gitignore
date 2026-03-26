@@ -1,3 +1,7 @@
+# Model files
+artifacts/*
+runs/*
+
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -515,4 +519,3 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
-
