@@ -39,7 +39,7 @@ class PPOArgs:
 
     # ==== Algorithm specific dataclasses ====
     # the id of the environment
-    env_id: str = "" # todo
+    env_id: str = ""  # todo
 
     # total timesteps of the experiments
     total_timesteps: int = 10000000

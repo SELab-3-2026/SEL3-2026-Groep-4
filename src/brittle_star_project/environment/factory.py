@@ -74,10 +74,10 @@ class BrittleStarEnvFactory:
 
     @staticmethod
     def create_environment(
-            backend: Backend,
-            morphology_config: MorphologyConfig,
-            arena_config: ArenaConfig,
-            env_config: EnvConfig
+        backend: Backend,
+        morphology_config: MorphologyConfig,
+        arena_config: ArenaConfig,
+        env_config: EnvConfig,
     ) -> DualMuJoCoEnvironment:
         from biorobot.brittle_star.environment.directed_locomotion.dual import (
             BrittleStarDirectedLocomotionEnvironment,
