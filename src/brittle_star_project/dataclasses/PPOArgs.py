@@ -1,9 +1,12 @@
 from dataclasses import dataclass
 
 
-# source: https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_atari_envpool_xla_jax_scan.py
 @dataclass
 class PPOArgs:
+    """
+    source: https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_atari_envpool_xla_jax_scan.py
+    """
+
     # the name of this experiment
     exp_name: str = "brittle_star_ppo"
 

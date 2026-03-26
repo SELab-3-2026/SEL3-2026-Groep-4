@@ -37,7 +37,7 @@ def make_env(num_envs: int) -> Callable:
 def train(args: PPOArgs):
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
-    args.num_iterations = 10 if True else args.total_timesteps // args.batch_size
+    args.num_iterations = args.total_timesteps // args.batch_size
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     print(f"running name: {run_name}")
 
@@ -142,7 +142,7 @@ def train(args: PPOArgs):
     critic.apply = jax.jit(critic.apply)
 
     @jax.jit
-    def get_action_and_value(
+    def get_action_and_value_noise(
         agent_state: TrainState,
         next_obs: jnp.ndarray,
         key: jax.random.PRNGKey,
@@ -159,7 +159,7 @@ def train(args: PPOArgs):
         return action, logprob, value.squeeze(-1), key
 
     @jax.jit
-    def get_action_and_value2(
+    def get_action_and_value(
         params: flax.core.FrozenDict,
         x: jnp.ndarray,
         action: np.ndarray,
@@ -200,7 +200,7 @@ def train(args: PPOArgs):
         return storage.replace(advantages=advantages, returns=advantages + storage.values)
 
     def ppo_loss(params, x, a, logp, mb_advantages, mb_returns):
-        newlogprob, entropy, newvalue = get_action_and_value2(params, x, a)
+        newlogprob, entropy, newvalue = get_action_and_value(params, x, a)
         logratio = newlogprob - logp
         ratio = jnp.exp(logratio)
         approx_kl = ((ratio - 1) - logratio).mean()
@@ -266,7 +266,7 @@ def train(args: PPOArgs):
 
     def step_once(carry, _, env_step_fn):
         agent_state, episode_stats, obs, done, key, env_state = carry
-        action, logprob, value, key = get_action_and_value(agent_state, obs, key)
+        action, logprob, value, key = get_action_and_value_noise(agent_state, obs, key)
 
         episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
             episode_stats, env_state, action
