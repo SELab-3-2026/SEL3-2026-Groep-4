@@ -1,3 +1,5 @@
+line-length = 100
+
 [lint]
 extend-select = [
   # "PLC0103",  # invalid-name
@@ -347,6 +349,7 @@ extend-ignore = [
   # "PLR1705",  # no-else-return
   # "PLR1706",  # consider-using-ternary
   # "PLR1707",  # trailing-comma-tuple
+  "PLR1708",  # stop-iteration-return
   # "PLR1709",  # simplify-boolean-expression
   # "PLR1710",  # inconsistent-return-statements
   "PLR1711",  # useless-return
@@ -390,5 +393,4 @@ extend-ignore = [
   "PLW0603",  # global-statement
   # "PLW1404",  # implicit-str-concat
 ]
-
 
