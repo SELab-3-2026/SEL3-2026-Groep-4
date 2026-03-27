@@ -8,14 +8,6 @@ import jax.numpy as jnp
 # Chose to use a class as it seemed the easiest way to integrate the CleanRL code style
 # with our need to seperate concerns
 class PPO:
-    """
-    args: params for training
-    input_network: network that takes input state and returns hidden state
-    action_network: network that takes hidden state and returns action distribution
-    critic: value network used for ppo
-    message_passer: function that executes message passing and state agregation X times
-    """
-
     def __init__(
         self, args, input_network, action_network, critic, message_passer=None
     ):
@@ -96,9 +88,6 @@ Should be ok to use partial here, since the references to network,
 actor and critic should not change at runtime
 The cost of seperating concerns is to somehow pass these values
 that are now not in the same scope
-Chose to pass the actual apply functions, since they should never change
-Other option was to pass the networks, but how does it influence compilation when their
-class values would ever change? Better safe than sorry.
 """
 
 
