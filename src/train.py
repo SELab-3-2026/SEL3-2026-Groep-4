@@ -27,9 +27,11 @@ def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
     )
 
 
-def make_env(num_envs: int) -> Callable:
+def make_env(config_path: str | None, num_envs: int) -> Callable:
     def thunk():
-        return BrittleStarJaxEnvWrapper.default(num_envs=num_envs)
+        if config_path is None:
+            return BrittleStarJaxEnvWrapper.default(num_envs=num_envs)
+        return BrittleStarJaxEnvWrapper.from_config(config_path, num_envs=num_envs)
 
     return thunk
 
@@ -69,7 +71,7 @@ def train(args: PPOArgs):
     print(f"Running on device: {device}")
 
     print("Creating the environment...")
-    env = make_env(num_envs=args.num_envs)()
+    env = make_env(config_path = args.config_path, num_envs=args.num_envs)()
 
     episode_stats = EpisodeStatistics(
         episode_returns=jnp.zeros(args.num_envs, dtype=jnp.float32),
