@@ -19,7 +19,7 @@ from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from brittle_star_project.rl import Network, Actor, Critic, AgentParams, Storage
-
+from ppo import PPO
 
 def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
     return jax.vmap(lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0]))(
@@ -146,6 +146,7 @@ def train(args: PPOArgs):
     critic_network.apply = jax.jit(critic_network.apply)
     actor.apply = jax.jit(actor.apply)
     critic.apply = jax.jit(critic.apply)
+    ppo_instance = PPO(args, network, actor, critic, critic_network)
 
     @jax.jit
     def get_action_and_value_noise(
@@ -163,20 +164,6 @@ def train(args: PPOArgs):
         logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
         value = critic.apply(agent_state.params["critic_params"], hidden)
         return action, logprob, value.squeeze(-1), key
-
-    @jax.jit
-    def get_action_and_value(
-        params: flax.core.FrozenDict,
-        x: jnp.ndarray,
-        action: np.ndarray,
-    ):
-        hidden = network.apply(params["network_params"], x)
-        mean, log_std = actor.apply(params["actor_params"], hidden)
-        std = jnp.exp(log_std)
-        logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
-        entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(-1)
-        value = critic.apply(params["critic_params"], hidden).squeeze(-1)
-        return logprob, entropy, value
 
     @jax.jit
     def compute_gae_once(carry, inp, gamma, gae_lambda):
@@ -204,61 +191,6 @@ def train(args: PPOArgs):
             reverse=True,
         )
         return storage.replace(advantages=advantages, returns=advantages + storage.values)
-
-    def ppo_loss(params, x, a, logp, mb_advantages, mb_returns):
-        newlogprob, entropy, newvalue = get_action_and_value(params, x, a)
-        logratio = newlogprob - logp
-        ratio = jnp.exp(logratio)
-        approx_kl = ((ratio - 1) - logratio).mean()
-
-        if args.norm_adv:
-            mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
-
-        pg_loss1 = -mb_advantages * ratio
-        pg_loss2 = -mb_advantages * jnp.clip(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
-        pg_loss = jnp.maximum(pg_loss1, pg_loss2).mean()
-        v_loss = 0.5 * ((newvalue - mb_returns) ** 2).mean()
-        entropy_loss = entropy.mean()
-        loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
-        return loss, (pg_loss, v_loss, entropy_loss, jax.lax.stop_gradient(approx_kl))
-
-    ppo_loss_grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
-
-    @jax.jit
-    def update_ppo(agent_state, storage, key):
-        def update_epoch(carry, _):
-            agent_state, key = carry
-            key, subkey = jax.random.split(key)
-
-            def flatten(x):
-                return x.reshape((-1,) + x.shape[2:])
-
-            def convert_data(x):
-                x = jax.random.permutation(subkey, x)
-                return jnp.reshape(x, (args.num_minibatches, -1) + x.shape[1:])
-
-            flatten_storage = jax.tree.map(flatten, storage)
-            shuffled_storage = jax.tree.map(convert_data, flatten_storage)
-
-            def update_minibatch(agent_state, minibatch):
-                (loss, (pg_loss, v_loss, entropy_loss, approx_kl)), grads = ppo_loss_grad_fn(
-                    agent_state.params,
-                    minibatch.obs,
-                    minibatch.actions,
-                    minibatch.logprobs,
-                    minibatch.advantages,
-                    minibatch.returns,
-                )
-                agent_state = agent_state.apply_gradients(grads=grads)
-                return agent_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl, grads)
-
-            agent_state, metrics = jax.lax.scan(update_minibatch, agent_state, shuffled_storage)
-            return (agent_state, key), metrics
-
-        (agent_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl, grads) = jax.lax.scan(
-            update_epoch, (agent_state, key), (), length=args.update_epochs
-        )
-        return agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key
 
     # --- Main training loop ---
     global_step = 0
@@ -318,7 +250,7 @@ def train(args: PPOArgs):
 
         global_step += args.num_steps * args.num_envs
         storage = compute_gae(agent_state, next_obs, next_done, storage)
-        agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = update_ppo(
+        agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = ppo_instance.update_ppo(
             agent_state, storage, key
         )
 

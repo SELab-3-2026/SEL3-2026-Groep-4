@@ -8,7 +8,8 @@ import jax.numpy as jnp
 # Chose to use a class as it seemed the easiest way to integrate the CleanRL code style
 # with our need to seperate concerns
 class PPO:
-    def __init__(self, args, input_network, action_network, critic, critic_network, message_passer=None):
+    def __init__(self, args, input_network, action_network, critic,
+                 critic_network, message_passer=None):
         self.args = args
 
         if not message_passer:
@@ -84,7 +85,7 @@ that are now not in the same scope
 """
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3))
+@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4))
 def get_action_and_value2(
     input_apply,
     action_apply,
@@ -120,12 +121,14 @@ def ppo_loss(
     action_network_apply,
     message_passer,
     critic_apply,
+    critic_network_apply
 ):
     newlogprob, entropy, newvalue = get_action_and_value2(
         input_network_apply,
         action_network_apply,
         message_passer,
         critic_apply,
+        critic_network_apply,
         params,
         x,
         a,
