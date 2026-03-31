@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 from dataclasses import asdict
@@ -18,7 +19,10 @@ from torch.utils.tensorboard import SummaryWriter
 from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
-from brittle_star_project.rl import Network, Actor, Critic, AgentParams, Storage
+from brittle_star_project.rl import Actor, AgentParams, Critic, Network, Storage
+from experiment_logger import UnifiedLogger
+
+log = logging.getLogger(__name__)
 
 
 def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
@@ -39,20 +43,19 @@ def train(args: PPOArgs):
     args.minibatch_size = args.batch_size // args.num_minibatches
     args.num_iterations = args.total_timesteps // args.batch_size
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
-    print(f"running name: {run_name}")
+    log.info(f"Run name: {run_name}")
 
-    if args.track:
-        import wandb
+    # Initialize unified logger (replaces wandb.init and tensorboard writer)
+    logger = UnifiedLogger(
+        run_name=run_name,
+        config=vars(args),
+        project_name=args.wandb_project_name,
+        entity=args.wandb_entity,
+        use_wandb=args.track,
+        save_code=True,
+    )
 
-        wandb.init(
-            project=args.wandb_project_name,
-            entity=args.wandb_entity,
-            sync_tensorboard=True,
-            config=vars(args),
-            name=run_name,
-            save_code=True,
-        )
-
+    # Keep TensorBoard writer for backward compatibility
     writer = SummaryWriter(f"runs/{run_name}")
     writer.add_text(
         "hyperparameters",
@@ -66,9 +69,10 @@ def train(args: PPOArgs):
 
     torch.backends.cudnn.deterministic = args.torch_deterministic
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
-    print(f"Running on device: {device}")
+    device = "cpu"  # Force CPU for JAX
+    log.info(f"Device: {device}")
 
-    print("Creating the environment...")
+    log.info("Creating environment...")
     env = make_env(num_envs=args.num_envs)()
 
     episode_stats = EpisodeStatistics(
@@ -110,7 +114,7 @@ def train(args: PPOArgs):
         frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / args.num_iterations
         return args.learning_rate * frac
 
-    print("Initializing the models...")
+    log.info("Initializing models...")
     network = Network()
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
     critic = Critic()
@@ -259,7 +263,7 @@ def train(args: PPOArgs):
     start_time = time.time()
 
     # Reset once to get initial state
-    print("Resetting the environment...")
+    log.info("Resetting environment...")
     next_env_state = env.reset(seed=args.seed)
     next_obs = convert_obs_dict_to_array(next_env_state.observations)
     next_done = jnp.zeros(args.num_envs, dtype=jnp.bool_)
@@ -301,9 +305,9 @@ def train(args: PPOArgs):
         max_steps=args.num_steps,
     )
 
-    print("Starting training...")
+    log.info("Starting training...")
     iters_bar = tqdm.tqdm(range(1, args.num_iterations + 1))
-    for _ in iters_bar:
+    for iteration in iters_bar:
         iteration_time_start = time.time()
 
         agent_state, episode_stats, next_obs, next_done, storage, key, next_env_state = rollout(
@@ -317,37 +321,76 @@ def train(args: PPOArgs):
         )
 
         avg_episodic_return = np.mean(jax.device_get(episode_stats.returned_episode_returns))
+        avg_episodic_length = np.mean(jax.device_get(episode_stats.returned_episode_lengths))
+        learning_rate = agent_state.opt_state[1].hyperparams["learning_rate"].item()
+        sps = int(global_step / (time.time() - start_time))
+        sps_update = int(args.num_envs * args.num_steps / (time.time() - iteration_time_start))
+
         iters_bar.set_postfix_str(
             f"global_step={global_step}, avg_episodic_return={avg_episodic_return}"
         )
 
+        # Log to unified logger
+        logger.log(
+            {
+                "charts/avg_episodic_return": avg_episodic_return,
+                "charts/avg_episodic_length": avg_episodic_length,
+                "charts/learning_rate": learning_rate,
+                "charts/SPS": sps,
+                "charts/SPS_update": sps_update,
+                "losses/value_loss": v_loss[-1, -1].item(),
+                "losses/policy_loss": pg_loss[-1, -1].item(),
+                "losses/entropy": entropy_loss[-1, -1].item(),
+                "losses/approx_kl": approx_kl[-1, -1].item(),
+                "losses/loss": loss[-1, -1].item(),
+            },
+            step=global_step,
+        )
+
+        # Also log to TensorBoard for backward compatibility
         writer.add_scalar("charts/avg_episodic_return", avg_episodic_return, global_step)
-        writer.add_scalar(
-            "charts/avg_episodic_length",
-            np.mean(jax.device_get(episode_stats.returned_episode_lengths)),
-            global_step,
-        )
-        writer.add_scalar(
-            "charts/learning_rate",
-            agent_state.opt_state[1].hyperparams["learning_rate"].item(),
-            global_step,
-        )
+        writer.add_scalar("charts/avg_episodic_length", avg_episodic_length, global_step)
+        writer.add_scalar("charts/learning_rate", learning_rate, global_step)
         writer.add_scalar("losses/value_loss", v_loss[-1, -1].item(), global_step)
         writer.add_scalar("losses/policy_loss", pg_loss[-1, -1].item(), global_step)
         writer.add_scalar("losses/entropy", entropy_loss[-1, -1].item(), global_step)
         writer.add_scalar("losses/approx_kl", approx_kl[-1, -1].item(), global_step)
         writer.add_scalar("losses/loss", loss[-1, -1].item(), global_step)
+        writer.add_scalar("charts/SPS", sps, global_step)
+        writer.add_scalar("charts/SPS_update", sps_update, global_step)
 
-        # iters_bar.set_postfix_str(f"SPS: {int(global_step / (time.time() - start_time))}")
-
-        writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
-        writer.add_scalar(
-            "charts/SPS_update",
-            int(args.num_envs * args.num_steps / (time.time() - iteration_time_start)),
-            global_step,
-        )
+        # Save periodic checkpoints
+        if args.checkpoint_frequency > 0 and iteration % args.checkpoint_frequency == 0:
+            logger.save_checkpoint(
+                params={
+                    "network_params": agent_state.params["network_params"],
+                    "actor_params": agent_state.params["actor_params"],
+                    "critic_params": agent_state.params["critic_params"],
+                },
+                step=global_step,
+                metadata={
+                    "iteration": iteration,
+                    "avg_episodic_return": float(avg_episodic_return),
+                    "avg_episodic_length": float(avg_episodic_length),
+                },
+            )
 
     if args.save_model:
+        # Save using unified logger (better organization and WandB integration)
+        logger.save_final_model(
+            params={
+                "network_params": agent_state.params["network_params"],
+                "actor_params": agent_state.params["actor_params"],
+                "critic_params": agent_state.params["critic_params"],
+            },
+            metadata={
+                "global_step": global_step,
+                "avg_episodic_return": float(avg_episodic_return),
+                "config": vars(args),
+            },
+        )
+
+        # Also save in old format for backward compatibility
         model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
         with open(model_path, "wb") as f:
             f.write(
@@ -362,13 +405,19 @@ def train(args: PPOArgs):
                     ]
                 )
             )
-        print(f"model saved to {model_path}")
+        log.info(f"Legacy model saved to {model_path}")
 
+    # Finalize logging
+    logger.finish()
     env.close()
     writer.close()
 
 
 def main() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
     args = tyro.cli(PPOArgs)
     train(args)
 
