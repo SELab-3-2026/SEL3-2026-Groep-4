@@ -21,6 +21,7 @@ from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from brittle_star_project.rl import Actor, AgentParams, Critic, Network, Storage
 from experiment_logger import UnifiedLogger
+from experiment_logger.config_utils import merge_config_with_cli, print_config
 
 log = logging.getLogger(__name__)
 
@@ -418,7 +419,13 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    args = tyro.cli(PPOArgs)
+    
+    # Enhanced argument parsing with YAML config support
+    args = merge_config_with_cli(PPOArgs)
+    
+    # Print final configuration
+    print_config(args, "Final Training Configuration")
+    
     train(args)
 
 
