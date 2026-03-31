@@ -64,7 +64,7 @@ def train(args: PPOArgs):
     random.seed(args.seed)
     np.random.seed(args.seed)
     key = jax.random.PRNGKey(args.seed)
-    key, network_key, actor_key, critic_key = jax.random.split(key, 4)
+    key, network_key, actor_key, critic_key, critic_network_key = jax.random.split(key, 5)
 
     torch.backends.cudnn.deterministic = args.torch_deterministic
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
@@ -115,6 +115,7 @@ def train(args: PPOArgs):
 
     print("Initializing the models...")
     network = Network()
+    critic_network = Network()
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
     critic = Critic()
 
@@ -126,12 +127,13 @@ def train(args: PPOArgs):
         ]
     )
     network_params = network.init(network_key, sample_obs)
+    critic_network_params = critic_network.init(critic_network_key, sample_obs)
     actor_params = actor.init(actor_key, network.apply(network_params, sample_obs))
-    critic_params = critic.init(critic_key, network.apply(network_params, sample_obs))
+    critic_params = critic.init(critic_key, critic_network.apply(critic_network_params, sample_obs))
 
     agent_state = TrainState.create(
         apply_fn=None,
-        params=asdict(AgentParams(network_params, actor_params, critic_params)),
+        params=asdict(AgentParams(network_params, actor_params, critic_params, critic_network_params)),
         tx=optax.chain(
             optax.clip_by_global_norm(args.max_grad_norm),
             optax.inject_hyperparams(optax.adam)(
@@ -141,6 +143,7 @@ def train(args: PPOArgs):
     )
 
     network.apply = jax.jit(network.apply)
+    critic_network.apply = jax.jit(critic_network.apply)
     actor.apply = jax.jit(actor.apply)
     critic.apply = jax.jit(critic.apply)
 
