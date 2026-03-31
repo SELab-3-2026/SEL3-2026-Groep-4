@@ -7,6 +7,7 @@ from typing import Callable
 import flax
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as np
 import optax
 import torch
@@ -18,8 +19,9 @@ from torch.utils.tensorboard import SummaryWriter
 from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
-from brittle_star_project.rl import Network, Actor, Critic, AgentParams, Storage
+from brittle_star_project.rl import Actor, AgentParams, Critic, Network, Storage
 from ppo import PPO
+
 
 def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
     return jax.vmap(lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0]))(
@@ -71,8 +73,8 @@ def train(args: PPOArgs):
     print(f"Running on device: {device}")
 
     print("Creating the environment...")
-    env = make_env(config_path = args.config_path, num_envs=args.num_envs)()
-    print(env)
+    env = make_env(config_path=args.config_path, num_envs=args.num_envs)()
+    print(f"Environment: {env}")
 
     episode_stats = EpisodeStatistics(
         episode_returns=jnp.zeros(args.num_envs, dtype=jnp.float32),
@@ -133,7 +135,9 @@ def train(args: PPOArgs):
 
     agent_state = TrainState.create(
         apply_fn=None,
-        params=asdict(AgentParams(network_params, actor_params, critic_params, critic_network_params)),
+        params=asdict(
+            AgentParams(network_params, actor_params, critic_params, critic_network_params)
+        ),
         tx=optax.chain(
             optax.clip_by_global_norm(args.max_grad_norm),
             optax.inject_hyperparams(optax.adam)(
@@ -241,6 +245,7 @@ def train(args: PPOArgs):
 
     print("Starting training...")
     iters_bar = tqdm.tqdm(range(1, args.num_iterations + 1))
+    losses = []
     for _ in iters_bar:
         iteration_time_start = time.time()
 
@@ -253,6 +258,8 @@ def train(args: PPOArgs):
         agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = ppo_instance.update_ppo(
             agent_state, storage, key
         )
+
+        losses.append(jnp.mean(loss))
 
         avg_episodic_return = np.mean(jax.device_get(episode_stats.returned_episode_returns))
         iters_bar.set_postfix_str(
@@ -304,6 +311,12 @@ def train(args: PPOArgs):
 
     env.close()
     writer.close()
+
+    print("Saving loss plot...")
+    plt.plot(losses)
+    plt.title("PPO Loss, mean over minibatches")
+    plt.savefig(f"runs/{run_name}/{args.exp_name}_losses.png")
+    plt.close()
 
 
 def main() -> None:
