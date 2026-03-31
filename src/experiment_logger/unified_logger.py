@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 import flax
+import jax.numpy as jnp
 import numpy as np
 
 from experiment_logger.wandb_utils import finish_wandb, init_wandb
@@ -153,7 +154,16 @@ class UnifiedLogger:
             metrics_file = self.metrics_dir / "metrics.jsonl"
             with open(metrics_file, "a") as f:
                 for metric in self.metrics_buffer:
-                    f.write(json.dumps(metric) + "\n")
+                    # Convert numpy/jax types to native Python types for JSON serialization
+                    serializable_metric = {}
+                    for k, v in metric.items():
+                        if hasattr(v, "item"):  # numpy/jax scalar
+                            serializable_metric[k] = v.item()
+                        elif isinstance(v, (np.ndarray, jnp.ndarray)):
+                            serializable_metric[k] = v.tolist()
+                        else:
+                            serializable_metric[k] = v
+                    f.write(json.dumps(serializable_metric) + "\n")
             self.metrics_buffer.clear()
         except Exception as e:
             logger.error(f"Error flushing metrics: {e}")
