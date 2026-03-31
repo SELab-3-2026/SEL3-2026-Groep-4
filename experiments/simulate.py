@@ -10,11 +10,13 @@ from brittle_star_project import (
     BrittleStarEnvFactory,
     EnvConfig,
     MorphologyConfig,
+    SimulationConfig,
     Task,
+    simulate_policy,
 )
+from brittle_star_project.environment import from_json
 from brittle_star_project.rl import RLModel  # imports concrete models via rl.__init__
 from brittle_star_project.rl.base import get_rl_model_registry
-from brittle_star_project.renderer import SimulationConfig, simulate_policy
 
 MODEL_BY_NAME = get_rl_model_registry()
 MODEL_OPTIONS = sorted(MODEL_BY_NAME)
@@ -35,9 +37,9 @@ def parse_args() -> argparse.Namespace:
         help="Which model class to instantiate when --model is omitted.",
     )
     p.add_argument(
-        "--task",
-        choices=[t.value for t in Task],
-        default=Task.DIRECTED_LOCOMOTION.value,
+        "--backend",
+        choices=[b for b in Backend],
+        default=Backend.MJX,
     )
     p.add_argument("--seed", type=int, default=None)
     return p.parse_args()
@@ -46,14 +48,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
+    morphology_cfg, arena_cfg, env_cfg = from_json("../configs/test.json")
+
     # ======= ENVIRONMENT SETUP =======
 
-    backend = Backend.MJC
-    task = Task(args.task)
-
-    morphology_cfg = MorphologyConfig()
-    arena_cfg = ArenaConfig(attach_target=(task == Task.DIRECTED_LOCOMOTION))
-    env_cfg = EnvConfig(task=task)
+    backend = args.backend
 
     factory = BrittleStarEnvFactory()
     raw_env = factory.create_environment(backend, morphology_cfg, arena_cfg, env_cfg)
