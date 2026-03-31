@@ -86,3 +86,12 @@ class BrittleStarJaxEnvWrapper:
         return BrittleStarJaxEnvWrapper(
             morphology_cfg, arena_cfg, env_cfg, num_envs=num_envs, backend=backend
         )
+
+    def __str__(self):
+        morphology_str = str(self._morphology)
+        arena_str = str(self._arena)
+        env_config_str = str(self._env_config)
+        return (
+            f"BrittleStarJaxEnvWrapper(backend={self._backend}, num_envs={self._num_envs}, "
+            + f"morphology={morphology_str}, arena={arena_str}, env_config={env_config_str})"
+        )

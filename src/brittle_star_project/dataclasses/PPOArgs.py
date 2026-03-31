@@ -44,8 +44,6 @@ class PPOArgs:
     hf_entity: str = ""
 
     # ==== Algorithm specific dataclasses ====
-    # the id of the environment
-    env_id: str = ""  # todo
 
     # total timesteps of the experiments
     total_timesteps: int = 10000000
@@ -54,7 +52,7 @@ class PPOArgs:
     learning_rate: float = 2.5e-4
 
     # the number of parallel game environments
-    num_envs: int = 16
+    num_envs: int = 100
 
     # the number of steps to run in each environment per policy rollout
     num_steps: int = 128

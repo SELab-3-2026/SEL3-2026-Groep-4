@@ -72,6 +72,7 @@ def train(args: PPOArgs):
 
     print("Creating the environment...")
     env = make_env(config_path = args.config_path, num_envs=args.num_envs)()
+    print(env)
 
     episode_stats = EpisodeStatistics(
         episode_returns=jnp.zeros(args.num_envs, dtype=jnp.float32),
