@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import NamedTuple
 import json
 
 from .env_types import Task
@@ -52,7 +51,7 @@ class EnvConfig:
 
 
 def from_json(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         config_json = json.load(f)
         morphology = MorphologyConfig(**config_json.get("morphology", {}))
         arena = ArenaConfig(**config_json.get("arena", {}))

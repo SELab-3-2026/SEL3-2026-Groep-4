@@ -4,14 +4,10 @@ import argparse
 from pathlib import Path
 
 from brittle_star_project import (
-    ArenaConfig,
     Backend,
     BrittleStarEnv,
     BrittleStarEnvFactory,
-    EnvConfig,
-    MorphologyConfig,
     SimulationConfig,
-    Task,
     simulate_policy,
 )
 from brittle_star_project.environment import from_json
