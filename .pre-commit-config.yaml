@@ -2,8 +2,8 @@ repos:
   - repo: local
     hooks:
       - id: ruff-format
-        name: ruff format (pipx)
-        entry: pipx run ruff format
+        name: ruff format (uv)
+        entry: uv run ruff format
         language: system
         types: [python]
 
