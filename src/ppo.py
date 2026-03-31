@@ -8,7 +8,9 @@ import jax.numpy as jnp
 # Chose to use a class as it seemed the easiest way to integrate the CleanRL code style
 # with our need to seperate concerns
 class PPO:
-    def __init__(self, args, input_network, action_network, critic, message_passer=None):
+    def __init__(
+        self, args, input_network, action_network, critic, critic_network, message_passer=None
+    ):
         self.args = args
 
         if not message_passer:
@@ -21,6 +23,7 @@ class PPO:
                 input_network_apply=input_network.apply,
                 action_network_apply=action_network.apply,
                 critic_apply=critic.apply,
+                critic_network_apply=critic_network.apply,
                 message_passer=message_passer,
             ),
             has_aux=True,
@@ -83,24 +86,26 @@ that are now not in the same scope
 """
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3))
+@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4))
 def get_action_and_value2(
     input_apply,
     action_apply,
     message_passer,
     critic_apply,
+    critic_network_apply,
     params: flax.core.FrozenDict,
     x: jnp.ndarray,
     action: jnp.ndarray,
 ):
-    hidden = input_apply(params["network_params"], x)
-    hidden = message_passer(hidden)
-    mean, log_std = action_apply(params["actor_params"], hidden)
+    hidden_network = input_apply(params["network_params"], x)
+    hidden_critic = critic_network_apply(params["critic_network_params"], x)
+    hidden_network = message_passer(hidden_network)
+    mean, log_std = action_apply(params["actor_params"], hidden_network)
     std = jnp.exp(log_std)
 
     logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
     entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(-1)
-    value = critic_apply(params["critic_params"], hidden).squeeze(-1)
+    value = critic_apply(params["critic_params"], hidden_critic).squeeze(-1)
 
     return logprob, entropy, value
 
@@ -117,12 +122,14 @@ def ppo_loss(
     action_network_apply,
     message_passer,
     critic_apply,
+    critic_network_apply,
 ):
     newlogprob, entropy, newvalue = get_action_and_value2(
         input_network_apply,
         action_network_apply,
         message_passer,
         critic_apply,
+        critic_network_apply,
         params,
         x,
         a,
