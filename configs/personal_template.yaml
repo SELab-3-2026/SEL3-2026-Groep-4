@@ -1,0 +1,40 @@
+# Personal Configuration Example for Team Member
+#
+# Copy this template and customize for your personal experiments
+
+# Experiment settings - PERSONALIZE THESE
+exp_name: "YOUR_NAME_experiment_v1"  # ⚠️ Change YOUR_NAME 
+seed: 42
+
+# WandB settings - ⚠️ IMPORTANT: Set your credentials!
+track: true  # Enable WandB tracking
+wandb_project_name: "PPO-Modularity"
+wandb_entity: "YOUR_WANDB_USERNAME"  # ⚠️ CHANGE THIS to your WandB username/team
+
+# Quick experiment settings (modify as needed)
+total_timesteps: 500000  # 500K for quick results
+num_envs: 8
+learning_rate: 0.0005
+num_steps: 128
+
+# Model saving
+save_model: true  
+checkpoint_frequency: 25  # Save checkpoints frequently
+
+# Standard PPO settings (usually don't need to change)
+gamma: 0.99
+gae_lambda: 0.95
+num_minibatches: 4
+update_epochs: 4
+norm_adv: true
+clip_coef: 0.2
+clip_vloss: true
+ent_coef: 0.01
+vf_coef: 0.5
+max_grad_norm: 0.5
+target_kl: null
+anneal_lr: true
+
+# Hardware
+cuda: true
+torch_deterministic: true

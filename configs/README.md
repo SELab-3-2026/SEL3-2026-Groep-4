@@ -2,47 +2,91 @@
 
 This directory contains configuration files for training experiments.
 
-## Usage
+## Quick Start
 
-Configuration files use YAML format and allow you to specify all training parameters in one place.
+### 1. Choose a Template
 
-### Quick Start
-
-Copy the default configuration template:
+**For Development/Testing:**
 ```bash
-cp configs/default_ppo.yaml configs/my_experiment.yaml
+cp configs/dev_test.yaml configs/my_dev.yaml
 ```
 
-Edit `my_experiment.yaml` to customize your experiment settings, particularly:
-- `wandb_entity`: Your WandB username or team name
-- `track`: Set to `true` to enable WandB logging
-- Training hyperparameters as needed
+**For Production Training:**
+```bash
+cp configs/production_training.yaml configs/my_experiment.yaml
+```
 
-Run training with your config:
+### 2. Configure Your Settings
+
+Edit your config file and **set your wandb entity**:
+```yaml
+# ⚠️  IMPORTANT: Set this to your WandB username or team name
+wandb_entity: "your-wandb-username"  
+track: true  # Enable WandB logging
+```
+
+### 3. Run Training
+
+**Using config file:**
 ```bash
 python src/train.py --config configs/my_experiment.yaml
 ```
 
-### Override Parameters
-
-You can override any parameter from the command line:
+**Override specific parameters:**
 ```bash
 python src/train.py --config configs/my_experiment.yaml --learning-rate 0.001 --num-envs 32
 ```
 
-### Configuration for Different Users
-
-Each researcher should create their own config file with their WandB settings:
-```yaml
-# configs/researcher_name.yaml
-exp_name: "researcher_name_experiment"
-track: true
-wandb_project_name: "PPO-Modularity"
-wandb_entity: "your-wandb-username"  # Change this!
+**Pure CLI (no config file):**
+```bash
+python src/train.py --track --wandb-entity your-username --total-timesteps 1000000
 ```
 
-This approach allows everyone to use the codebase without modifying source files.
+## Features
 
-## Available Configurations
+### 📊 WandB Integration  
+- Real-time metrics logging
+- Model checkpoints as artifacts
+- Run comparison and collaboration
 
-- `default_ppo.yaml` - Default PPO training configuration template
+### 🔧 Flexible Configuration
+- YAML files for reproducible experiments
+- CLI overrides for quick adjustments  
+- Team collaboration without code changes
+
+## Configuration Templates
+
+### `dev_test.yaml`
+- Fast iteration for development
+- Short runs (100K timesteps)
+- Frequent checkpoints
+- Small environment count
+
+### `production_training.yaml`  
+- Full-scale training (50M timesteps)
+- Optimized hyperparameters
+- Production-ready settings
+
+### `default_ppo.yaml`
+- Baseline configuration template
+- Balanced settings for most use cases
+
+## Team Collaboration
+
+Each team member should create their own config file:
+
+```yaml
+# configs/alice_experiment.yaml
+exp_name: "alice_locomotion_v2"
+track: true
+wandb_project_name: "PPO-Modularity"
+wandb_entity: "alice-research"  # Alice's WandB username
+total_timesteps: 20000000
+# ... other settings
+```
+
+This allows everyone to:
+- Use their own WandB account
+- Run different experiments simultaneously  
+- Share configurations via version control
+- Avoid conflicts in run names

@@ -1,0 +1,43 @@
+# Production Training Configuration
+#
+# Full-scale training configuration for production runs
+# with wandb logging enabled.
+
+# Experiment settings
+exp_name: "brittle_star_production"
+seed: 42
+
+# Tracking settings - IMPORTANT: Set your own wandb_entity!
+track: true
+wandb_project_name: "PPO-Modularity"
+wandb_entity: null  # ⚠️  SET THIS TO YOUR WANDB USERNAME OR TEAM
+
+# Model saving
+save_model: true
+checkpoint_frequency: 100  # Save checkpoint every 100 iterations
+
+# Environment settings
+num_envs: 32  # Increased for production
+
+# Training hyperparameters - Production scale
+total_timesteps: 50000000  # 50M timesteps for full training
+learning_rate: 0.00025
+num_steps: 256  # Longer rollouts
+anneal_lr: true
+
+# PPO specific - Fine-tuned
+gamma: 0.99
+gae_lambda: 0.95
+num_minibatches: 8  # More minibatches for stability
+update_epochs: 4
+norm_adv: true
+clip_coef: 0.2
+clip_vloss: true
+ent_coef: 0.01
+vf_coef: 0.5
+max_grad_norm: 0.5
+target_kl: null
+
+# Hardware
+cuda: true
+torch_deterministic: true
