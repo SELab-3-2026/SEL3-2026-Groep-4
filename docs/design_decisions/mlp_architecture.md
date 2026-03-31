@@ -19,6 +19,6 @@ Inspired by: https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-det
 
 For starters we will execute our tests with simple models. Each MLP will have only 1 hidden layer. This will be expanded as needed. The exceptions are the input networks / feature extractors — they will be given 2 hidden layers and 64 nodes per layer as advised in the blog. This might change as we make progress in our experiments.
 
-Our policy and value networks use separate networks as advised by the paper and the blog. For continuous actions this should allow better learning at a small cost.
+Our policy and value networks use separate input networks / feature extractors as advised by the SEL3 course assistants and the blog. For continuous actions this should allow better learning at a small cost.
 
 We use mean and log_std to represent the action distribution, because it is advised by previous research for learning stability and other reasons.
