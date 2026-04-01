@@ -9,7 +9,7 @@ seed: 42
 # WandB settings - ⚠️ IMPORTANT: Set your credentials!
 track: true  # Enable WandB tracking
 wandb_project_name: "PPO-Modularity"
-wandb_entity: "YOUR_WANDB_USERNAME"  # ⚠️ CHANGE THIS to your WandB username/team
+wandb_entity: "SEL3-2026-Groep-4"  # ⚠️ CHANGE THIS to your WandB username/team
 
 # Quick experiment settings (modify as needed)
 total_timesteps: 500000  # 500K for quick results

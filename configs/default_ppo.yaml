@@ -15,7 +15,7 @@ seed: 1
 # Tracking settings
 track: false  # Set to true to enable WandB logging
 wandb_project_name: "PPO-Modularity"
-wandb_entity: null  # Set to your WandB username or team name
+wandb_entity: "SEL3-2026-Groep-4"  # Set to your WandB username or team name
 
 # Model saving
 save_model: true

@@ -10,7 +10,7 @@ seed: 42
 # Tracking settings - IMPORTANT: Set your own wandb_entity!
 track: true
 wandb_project_name: "PPO-Modularity"
-wandb_entity: null  # ⚠️  SET THIS TO YOUR WANDB USERNAME OR TEAM
+wandb_entity: "SEL3-2026-Groep-4"  # ⚠️  SET THIS TO YOUR WANDB USERNAME OR TEAM
 
 # Model saving
 save_model: true

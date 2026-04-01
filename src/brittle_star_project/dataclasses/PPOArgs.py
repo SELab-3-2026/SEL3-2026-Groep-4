@@ -26,7 +26,7 @@ class PPOArgs:
     wandb_project_name: str = "PPO-Modularity"
 
     # the entity (team) of wandb's project
-    wandb_entity: str | None = None
+    wandb_entity: str | None = "SEL3-2026-Groep-4"
 
     # whether to capture videos of the agent performances (check out `videos` folder)
     capture_video: bool = False
