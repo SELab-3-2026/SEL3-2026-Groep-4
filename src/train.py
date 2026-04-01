@@ -1,4 +1,3 @@
-import logging
 import random
 import time
 from dataclasses import asdict
@@ -12,7 +11,6 @@ import numpy as np
 import optax
 import torch
 import tqdm
-import tyro
 from flax.training.train_state import TrainState
 from torch.utils.tensorboard import SummaryWriter
 
@@ -20,10 +18,8 @@ from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from brittle_star_project.rl import Actor, AgentParams, Critic, Network, Storage
-from experiment_logger import UnifiedLogger
-from experiment_logger.config_utils import merge_config_with_cli, print_config
-
-log = logging.getLogger(__name__)
+from experiment_logger import UnifiedLogger, get_logger
+from experiment_logger.config_utils import merge_config_with_cli
 
 
 def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
@@ -44,7 +40,7 @@ def train(args: PPOArgs):
     args.minibatch_size = args.batch_size // args.num_minibatches
     args.num_iterations = args.total_timesteps // args.batch_size
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
-    log.info(f"Run name: {run_name}")
+    get_logger().info(f"Run name: {run_name}")
 
     # Initialize unified logger (replaces wandb.init and tensorboard writer)
     logger = UnifiedLogger(
@@ -71,9 +67,9 @@ def train(args: PPOArgs):
     torch.backends.cudnn.deterministic = args.torch_deterministic
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     device = "cpu"  # Force CPU for JAX
-    log.info(f"Device: {device}")
+    logger.info(f"Device: {device}")
 
-    log.info("Creating environment...")
+    logger.info("Creating environment...")
     env = make_env(num_envs=args.num_envs)()
 
     episode_stats = EpisodeStatistics(
@@ -115,7 +111,7 @@ def train(args: PPOArgs):
         frac = 1.0 - (count // (args.num_minibatches * args.update_epochs)) / args.num_iterations
         return args.learning_rate * frac
 
-    log.info("Initializing models...")
+    logger.info("Initializing models...")
     network = Network()
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
     critic = Critic()
@@ -264,7 +260,7 @@ def train(args: PPOArgs):
     start_time = time.time()
 
     # Reset once to get initial state
-    log.info("Resetting environment...")
+    logger.info("Resetting environment...")
     next_env_state = env.reset(seed=args.seed)
     next_obs = convert_obs_dict_to_array(next_env_state.observations)
     next_done = jnp.zeros(args.num_envs, dtype=jnp.bool_)
@@ -306,7 +302,7 @@ def train(args: PPOArgs):
         max_steps=args.num_steps,
     )
 
-    log.info("Starting training...")
+    logger.info("Starting training...")
     iters_bar = tqdm.tqdm(range(1, args.num_iterations + 1))
     for iteration in iters_bar:
         iteration_time_start = time.time()
@@ -406,7 +402,7 @@ def train(args: PPOArgs):
                     ]
                 )
             )
-        log.info(f"Legacy model saved to {model_path}")
+        logger.info(f"Legacy model saved to {model_path}")
 
     # Finalize logging
     logger.finish()
@@ -415,17 +411,14 @@ def train(args: PPOArgs):
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-    
     # Enhanced argument parsing with YAML config support
     args = merge_config_with_cli(PPOArgs)
-    
+
     # Print final configuration
+    from experiment_logger.config_utils import print_config
+
     print_config(args, "Final Training Configuration")
-    
+
     train(args)
 
 

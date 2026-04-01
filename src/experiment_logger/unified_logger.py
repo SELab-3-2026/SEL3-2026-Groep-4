@@ -2,15 +2,16 @@
 
 This logger ensures all experimental data is preserved by writing to:
 1. Weights & Biases (when available)
-2. Local disk (JSON files, model checkpoints)
+2. Local disk (JSON files, model checkpoints, run.log)
 3. stdout (for real-time monitoring)
 """
 
 import json
 import logging
+import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import flax
 import jax.numpy as jnp
@@ -18,7 +19,38 @@ import numpy as np
 
 from experiment_logger.wandb_utils import finish_wandb, init_wandb
 
-logger = logging.getLogger(__name__)
+# Global singleton storage
+_global_logger = None
+
+
+def get_logger() -> "UnifiedLogger":
+    """Retrieve the global UnifiedLogger. If not initialized, fallback to auto-initialization."""
+    global _global_logger
+    if _global_logger is None:
+        try:
+            commit_hash = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.STDOUT
+                )
+                .decode("utf-8")
+                .strip()
+            )
+        except Exception:
+            commit_hash = "unknown"
+
+        timestamp = int(time.time())
+        generic_name = f"brittle_star_{commit_hash}_{timestamp}"
+
+        # Initialize generic fallback logger without WandB
+        _global_logger = UnifiedLogger(
+            run_name=generic_name,
+            config={"auto_initialized": True},
+            use_wandb=False,
+            _set_as_global=False,  # Prevent recursive call inside __init__
+        )
+        _global_logger.warning(f"UnifiedLogger auto-initialized with name: {generic_name}")
+
+    return _global_logger
 
 
 class UnifiedLogger:
@@ -33,6 +65,7 @@ class UnifiedLogger:
         base_dir: str = "runs",
         use_wandb: bool = True,
         save_code: bool = True,
+        _set_as_global: bool = True,
     ):
         """Initialize the unified logger.
 
@@ -44,6 +77,7 @@ class UnifiedLogger:
             base_dir: Base directory for local storage
             use_wandb: Whether to use WandB logging
             save_code: Whether to save code to WandB
+            _set_as_global: Internal flag to override the global singleton
         """
         self.run_name = run_name
         self.config = config
@@ -63,6 +97,28 @@ class UnifiedLogger:
 
         self.config_file = self.run_dir / "config.json"
 
+        # Setup standard Python logging mirror
+        self.text_log_file = self.run_dir / "run.log"
+        self._text_logger = logging.getLogger(f"UnifiedLogger_{self.run_name}")
+        self._text_logger.setLevel(logging.INFO)
+
+        # Avoid duplicate handlers if re-instantiated
+        if not self._text_logger.handlers:
+            fh = logging.FileHandler(self.text_log_file)
+            ch = logging.StreamHandler()
+
+            formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            fh.setFormatter(formatter)
+            ch.setFormatter(formatter)
+
+            self._text_logger.addHandler(fh)
+            self._text_logger.addHandler(ch)
+
+        # Set as global singleton
+        global _global_logger
+        if _set_as_global:
+            _global_logger = self
+
         # Save config to disk
         self._save_config()
 
@@ -71,12 +127,28 @@ class UnifiedLogger:
             self._init_wandb(project_name, entity, save_code)
 
         # Initialize metrics storage
-        self.metrics_buffer: list[Dict[str, Any]] = []
+        self.metrics_buffer: List[Dict[str, Any]] = []
         self.step_counter = 0
 
-        logger.info(f"Initialized for run: {run_name}")
-        logger.info(f"Local storage: {self.run_dir.absolute()}")
-        logger.info(f"WandB logging: {self.wandb_available}")
+        self.info(f"Initialized UnifiedLogger for run: {run_name}")
+        self.info(f"Local storage: {self.run_dir.absolute()}")
+        self.info(f"WandB logging: {self.wandb_available}")
+
+    def info(self, msg: str, *args, **kwargs):
+        """Log an info message to stdout and disk."""
+        self._text_logger.info(msg, *args, **kwargs)
+
+    def warning(self, msg: str, *args, **kwargs):
+        """Log a warning message to stdout and disk."""
+        self._text_logger.warning(msg, *args, **kwargs)
+
+    def error(self, msg: str, *args, **kwargs):
+        """Log an error message to stdout and disk."""
+        self._text_logger.error(msg, *args, **kwargs)
+
+    def debug(self, msg: str, *args, **kwargs):
+        """Log a debug message to stdout and disk."""
+        self._text_logger.debug(msg, *args, **kwargs)
 
     def _init_wandb(self, project_name: str, entity: Optional[str], save_code: bool):
         """Initialize Weights & Biases logging."""
@@ -95,9 +167,9 @@ class UnifiedLogger:
         try:
             with open(self.config_file, "w") as f:
                 json.dump(self.config, f, indent=2)
-            logger.info(f"Config saved to {self.config_file}")
+            self.info(f"Config saved to {self.config_file}")
         except Exception as e:
-            logger.error(f"Error saving config: {e}")
+            self.error(f"Error saving config: {e}")
 
     def log(self, metrics: Dict[str, Any], step: Optional[int] = None, commit: bool = True):
         """Log metrics to all backends.
@@ -126,7 +198,7 @@ class UnifiedLogger:
             try:
                 self.wandb_run.log(metrics, step=step, commit=commit)
             except Exception as e:
-                logger.warning(f"WandB logging failed: {e}")
+                self.warning(f"WandB logging failed: {e}")
 
         # Buffer for disk storage
         self.metrics_buffer.append(metrics_with_metadata)
@@ -143,7 +215,7 @@ class UnifiedLogger:
             for k, v in metrics.items()
             if k not in ["step", "timestamp"]
         )
-        logger.info(f"[Step {step}] {metric_str}")
+        self.info(f"[Step {step}] {metric_str}")
 
     def _flush_metrics(self):
         """Flush buffered metrics to disk."""
@@ -166,7 +238,7 @@ class UnifiedLogger:
                     f.write(json.dumps(serializable_metric) + "\n")
             self.metrics_buffer.clear()
         except Exception as e:
-            logger.error(f"Error flushing metrics: {e}")
+            self.error(f"Error flushing metrics: {e}")
 
     def save_checkpoint(
         self,
@@ -175,14 +247,7 @@ class UnifiedLogger:
         prefix: str = "checkpoint",
         metadata: Optional[Dict[str, Any]] = None,
     ):
-        """Save model checkpoint to disk and optionally to WandB.
-
-        Args:
-            params: Model parameters (Flax params or any serializable object)
-            step: Current training step
-            prefix: Prefix for checkpoint filename
-            metadata: Additional metadata to save with checkpoint
-        """
+        """Save model checkpoint to disk and optionally to WandB."""
         checkpoint_name = f"{prefix}_step_{step}.flax"
         checkpoint_path = self.checkpoints_dir / checkpoint_name
 
@@ -197,7 +262,7 @@ class UnifiedLogger:
                 with open(metadata_path, "w") as f:
                     json.dump(metadata, f, indent=2)
 
-            logger.info(f"Checkpoint saved: {checkpoint_path}")
+            self.info(f"Checkpoint saved: {checkpoint_path}")
 
             # Log to WandB as artifact
             if self.wandb_available:
@@ -213,20 +278,15 @@ class UnifiedLogger:
                     if metadata:
                         artifact.add_file(str(metadata_path))
                     self.wandb_run.log_artifact(artifact)
-                    logger.info("Checkpoint uploaded to WandB")
+                    self.info("Checkpoint uploaded to WandB")
                 except Exception as e:
-                    logger.warning(f"Could not upload checkpoint to WandB: {e}")
+                    self.warning(f"Could not upload checkpoint to WandB: {e}")
 
         except Exception as e:
-            logger.error(f"Error saving checkpoint: {e}")
+            self.error(f"Error saving checkpoint: {e}")
 
     def save_final_model(self, params: Any, metadata: Optional[Dict[str, Any]] = None):
-        """Save the final trained model.
-
-        Args:
-            params: Model parameters
-            metadata: Additional metadata about the final model
-        """
+        """Save the final trained model."""
         final_model_path = self.run_dir / "final_model.flax"
 
         try:
@@ -238,7 +298,7 @@ class UnifiedLogger:
                 with open(metadata_path, "w") as f:
                     json.dump(metadata, f, indent=2)
 
-            logger.info(f"Final model saved: {final_model_path}")
+            self.info(f"Final model saved: {final_model_path}")
 
             # Log to WandB
             if self.wandb_available:
@@ -255,17 +315,17 @@ class UnifiedLogger:
                         artifact.add_file(str(metadata_path))
                     self.wandb_run.log_artifact(artifact)
                 except Exception as e:
-                    logger.warning(f"Could not upload final model to WandB: {e}")
+                    self.warning(f"Could not upload final model to WandB: {e}")
 
         except Exception as e:
-            logger.error(f"Error saving final model: {e}")
+            self.error(f"Error saving final model: {e}")
 
     def finish(self):
         """Finalize logging and cleanup."""
         # Flush remaining metrics
         self._flush_metrics()
 
-        logger.info(f"Run complete. Results saved to: {self.run_dir.absolute()}")
+        self.info(f"Run complete. Results saved to: {self.run_dir.absolute()}")
 
         # Finish WandB run
         if self.wandb_available:

@@ -1,9 +1,6 @@
-import logging
-
 import jax
-
-logger = logging.getLogger(__name__)
+from experiment_logger import get_logger
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logger = get_logger()
     logger.info(f"JAX devices: {jax.devices()}")
