@@ -6,6 +6,7 @@ from flax.linen.initializers import constant, orthogonal
 
 class Network(nn.Module):
     hidden_size: int = 256
+
     @nn.compact
     def __call__(self, x):
         # x shape: (batch, obs_dim)
