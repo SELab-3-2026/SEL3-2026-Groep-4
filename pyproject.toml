@@ -3,7 +3,7 @@ name = "2026sel3-project"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">= 3.12, < 3.13"
+requires-python = ">= 3.11, < 3.13"
 dependencies = [
     "biorobot==0.4.2",
     "cleanrl>=0.4.8",
