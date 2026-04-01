@@ -394,4 +394,3 @@ extend-ignore = [
   # "PLW1404",  # implicit-str-concat
 ]
 
-
