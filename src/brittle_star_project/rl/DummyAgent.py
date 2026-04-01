@@ -52,6 +52,7 @@ class AgentParams:
     network_params: flax.core.FrozenDict
     actor_params: flax.core.FrozenDict
     critic_params: flax.core.FrozenDict
+    critic_network_params: flax.core.FrozenDict
 
 
 @jax.tree_util.register_dataclass

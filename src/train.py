@@ -7,6 +7,7 @@ from typing import Callable
 import flax
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as np
 import optax
 import torch
@@ -18,7 +19,8 @@ from torch.utils.tensorboard import SummaryWriter
 from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
-from brittle_star_project.rl import Network, Actor, Critic, AgentParams, Storage
+from brittle_star_project.rl import Actor, AgentParams, Critic, Network, Storage
+from ppo import PPO
 
 
 def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
@@ -27,9 +29,11 @@ def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
     )
 
 
-def make_env(num_envs: int) -> Callable:
+def make_env(config_path: str | None, num_envs: int) -> Callable:
     def thunk():
-        return BrittleStarJaxEnvWrapper.default(num_envs=num_envs)
+        if config_path is None:
+            return BrittleStarJaxEnvWrapper.default(num_envs=num_envs)
+        return BrittleStarJaxEnvWrapper.from_config(config_path, num_envs=num_envs)
 
     return thunk
 
@@ -62,14 +66,15 @@ def train(args: PPOArgs):
     random.seed(args.seed)
     np.random.seed(args.seed)
     key = jax.random.PRNGKey(args.seed)
-    key, network_key, actor_key, critic_key = jax.random.split(key, 4)
+    key, network_key, actor_key, critic_key, critic_network_key = jax.random.split(key, 5)
 
     torch.backends.cudnn.deterministic = args.torch_deterministic
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     print(f"Running on device: {device}")
 
     print("Creating the environment...")
-    env = make_env(num_envs=args.num_envs)()
+    env = make_env(config_path=args.config_path, num_envs=args.num_envs)()
+    print(f"Environment: {env}")
 
     episode_stats = EpisodeStatistics(
         episode_returns=jnp.zeros(args.num_envs, dtype=jnp.float32),
@@ -112,6 +117,7 @@ def train(args: PPOArgs):
 
     print("Initializing the models...")
     network = Network()
+    critic_network = Network()
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
     critic = Critic()
 
@@ -123,12 +129,15 @@ def train(args: PPOArgs):
         ]
     )
     network_params = network.init(network_key, sample_obs)
+    critic_network_params = critic_network.init(critic_network_key, sample_obs)
     actor_params = actor.init(actor_key, network.apply(network_params, sample_obs))
-    critic_params = critic.init(critic_key, network.apply(network_params, sample_obs))
+    critic_params = critic.init(critic_key, critic_network.apply(critic_network_params, sample_obs))
 
     agent_state = TrainState.create(
         apply_fn=None,
-        params=asdict(AgentParams(network_params, actor_params, critic_params)),
+        params=asdict(
+            AgentParams(network_params, actor_params, critic_params, critic_network_params)
+        ),
         tx=optax.chain(
             optax.clip_by_global_norm(args.max_grad_norm),
             optax.inject_hyperparams(optax.adam)(
@@ -138,8 +147,10 @@ def train(args: PPOArgs):
     )
 
     network.apply = jax.jit(network.apply)
+    critic_network.apply = jax.jit(critic_network.apply)
     actor.apply = jax.jit(actor.apply)
     critic.apply = jax.jit(critic.apply)
+    ppo_instance = PPO(args, network, actor, critic, critic_network)
 
     @jax.jit
     def get_action_and_value_noise(
@@ -157,20 +168,6 @@ def train(args: PPOArgs):
         logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
         value = critic.apply(agent_state.params["critic_params"], hidden)
         return action, logprob, value.squeeze(-1), key
-
-    @jax.jit
-    def get_action_and_value(
-        params: flax.core.FrozenDict,
-        x: jnp.ndarray,
-        action: np.ndarray,
-    ):
-        hidden = network.apply(params["network_params"], x)
-        mean, log_std = actor.apply(params["actor_params"], hidden)
-        std = jnp.exp(log_std)
-        logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
-        entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(-1)
-        value = critic.apply(params["critic_params"], hidden).squeeze(-1)
-        return logprob, entropy, value
 
     @jax.jit
     def compute_gae_once(carry, inp, gamma, gae_lambda):
@@ -198,61 +195,6 @@ def train(args: PPOArgs):
             reverse=True,
         )
         return storage.replace(advantages=advantages, returns=advantages + storage.values)
-
-    def ppo_loss(params, x, a, logp, mb_advantages, mb_returns):
-        newlogprob, entropy, newvalue = get_action_and_value(params, x, a)
-        logratio = newlogprob - logp
-        ratio = jnp.exp(logratio)
-        approx_kl = ((ratio - 1) - logratio).mean()
-
-        if args.norm_adv:
-            mb_advantages = (mb_advantages - mb_advantages.mean()) / (mb_advantages.std() + 1e-8)
-
-        pg_loss1 = -mb_advantages * ratio
-        pg_loss2 = -mb_advantages * jnp.clip(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
-        pg_loss = jnp.maximum(pg_loss1, pg_loss2).mean()
-        v_loss = 0.5 * ((newvalue - mb_returns) ** 2).mean()
-        entropy_loss = entropy.mean()
-        loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
-        return loss, (pg_loss, v_loss, entropy_loss, jax.lax.stop_gradient(approx_kl))
-
-    ppo_loss_grad_fn = jax.value_and_grad(ppo_loss, has_aux=True)
-
-    @jax.jit
-    def update_ppo(agent_state, storage, key):
-        def update_epoch(carry, _):
-            agent_state, key = carry
-            key, subkey = jax.random.split(key)
-
-            def flatten(x):
-                return x.reshape((-1,) + x.shape[2:])
-
-            def convert_data(x):
-                x = jax.random.permutation(subkey, x)
-                return jnp.reshape(x, (args.num_minibatches, -1) + x.shape[1:])
-
-            flatten_storage = jax.tree.map(flatten, storage)
-            shuffled_storage = jax.tree.map(convert_data, flatten_storage)
-
-            def update_minibatch(agent_state, minibatch):
-                (loss, (pg_loss, v_loss, entropy_loss, approx_kl)), grads = ppo_loss_grad_fn(
-                    agent_state.params,
-                    minibatch.obs,
-                    minibatch.actions,
-                    minibatch.logprobs,
-                    minibatch.advantages,
-                    minibatch.returns,
-                )
-                agent_state = agent_state.apply_gradients(grads=grads)
-                return agent_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl, grads)
-
-            agent_state, metrics = jax.lax.scan(update_minibatch, agent_state, shuffled_storage)
-            return (agent_state, key), metrics
-
-        (agent_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl, grads) = jax.lax.scan(
-            update_epoch, (agent_state, key), (), length=args.update_epochs
-        )
-        return agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key
 
     # --- Main training loop ---
     global_step = 0
@@ -303,6 +245,7 @@ def train(args: PPOArgs):
 
     print("Starting training...")
     iters_bar = tqdm.tqdm(range(1, args.num_iterations + 1))
+    losses = []
     for _ in iters_bar:
         iteration_time_start = time.time()
 
@@ -312,9 +255,11 @@ def train(args: PPOArgs):
 
         global_step += args.num_steps * args.num_envs
         storage = compute_gae(agent_state, next_obs, next_done, storage)
-        agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = update_ppo(
+        agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = ppo_instance.update_ppo(
             agent_state, storage, key
         )
+
+        losses.append(jnp.mean(loss))
 
         avg_episodic_return = np.mean(jax.device_get(episode_stats.returned_episode_returns))
         iters_bar.set_postfix_str(
@@ -366,6 +311,12 @@ def train(args: PPOArgs):
 
     env.close()
     writer.close()
+
+    print("Saving loss plot...")
+    plt.plot(losses)
+    plt.title("PPO Loss, mean over minibatches")
+    plt.savefig(f"runs/{run_name}/{args.exp_name}_losses.png")
+    plt.close()
 
 
 def main() -> None:

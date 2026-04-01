@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 
 from .env_types import Task
 
@@ -48,6 +49,11 @@ class EnvConfig:
     # Per docs in upstream env config: integer factors of 200.
     light_perlin_noise_scale: int = 0
 
-    @staticmethod
-    def from_json(path: str) -> EnvConfig:
-        pass
+
+def from_json(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
+    with open(path, "r") as f:
+        config_json = json.load(f)
+        morphology = MorphologyConfig(**config_json.get("morphology", {}))
+        arena = ArenaConfig(**config_json.get("arena", {}))
+        env = EnvConfig(**config_json.get("env", {}))
+        return morphology, arena, env
