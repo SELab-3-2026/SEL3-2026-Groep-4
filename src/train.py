@@ -1,4 +1,5 @@
 import random
+import sys
 import time
 from dataclasses import asdict
 from functools import partial
@@ -244,7 +245,10 @@ def train(args: PPOArgs):
     )
 
     print("Starting training...")
-    iters_bar = tqdm.tqdm(range(1, args.num_iterations + 1))
+    iters_bar = tqdm.tqdm(
+        range(1, args.num_iterations + 1),
+        disable=not sys.stdout.isatty(),
+    )
     losses = []
     for _ in iters_bar:
         iteration_time_start = time.time()
