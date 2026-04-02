@@ -1,4 +1,4 @@
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
 
 import flax
 import flax.linen as nn
@@ -11,8 +11,8 @@ from flax.linen.initializers import constant, orthogonal
 # example usage: network = SemiGenericNetwork(layer_sizes=[256, 256], activation=nn.relu)
 # semi generic so we can easily make a config for it in experiments
 class SemiGenericNetwork(nn.Module):
-    layer_sizes: Sequence[int] = [64, 64]  # default 2 layers of 64 neurons
-    activation: Callable = nn.tanh  # default tanh
+    layer_sizes: Sequence[int] = field(default_factory=lambda: [64, 64])
+    activation: Callable = nn.tanh
 
     @nn.compact
     def __call__(self, x):
@@ -29,11 +29,13 @@ class Critic(nn.Module):
 
 
 class Actor(nn.Module):
-    action_dim: Sequence[int]
+    action_dim: int
 
     @nn.compact
     def __call__(self, x):
-        return nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
+        mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
+        log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
+        return mean, log_std
 
 
 @jax.tree_util.register_dataclass
