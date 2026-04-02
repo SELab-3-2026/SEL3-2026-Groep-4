@@ -1,6 +1,10 @@
-from typing import Sequence, Callable
+from dataclasses import dataclass, fields
+
+import flax
 import flax.linen as nn
 import jax.numpy as jnp
+import jax.tree_util
+from typing import Sequence, Callable
 from flax.linen.initializers import constant, orthogonal
 
 
@@ -30,3 +34,29 @@ class Actor(nn.Module):
     @nn.compact
     def __call__(self, x):
         return nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
+
+
+@jax.tree_util.register_dataclass
+@dataclass
+class AgentParams:
+    network_params: flax.core.FrozenDict
+    actor_params: flax.core.FrozenDict
+    critic_params: flax.core.FrozenDict
+    critic_network_params: flax.core.FrozenDict
+
+
+@jax.tree_util.register_dataclass
+@dataclass
+class Storage:
+    obs: jnp.array
+    actions: jnp.array
+    logprobs: jnp.array
+    dones: jnp.array
+    values: jnp.array
+    advantages: jnp.array
+    returns: jnp.array
+    rewards: jnp.array
+
+    def replace(self, **kwargs) -> "Storage":
+        fs = fields(self)
+        return Storage(**{f.name: kwargs.get(f.name, getattr(self, f.name)) for f in fs})
