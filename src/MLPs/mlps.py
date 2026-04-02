@@ -21,7 +21,7 @@ class SemiGenericNetwork(nn.Module):
         return x
 
 
-class Critic(nn.Module):
+class OneDenseLayerMLP(nn.Module):
     @nn.compact
     def __call__(self, x):
         return nn.Dense(1, kernel_init=orthogonal(1), bias_init=constant(0.0))(x)
