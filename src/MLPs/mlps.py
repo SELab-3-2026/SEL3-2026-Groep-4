@@ -8,7 +8,6 @@ from typing import Sequence, Callable
 from flax.linen.initializers import constant, orthogonal
 
 
-# example usage: network = SemiGenericNetwork(layer_sizes=[256, 256], activation=nn.relu)
 # semi generic so we can easily make a config for it in experiments
 class SemiGenericNetwork(nn.Module):
     layer_sizes: Sequence[int] = field(default_factory=lambda: [64, 64])
