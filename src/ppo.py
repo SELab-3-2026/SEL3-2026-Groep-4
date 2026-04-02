@@ -8,9 +8,7 @@ import jax.numpy as jnp
 # Chose to use a class as it seemed the easiest way to integrate the CleanRL code style
 # with our need to seperate concerns
 class PPO:
-    def __init__(
-        self, args, input_network, action_network, critic, critic_network, message_passer=None
-    ):
+    def __init__(self, args, sensor, actor, critic, feature_extractor, message_passer=None):
         self.args = args
 
         if not message_passer:
@@ -20,10 +18,10 @@ class PPO:
             partial(
                 ppo_loss,
                 args=args,
-                input_network_apply=input_network.apply,
-                action_network_apply=action_network.apply,
+                sensor_apply=sensor.apply,
+                actor_apply=actor.apply,
                 critic_apply=critic.apply,
-                critic_network_apply=critic_network.apply,
+                feature_extractor_apply=feature_extractor.apply,
                 message_passer=message_passer,
             ),
             has_aux=True,
@@ -92,15 +90,15 @@ def get_action_and_value2(
     action_apply,
     message_passer,
     critic_apply,
-    critic_network_apply,
+    feature_extractor_apply,
     params: flax.core.FrozenDict,
     x: jnp.ndarray,
     action: jnp.ndarray,
 ):
-    hidden_network = input_apply(params["network_params"], x)
-    hidden_critic = critic_network_apply(params["critic_network_params"], x)
-    hidden_network = message_passer(hidden_network)
-    mean, log_std = action_apply(params["actor_params"], hidden_network)
+    hidden_sensor = input_apply(params["sensor_params"], x)
+    hidden_critic = feature_extractor_apply(params["feature_extractor_params"], x)
+    hidden_sensor = message_passer(hidden_sensor)
+    mean, log_std = action_apply(params["actor_params"], hidden_sensor)
     std = jnp.exp(log_std)
 
     logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
@@ -118,18 +116,18 @@ def ppo_loss(
     mb_advantages,
     mb_returns,
     args,
-    input_network_apply,
-    action_network_apply,
+    sensor_apply,
+    actor_apply,
     message_passer,
     critic_apply,
-    critic_network_apply,
+    feature_extractor_apply,
 ):
     newlogprob, entropy, newvalue = get_action_and_value2(
-        input_network_apply,
-        action_network_apply,
+        sensor_apply,
+        actor_apply,
         message_passer,
         critic_apply,
-        critic_network_apply,
+        feature_extractor_apply,
         params,
         x,
         a,

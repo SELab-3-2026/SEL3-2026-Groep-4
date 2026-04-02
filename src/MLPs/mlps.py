@@ -40,10 +40,10 @@ class Actor(nn.Module):
 @jax.tree_util.register_dataclass
 @dataclass
 class AgentParams:
-    network_params: flax.core.FrozenDict
+    sensor_params: flax.core.FrozenDict
     actor_params: flax.core.FrozenDict
     critic_params: flax.core.FrozenDict
-    critic_network_params: flax.core.FrozenDict
+    feature_extractor_params: flax.core.FrozenDict
 
 
 @jax.tree_util.register_dataclass
