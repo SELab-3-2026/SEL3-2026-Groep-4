@@ -19,7 +19,13 @@ from torch.utils.tensorboard import SummaryWriter
 from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
-from MLPs.mlps import SemiGenericNetwork, Actor, OneDenseLayerMLP, AgentParams, Storage
+from MLPs.mlps import (
+    GenericDenseLayersWithActivation,
+    Actor,
+    OneDenseLayerMLP,
+    AgentParams,
+    Storage,
+)
 from ppo import PPO
 
 
@@ -116,8 +122,8 @@ def train(args: PPOArgs):
         return args.learning_rate * frac
 
     print("Initializing the models...")
-    network = SemiGenericNetwork()
-    critic_network = SemiGenericNetwork()
+    network = GenericDenseLayersWithActivation()
+    critic_network = GenericDenseLayersWithActivation()
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
     critic = OneDenseLayerMLP()
     # messager = OneDenseLayerMLP()

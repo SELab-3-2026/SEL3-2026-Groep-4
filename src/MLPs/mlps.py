@@ -9,7 +9,7 @@ from flax.linen.initializers import constant, orthogonal
 
 
 # semi generic so we can easily make a config for it in experiments
-class SemiGenericNetwork(nn.Module):
+class GenericDenseLayersWithActivation(nn.Module):
     layer_sizes: Sequence[int] = field(default_factory=lambda: [64, 64])
     activation: Callable = nn.tanh
 
