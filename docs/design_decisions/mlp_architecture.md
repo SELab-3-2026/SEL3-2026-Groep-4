@@ -2,8 +2,8 @@
 
 In the decentralized architectures (arm-level and segment-level), each controller/module follows the same **shared MLP-based pipeline** inspired by NerveNet-style message passing. The pipeline consists of 5 MLPs (4 in the case of centralized, with no messager):
 
-- **INPUT_ACTOR**: Processes local observations for the actor branch.
-- **INPUT_CRITIC**: Processes local observations for the critic branch.
+- **SENSOR**: Processes local observations for the actor branch.
+- **FEATURE EXTRACTOR**: Processes local observations for the critic branch.
 - **MESSAGER**: Processes incoming hidden states from neighboring modules (via the chosen communication scheme) and produces an aggregated hidden state.
 - **ACTOR**: Takes the aggregated hidden state and outputs the action distribution (mean and log_std).
 - **CRITIC**: Takes the aggregated hidden state and outputs a scalar value estimate.
