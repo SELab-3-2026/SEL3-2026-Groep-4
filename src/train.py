@@ -245,7 +245,7 @@ def train(args: PPOArgs):
 
     print("Starting training...")
     iters_bar = tqdm.tqdm(range(1, args.num_iterations + 1))
-    losses = []
+    returns = []
     for _ in iters_bar:
         iteration_time_start = time.time()
 
@@ -259,12 +259,12 @@ def train(args: PPOArgs):
             agent_state, storage, key
         )
 
-        losses.append(jnp.mean(loss))
-
         avg_episodic_return = np.mean(jax.device_get(episode_stats.returned_episode_returns))
         iters_bar.set_postfix_str(
             f"global_step={global_step}, avg_episodic_return={avg_episodic_return}"
         )
+
+        returns.append(jnp.mean(avg_episodic_return))
 
         writer.add_scalar("charts/avg_episodic_return", avg_episodic_return, global_step)
         writer.add_scalar(
@@ -313,8 +313,8 @@ def train(args: PPOArgs):
     writer.close()
 
     print("Saving loss plot...")
-    plt.plot(losses)
-    plt.title("PPO Loss, mean over minibatches")
+    plt.plot(returns)
+    plt.title("PPO Episodic Returns, mean over minibatches")
     plt.savefig(f"runs/{run_name}/{args.exp_name}_losses.png")
     plt.close()
 
