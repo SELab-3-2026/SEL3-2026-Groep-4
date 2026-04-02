@@ -7,7 +7,6 @@ from typing import Callable
 import flax
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 import numpy as np
 import optax
 import torch
@@ -20,6 +19,7 @@ from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from brittle_star_project.rl import Actor, AgentParams, Critic, Network, Storage
+from experiments.plots.plot import simple_plot
 from ppo import PPO
 
 
@@ -41,7 +41,8 @@ def make_env(config_path: str | None, num_envs: int) -> Callable:
 def train(args: PPOArgs):
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
-    args.num_iterations = args.total_timesteps // args.batch_size
+    # args.num_iterations = args.total_timesteps // args.batch_size
+    args.num_iterations = 5
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     print(f"running name: {run_name}")
 
@@ -313,10 +314,7 @@ def train(args: PPOArgs):
     writer.close()
 
     print("Saving loss plot...")
-    plt.plot(returns)
-    plt.title("PPO Episodic Returns, mean over minibatches")
-    plt.savefig(f"runs/{run_name}/{args.exp_name}_losses.png")
-    plt.close()
+    simple_plot(range(len(returns)), returns, show_window=True, filename=f"runs/{run_name}/{args.exp_name}_losses.png")
 
 
 def main() -> None:
