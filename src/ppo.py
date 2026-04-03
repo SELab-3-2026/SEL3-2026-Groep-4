@@ -85,9 +85,9 @@ that are now not in the same scope
 
 
 @partial(jax.jit, static_argnums=(0, 1, 2, 3, 4))
-def get_action_and_value2(
-    input_apply,
-    action_apply,
+def get_action_and_value(
+    sensor_apply,
+    actor_apply,
     message_passer,
     critic_apply,
     feature_extractor_apply,
@@ -95,10 +95,10 @@ def get_action_and_value2(
     x: jnp.ndarray,
     action: jnp.ndarray,
 ):
-    hidden_sensor = input_apply(params["sensor_params"], x)
+    hidden_sensor = sensor_apply(params["sensor_params"], x)
     hidden_critic = feature_extractor_apply(params["feature_extractor_params"], x)
     hidden_sensor = message_passer(hidden_sensor)
-    mean, log_std = action_apply(params["actor_params"], hidden_sensor)
+    mean, log_std = actor_apply(params["actor_params"], hidden_sensor)
     std = jnp.exp(log_std)
 
     logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
@@ -122,7 +122,7 @@ def ppo_loss(
     critic_apply,
     feature_extractor_apply,
 ):
-    newlogprob, entropy, newvalue = get_action_and_value2(
+    newlogprob, entropy, newvalue = get_action_and_value(
         sensor_apply,
         actor_apply,
         message_passer,
