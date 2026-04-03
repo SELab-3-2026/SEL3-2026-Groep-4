@@ -25,6 +25,7 @@ from MLPs.mlps import (
     AgentParams,
     Storage,
 )
+from plots import simple_plot
 from ppo import PPO
 
 
@@ -41,6 +42,21 @@ def make_env(config_path: str | None, num_envs: int) -> Callable:
         return BrittleStarJaxEnvWrapper.from_config(config_path, num_envs=num_envs)
 
     return thunk
+
+def save_model(model_path: str, agent_state: TrainState, args: PPOArgs):
+    with open(model_path, "wb") as f:
+        f.write(
+            flax.serialization.to_bytes(
+                [
+                    vars(args),
+                    [
+                        agent_state.params["network_params"],
+                        agent_state.params["actor_params"],
+                        agent_state.params["critic_params"],
+                    ],
+                ]
+            )
+        )
 
 
 def train(args: PPOArgs):
@@ -182,6 +198,8 @@ def train(args: PPOArgs):
         value = critic.apply(agent_state.params["critic_params"], hidden_critic)
         return action, logprob, value.squeeze(-1), key
 
+
+    # GAE
     @jax.jit
     def compute_gae_once(carry, inp, gamma, gae_lambda):
         advantages = carry
@@ -208,6 +226,7 @@ def train(args: PPOArgs):
             reverse=True,
         )
         return storage.replace(advantages=advantages, returns=advantages + storage.values)
+    # END GAE
 
     # --- Main training loop ---
     global_step = 0
@@ -277,7 +296,7 @@ def train(args: PPOArgs):
             f"global_step={global_step}, avg_episodic_return={avg_episodic_return}"
         )
 
-        returns.append(jnp.mean(avg_episodic_return))
+        returns.append(avg_episodic_return)
 
         writer.add_scalar("charts/avg_episodic_return", avg_episodic_return, global_step)
         writer.add_scalar(
@@ -307,27 +326,19 @@ def train(args: PPOArgs):
 
     if args.save_model:
         model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
-        with open(model_path, "wb") as f:
-            f.write(
-                flax.serialization.to_bytes(
-                    [
-                        vars(args),
-                        [
-                            agent_state.params["sensor_params"],
-                            agent_state.params["actor_params"],
-                            agent_state.params["critic_params"],
-                            agent_state.params["feature_extractor_params"],
-                        ],
-                    ]
-                )
-            )
+        save_model(model_path, agent_state, args)
         print(f"model saved to {model_path}")
 
     env.close()
     writer.close()
 
     print("Saving loss plot...")
-    simple_plot(range(len(returns)), returns, show_window=True, filename=f"runs/{run_name}/{args.exp_name}_losses.png")
+    simple_plot(
+        list(range(len(returns))),
+        returns,
+        show_window=True,
+        filename=f"runs/{run_name}/{args.exp_name}_losses.png",
+    )
 
 
 def main() -> None:

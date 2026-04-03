@@ -6,6 +6,7 @@ def simple_plot(x: list, y: list, show_window: bool = False, filename: str = "pl
     plt.savefig(filename)
 
     if show_window:
+        # blocks until window is closed
         plt.show()
 
     plt.close()
