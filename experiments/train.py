@@ -1,5 +1,6 @@
 import time
 
+import torch
 import tyro
 
 from brittle_star_project.dataclasses import PPOArgs
@@ -22,6 +23,8 @@ if __name__ == "__main__":
     args.num_iterations = 5
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     env = make_env(args.config_path, args.num_envs)
+
+    torch.backends.cudnn.deterministic = args.torch_deterministic
 
     ppo_trainer = PPOTrainer(args, env, run_name)
     ppo_trainer.train()
