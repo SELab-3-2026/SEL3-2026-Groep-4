@@ -47,10 +47,11 @@ source vsc-venv --activate \
     --requirements "$HPC_CONFIG_DIR/requirements.txt"
 set -euo pipefail
 
-# Force the venv path to the front of PYTHONPATH so venv packages take priority
-# over system module packages (e.g. SciPy-bundle) that may be injected by loaded modules.
+# Prepend venv to PYTHONPATH to shadow system packages (e.g. SciPy-bundle compiled
+# against NumPy 1.x) that are injected by the loaded modules.
 VENV_LIB_DIR="$VIRTUAL_ENV/lib/python$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/site-packages"
-export PYTHONPATH="$VENV_LIB_DIR:$PYTHONPATH"
+export PYTHONPATH="$VENV_LIB_DIR:${PYTHONPATH:-}"
+
 
 echo ">>> Starting BrittleStar training..."
 export MUJOCO_GL=egl
