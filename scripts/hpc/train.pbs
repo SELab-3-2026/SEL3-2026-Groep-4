@@ -41,11 +41,14 @@ if [ ! -d "$HPC_CONFIG_DIR" ]; then
     exit 1
 fi
 
+# cd to $VSC_DATA so vsc-venv finds its venvs/ directory there, not in $HOME.
+cd "$VSC_DATA/$PROJ_NAME"
 set +euo pipefail
 source vsc-venv --activate \
     --modules "$HPC_CONFIG_DIR/modules.txt" \
     --requirements "$HPC_CONFIG_DIR/requirements.txt"
 set -euo pipefail
+cd "$PBS_O_WORKDIR"
 
 # Prepend venv to PYTHONPATH to shadow system packages (e.g. SciPy-bundle compiled
 # against NumPy 1.x) that are injected by the loaded modules.

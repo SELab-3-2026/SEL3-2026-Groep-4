@@ -34,11 +34,15 @@ mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR"
 module load vsc-venv
 
 echo ">>> Synchronizing and activating environment (vsc-venv)..."
+# cd to $VSC_DATA so vsc-venv creates its venvs/ directory there, not in $HOME.
+mkdir -p "$VSC_DATA/$PROJ_NAME"
+cd "$VSC_DATA/$PROJ_NAME"
 set +euo pipefail
 source vsc-venv --activate \
     --modules "$HPC_CONFIG_DIR/modules.txt" \
     --requirements "$HPC_CONFIG_DIR/requirements.txt"
 set -euo pipefail
+cd "$PBS_O_WORKDIR"
 
 # Prepend venv to PYTHONPATH to shadow system packages (e.g. SciPy-bundle compiled
 # against NumPy 1.x) that are injected by the loaded modules.
