@@ -36,8 +36,8 @@ export MUJOCO_GL=egl
 export WANDB_DIR="$SCRATCH_RUNDIR"
 
 python src/train.py \
-    --config configs/hpc/smoke_test.yaml \
-    --run_dir "$SCRATCH_RUNDIR"
+    --config-path configs/hpc/smoke_test.yaml \
+    --run-dir "$SCRATCH_RUNDIR"
     # ^^^ Replace with your production config, e.g. configs/production_training.yaml
 
 cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"
