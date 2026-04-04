@@ -37,7 +37,8 @@ def main() -> None:
         print(f"Error: {modules_path} not found.", file=sys.stderr)
         sys.exit(1)
 
-    # Read normalized module names from modules.txt
+    # Read normalized module names from base modules only
+    # Library modules (like PyTorch) are kept in requirements for portability
     module_names = [
         normalise(line.split()[0].split("/")[0])
         for line in modules_path.read_text().splitlines()
@@ -51,7 +52,7 @@ def main() -> None:
     deps: list[str] = data.get("project", {}).get("dependencies", [])
 
     final_deps: list[str] = []
-    print(f"Checking dependencies against {modules_path}...", file=sys.stderr)
+    print(f"Checking dependencies against HPC module list...", file=sys.stderr)
     for dep in deps:
         name = normalise(pkg_name(dep))
         # Smart check: if the package name is a substring of any loaded module name
@@ -63,7 +64,8 @@ def main() -> None:
         final_deps.append(dep)
         print(f"  [pip] {dep}", file=sys.stderr)
 
-    output_path = ROOT / "env" / "hpc" / "requirements.txt"
+    hpc_dir = ROOT / "env" / "hpc"
+    output_path = hpc_dir / "requirements.txt"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(final_deps) + "\n")
     print(f"\nWrote {len(final_deps)} requirement(s) to {output_path}", file=sys.stderr)

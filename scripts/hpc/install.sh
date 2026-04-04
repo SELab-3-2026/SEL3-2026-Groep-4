@@ -21,19 +21,12 @@ fi
 
 module load vsc-venv
 
-echo 'Synchronizing environment...'
-# Step 1: Sync (build/update) the environment
-vsc-venv \
-    --modules env/hpc/modules.txt \
-    --requirements env/hpc/requirements.txt
-
-echo 'Activating environment...'
-# Step 2: Activate the environment
+echo 'Synchronizing and activating environment...'
 source vsc-venv --activate \
     --modules env/hpc/modules.txt \
     --requirements env/hpc/requirements.txt
 
-# Step 3: Force upgrade shared system dependencies to ensure venv precedence
+# Step 2: Force upgrade shared system dependencies to ensure venv precedence
 echo 'Applying library overlays (NumPy, Protobuf)...'
 pip install --upgrade --no-deps numpy protobuf
 
