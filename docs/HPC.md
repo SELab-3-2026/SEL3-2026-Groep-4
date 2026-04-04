@@ -81,9 +81,8 @@ module swap cluster/donphan
 qsub -I -l nodes=1:ppn=4 -l walltime=1:00:00
 
 # Once inside the job — redirect caches to scratch first
-export XDG_CACHE_HOME="$VSC_SCRATCH/.cache"
+export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
 export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
-export MPLCONFIGDIR="$VSC_SCRATCH/.config/matplotlib"
 
 # Change to the project directory and activate environment
 cd "$PBS_O_WORKDIR"

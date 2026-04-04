@@ -1,80 +1,44 @@
 #!/bin/bash
-# scripts/hpc/train.pbs — Submit PPO training as a batch job with qsub.
+# scripts/hpc/train.pbs
 #
-# Usage (from project root after cloning into $VSC_HOME):
+# Usage (from project root):
 #   qsub scripts/hpc/train.pbs
 #
-# To target a different GPU cluster (default: joltik):
+# To target a specific GPU cluster (default: joltik):
 #   module swap cluster/accelgor && qsub scripts/hpc/train.pbs
-#
-# Available GPU clusters: joltik, accelgor, litleo
-# Debug / interactive:    doduo (CPU) or donphan (interactive GPU)
 
-# ---------------------------------------------------------------------------
-# PBS job directives
-# ---------------------------------------------------------------------------
 #PBS -N brittlestar-ppo
 #PBS -l nodes=1:ppn=8:gpus=1
 #PBS -l walltime=24:00:00
 #PBS -l mem=32gb
-# Logs are redirected inside the script to $VSC_DATA so they persist.
 #PBS -o /dev/null
 #PBS -e /dev/null
-# ---------------------------------------------------------------------------
 
 set -euo pipefail
 
-# Always change to the directory from which qsub was called (best practice).
 cd "$PBS_O_WORKDIR"
 
-# ---------------------------------------------------------------------------
-# Storage routing (see https://docs.hpc.ugent.be/Linux/running_jobs_with_input_output_data/)
-#
-#  $VSC_HOME    (~3 GB)  — project source code only; no writes during jobs
-#  $VSC_DATA    (~25 GB) — persistent run artefacts (models, final logs)
-#  $VSC_SCRATCH (large)  — fast I/O during the job; caches; intermediate files
-# ---------------------------------------------------------------------------
-
-# Redirect Python / pip / uv caches away from $VSC_HOME to scratch (fast I/O).
-export XDG_CACHE_HOME="$VSC_SCRATCH/.cache"
+# Keep caches off $VSC_HOME (quota ~3 GB).
+export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
 export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
-export MPLCONFIGDIR="$VSC_SCRATCH/.config/matplotlib"
-mkdir -p "$XDG_CACHE_HOME" "$UV_CACHE_DIR" "$MPLCONFIGDIR"
 
-# Run outputs: write to $VSC_SCRATCH during the job (fast), then copy to
-# $VSC_DATA at the end for long-term storage.
+# Write run outputs to scratch during the job (fast I/O),
+# then stage out to $VSC_DATA at the end for persistence.
 RUN_ID="brittlestar_${PBS_JOBID}"
 SCRATCH_RUNDIR="$VSC_SCRATCH/runs/$RUN_ID"
 DATA_RUNDIR="$VSC_DATA/runs/$RUN_ID"
-mkdir -p "$SCRATCH_RUNDIR" "$DATA_RUNDIR"
+mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR" "$SCRATCH_RUNDIR" "$DATA_RUNDIR"
 
-# PBS stdout/stderr: redirect into the data directory for persistence.
 exec 1> "$DATA_RUNDIR/job.out" 2> "$DATA_RUNDIR/job.err"
 
-# ---------------------------------------------------------------------------
-# Environment
-# ---------------------------------------------------------------------------
 module load vsc-venv
 source vsc-venv --activate --modules env/hpc/modules.txt
 
-# EGL is required for headless MuJoCo — both the physics sim loop and
-# on-demand video rendering to disk. Without this, MuJoCo tries to open an
-# X11 display and fails on compute nodes.
 export MUJOCO_GL=egl
-
-# Tell WandB to store its local run cache on scratch (fast, large).
 export WANDB_DIR="$SCRATCH_RUNDIR"
 
-# ---------------------------------------------------------------------------
-# Run
-# ---------------------------------------------------------------------------
 python src/train.py \
     --config configs/production_training.yaml \
     --run_dir "$SCRATCH_RUNDIR"
 
-# ---------------------------------------------------------------------------
-# Stage out: copy results to persistent VSC_DATA storage.
-# ---------------------------------------------------------------------------
-echo "Copying results from scratch to \$VSC_DATA..."
 cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"
-echo "Done. Results at: $DATA_RUNDIR"
