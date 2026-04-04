@@ -14,14 +14,27 @@ export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
 export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
 mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR"
 
+# Ensure we are in the project root
+if [ -n "$PBS_O_WORKDIR" ]; then
+    cd "$PBS_O_WORKDIR"
+fi
+
 module load vsc-venv
 
-echo 'Installing venv...'
+echo 'Synchronizing environment...'
+# Step 1: Sync (build/update) the environment
+vsc-venv \
+    --modules env/hpc/modules.txt \
+    --requirements env/hpc/requirements.txt
+
+echo 'Activating environment...'
+# Step 2: Activate the environment
 source vsc-venv --activate \
     --modules env/hpc/modules.txt \
     --requirements env/hpc/requirements.txt
 
-# Force upgrade shared system dependencies to ensure venv precedence
+# Step 3: Force upgrade shared system dependencies to ensure venv precedence
+echo 'Applying library overlays (NumPy, Protobuf)...'
 pip install --upgrade --no-deps numpy protobuf
 
 echo 'Installing ipykernel...'
