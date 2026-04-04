@@ -1,0 +1,38 @@
+#!/bin/bash
+# scripts/hpc/train.pbs — Submit PPO training as a batch job with qsub.
+#
+# Usage (from project root):
+#   qsub scripts/hpc/train.pbs
+#
+# To target a specific GPU cluster (default: joltik):
+#   module swap cluster/accelgor && qsub scripts/hpc/train.pbs
+#
+# Available GPU clusters: joltik, accelgor, litleo
+# Debug / interactive:    doduo (CPU) or donphan (interactive GPU)
+
+# ---------------------------------------------------------------------------
+# PBS job directives
+# ---------------------------------------------------------------------------
+#PBS -N brittlestar-ppo
+#PBS -l nodes=1:ppn=8:gpus=1
+#PBS -l walltime=24:00:00
+#PBS -l mem=32gb
+#PBS -o runs/pbs_${PBS_JOBID}.out
+#PBS -e runs/pbs_${PBS_JOBID}.err
+# ---------------------------------------------------------------------------
+
+set -euo pipefail
+
+cd "$PBS_O_WORKDIR"
+
+# Activate the project virtual environment via the official vsc-venv wrapper.
+# This loads the modules listed in env/hpc/modules.txt and the per-cluster venv.
+module load vsc-venv
+source vsc-venv --activate --modules env/hpc/modules.txt
+
+# EGL is required for headless MuJoCo operation — both for the physics
+# simulation loop and for rendering videos to disk. Without this, MuJoCo
+# attempts to open an X11 display and fails on compute nodes.
+export MUJOCO_GL=egl
+
+python src/train.py --config configs/production_training.yaml
