@@ -20,7 +20,7 @@ if [ -n "$PBS_O_WORKDIR" ]; then
     cd "$PBS_O_WORKDIR"
 fi
 
-# Set up storage paths immediately
+# Set up storage paths dynamically
 PROJ_NAME=$(basename "$PWD")
 RUN_ID="brittlestar_${PBS_JOBID}"
 SCRATCH_RUNDIR="$VSC_SCRATCH/runs/$RUN_ID"
@@ -41,11 +41,16 @@ if [ ! -d "$HPC_CONFIG_DIR" ]; then
     exit 1
 fi
 
-set +eo pipefail
+set +euo pipefail
 source vsc-venv --activate \
     --modules "$HPC_CONFIG_DIR/modules.txt" \
     --requirements "$HPC_CONFIG_DIR/requirements.txt"
 set -euo pipefail
+
+# Force the venv path to the front of PYTHONPATH to override system modules (e.g. NumPy 1.2x)
+# This is required because VSC system modules are appended to PYTHONPATH and would otherwise shadow your venv
+VENV_LIB_DIR="$VIRTUAL_ENV/lib/python$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/site-packages"
+export PYTHONPATH="$VENV_LIB_DIR:$PYTHONPATH"
 
 echo ">>> Starting BrittleStar training..."
 export MUJOCO_GL=egl

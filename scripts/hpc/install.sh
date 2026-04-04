@@ -1,11 +1,29 @@
 #!/bin/bash -l
 # scripts/hpc/install.sh
 #
-set -eo pipefail
+# Usage (on any compute node):
+#   bash scripts/hpc/install.sh
+#
+# Batch usage:
+#   qsub scripts/hpc/install.sh
 
-echo ">>> Starting HPC Installation in $(hostname)..."
+#PBS -N brittlestar-install
+#PBS -l nodes=1:ppn=1:gpus=1
+#PBS -l walltime=01:00:00
+#PBS -o scripts/hpc/install.o$PBS_JOBID
+#PBS -e scripts/hpc/install.e$PBS_JOBID
+
+set -euo pipefail
+
+# Preliminary status echo
+echo ">>> Starting installation job $PBS_JOBID on $(hostname)..."
+
+if [ -n "$PBS_O_WORKDIR" ]; then
+    cd "$PBS_O_WORKDIR"
+fi
 
 # Mirror configs to $VSC_DATA to avoid home quota limits (3GB)
+# vsc-venv manages environments relative to the requirements file
 PROJ_NAME=$(basename "$PWD")
 HPC_CONFIG_DIR="$VSC_DATA/$PROJ_NAME/env/hpc"
 mkdir -p "$HPC_CONFIG_DIR"
@@ -14,13 +32,17 @@ cp env/hpc/*.txt "$HPC_CONFIG_DIR/"
 module load vsc-venv
 
 echo ">>> Synchronizing and activating environment (vsc-venv)..."
-set +eo pipefail
+set +euo pipefail
 source vsc-venv --activate \
     --modules "$HPC_CONFIG_DIR/modules.txt" \
     --requirements "$HPC_CONFIG_DIR/requirements.txt"
-set -eo pipefail
+set -euo pipefail
 
-# Overlay specific NumPy/Protobuf versions to ensure venv precedence
+# Force the venv path to the front of PYTHONPATH to override system modules (e.g. NumPy 1.2x)
+VENV_LIB_DIR="$VIRTUAL_ENV/lib/python$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/site-packages"
+export PYTHONPATH="$VENV_LIB_DIR:$PYTHONPATH"
+
+# Overlay modern NumPy/Protobuf versions
 echo ">>> Applying library overlays (NumPy, Protobuf)..."
 pip install --upgrade --no-deps numpy protobuf
 
