@@ -4,7 +4,7 @@
 # Usage (from project root):
 #   bash scripts/hpc/install.sh
 
-set -euo pipefail
+set -eo pipefail
 
 # Keep caches off $VSC_HOME (quota ~3 GB).
 export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
