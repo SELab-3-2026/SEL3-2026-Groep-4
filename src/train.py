@@ -1,4 +1,5 @@
 import random
+import subprocess
 import sys
 import time
 from dataclasses import asdict
@@ -43,7 +44,14 @@ def train(args: PPOArgs):
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
     args.num_iterations = args.total_timesteps // args.batch_size
-    run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
+    
+    # Try to get git short hash
+    try:
+        git_hash = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
+    except Exception:
+        git_hash = "none"
+
+    run_name = f"{args.exp_name}__seed_{args.seed}__{git_hash}__{int(time.time())}"
     print(f"running name: {run_name}")
 
     if args.run_dir is None:
