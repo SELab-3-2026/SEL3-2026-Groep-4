@@ -24,11 +24,34 @@ export VENV_PATH="$VSC_DATA/venvs/sel3_${VSC_INSTITUTE_CLUSTER}"
 python -m venv --system-site-packages "$VENV_PATH"
 source "$VENV_PATH/bin/activate"
 
-# -- Install only the missing lightweight packages ---------------------------
-# We bypass uv here to strictly adhere to the user's storage limits requirement.
-pip install --upgrade pip
-pip install biorobot==0.4.2 evosax==0.2.0 mediapy==1.2.6 tyro>=1.0.10 \
-    cleanrl>=0.4.8 gymnasium>=1.2.3 PyOpenGL>=3.1.10 PyOpenGL-accelerate>=3.1.10
+# -- Extract and install missing dependencies ----------------------------------
+# Dynamically parse pyproject.toml and install only what is missing natively
+MISSING_DEPS=$(python -c '
+import tomllib, importlib.util, re
+with open("pyproject.toml", "rb") as f:
+    deps = tomllib.load(f)["project"]["dependencies"]
+
+missing = []
+for dep in deps:
+    pkg = re.split(r"[\[=><~]", dep)[0].strip()
+    # Map common PyPI package names to their python import names
+    mapping = {"pyyaml": "yaml", "pyopengl": "OpenGL", "pyopengl-accelerate": "OpenGL_accelerate"}
+    import_name = mapping.get(pkg.lower(), pkg.replace("-", "_"))
+    
+    # If the system module cannot find the package, add it to our pip install list
+    if getattr(importlib.util, "find_spec", None) is None or importlib.util.find_spec(import_name) is None:
+        missing.append(f"\"{dep}\"")
+
+print(" ".join(missing))
+')
+
+if [ -n "$MISSING_DEPS" ]; then
+    echo "Installing missing dependencies: $MISSING_DEPS"
+    pip install --upgrade pip
+    eval "pip install $MISSING_DEPS"
+else
+    echo "All dependencies from pyproject.toml are successfully satisfied by HPC system modules."
+fi
 
 # -- Register as Jupyter kernel -----------------------------------------------
 python -m ipykernel install --user --name="sel3_${VSC_INSTITUTE_CLUSTER}-kernel"
