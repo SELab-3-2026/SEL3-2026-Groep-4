@@ -25,7 +25,6 @@ source "$VSC_DATA/venvs/sel3_${VSC_INSTITUTE_CLUSTER}/bin/activate"
 
 # -- HPC-specific environment flags -------------------------------------------
 export MUJOCO_GL=egl          # Headless OpenGL via EGL (no display required)
-export WANDB_MODE=offline     # Sync to WandB after the job (no outbound internet needed)
 
 # -- Run from the project root -------------------------------------------------
 cd "$SLURM_SUBMIT_DIR"

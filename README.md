@@ -39,9 +39,3 @@ Submit long-running experiments via the provided Slurm script:
 ```bash
 sbatch scripts/hpc_train.slurm
 ```
-
-### Syncing WandB
-Since compute nodes are offline, sync your WandB logs after the job finishes:
-```bash
-wandb sync runs/<run_name>/wandb
-```
