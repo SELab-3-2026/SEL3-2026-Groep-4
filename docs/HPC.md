@@ -17,22 +17,25 @@ Check your quota: <https://account.vscentrum.be> (Usage section).
 
 ## Initial Environment Setup
 
-Run **once** from a login shell on `donphan` after cloning the repository:
+Run **once** after cloning the repository, but ensure you are logged into a **compute node** on the target cluster (e.g., `donphan` or `joltik`). The login node (`doduo`) will block the installation script to prevent architecture mismatches.
 
 ```bash
-# 1. Connect via the web portal → HPC Login → Interactive Apps > Shell (tmux)
-#    Set cluster to "donphan (interactive/debug)"
+# 1. Swap to the target cluster
+module swap cluster/joltik
 
-# 2. Clone the project into $VSC_HOME (if not done yet)
-cd $VSC_HOME
-git clone <repo-url>
-cd 2026SEL3-project-BrittleStar
+# 2. Start an interactive session on a compute node
+qsub -I -l nodes=1:ppn=8:gpus=1
 
-# 3. Run the install script
+# 3. Navigate to the project directory and run the install script
+cd SEL3-2026-Groep-4
 bash scripts/hpc/install.sh
+
+# 4. Exit the interactive session once finished
+exit
 ```
 
-> **Note:** virtual environments are cluster-specific. Re-run the script when switching to a new cluster.
+> [!IMPORTANT]
+> Virtual environments are cluster-specific. If you want to switch from `joltik` to `accelgor`, you must re-run the `install.sh` script while logged into an interactive session on `accelgor`.
 
 ## Interactive Debugging on donphan
 

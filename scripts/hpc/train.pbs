@@ -30,7 +30,9 @@ DATA_RUNDIR="$VSC_DATA/runs/$RUN_ID"
 mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR" "$SCRATCH_RUNDIR" "$DATA_RUNDIR" runs/
 
 module load vsc-venv
+set +u
 source vsc-venv --activate --modules env/hpc/modules.txt
+set -u
 
 export MUJOCO_GL=egl
 export WANDB_DIR="$SCRATCH_RUNDIR"
