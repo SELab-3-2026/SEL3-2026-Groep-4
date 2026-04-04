@@ -8,10 +8,7 @@
 #   qsub scripts/hpc/install.sh
 
 #PBS -N brittlestar-install
-#PBS -l nodes=1:ppn=1:gpus=1
 #PBS -l walltime=01:00:00
-#PBS -o scripts/hpc/install.o$PBS_JOBID
-#PBS -e scripts/hpc/install.e$PBS_JOBID
 
 set -euo pipefail
 
