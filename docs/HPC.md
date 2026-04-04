@@ -55,7 +55,11 @@ export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
 # Change to the project directory and activate environment
 cd "$PBS_O_WORKDIR"
 module load vsc-venv
-source vsc-venv --activate --modules env/hpc/modules.txt
+set +u
+source vsc-venv --activate \
+    --modules env/hpc/modules.txt \
+    --requirements env/hpc/requirements.txt
+set -u
 
 # Set headless rendering backend
 export MUJOCO_GL=egl

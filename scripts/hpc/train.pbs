@@ -31,7 +31,9 @@ mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR" "$SCRATCH_RUNDIR" "$DATA_RUNDIR" runs/
 
 module load vsc-venv
 set +u
-source vsc-venv --activate --modules env/hpc/modules.txt
+source vsc-venv --activate \
+    --modules env/hpc/modules.txt \
+    --requirements env/hpc/requirements.txt
 set -u
 
 export MUJOCO_GL=egl
