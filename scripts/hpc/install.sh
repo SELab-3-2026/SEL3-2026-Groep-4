@@ -16,12 +16,14 @@ mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR"
 
 module load vsc-venv
 
-# Temporarily disable 'unbound variable' check for vsc-venv compatibility
-set +u
+echo 'Installing venv...'
 source vsc-venv --activate \
     --modules env/hpc/modules.txt \
     --requirements env/hpc/requirements.txt
-set -u
 
+echo 'Installing ipykernel...'
 python -m ipykernel install --user --name="sel3_${VSC_INSTITUTE_CLUSTER}" \
     --display-name "SEL3 (${VSC_INSTITUTE_CLUSTER})"
+
+echo 'Done'
+

@@ -27,7 +27,7 @@ module swap cluster/joltik
 qsub -I -l nodes=1:ppn=8:gpus=1
 
 # 3. Navigate to the project directory and run the install script
-cd SEL3-2026-Groep-4
+cd "${PBS_O_WORKDIR}"
 bash scripts/hpc/install.sh
 
 # 4. Exit the interactive session once finished
@@ -39,7 +39,7 @@ exit
 
 ## Interactive Debugging on donphan
 
-### Option A — Interactive shell session
+### Interactive shell session
 
 ```bash
 # Swap to the debug cluster (from any login node)
@@ -55,20 +55,18 @@ export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
 # Change to the project directory and activate environment
 cd "$PBS_O_WORKDIR"
 module load vsc-venv
-set +u
 source vsc-venv --activate \
     --modules env/hpc/modules.txt \
     --requirements env/hpc/requirements.txt
-set -u
 
 # Set headless rendering backend
 export MUJOCO_GL=egl
 
 # Run the smoke test
-python src/train.py --config configs/hpc/smoke_test.yaml
+python src/train.py --env-config-path configs/hpc/smoke_test.yaml
 ```
 
-### Option B — JupyterLab session (HPC web portal)
+### JupyterLab session (HPC web portal)
 
 1. In the web portal go to **Interactive Apps → JupyterLab RHEL9**
 2. Set the following options:
