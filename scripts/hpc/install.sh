@@ -21,6 +21,9 @@ source vsc-venv --activate \
     --modules env/hpc/modules.txt \
     --requirements env/hpc/requirements.txt
 
+# Force upgrade shared system dependencies to ensure venv precedence
+pip install --upgrade --no-deps numpy protobuf
+
 echo 'Installing ipykernel...'
 python -m ipykernel install --user --name="sel3_${VSC_INSTITUTE_CLUSTER}" \
     --display-name "SEL3 (${VSC_INSTITUTE_CLUSTER})"
