@@ -1,11 +1,10 @@
 # Minimal config to verify HPC setup is functional.
-# Run with: python src/train.py --config configs/hpc_smoke_test.yaml
+# Run with: python src/train.py --config configs/hpc/smoke_test.yaml
 exp_name: "hpc_smoke_test"
 seed: 0
 track: true           # Test WandB integration
 capture_video: false  # No rendering for smoke test
 save_model: true      # Test the end-of-training save routine
-checkpoint_frequency: 0
 num_envs: 4
 total_timesteps: 10000
 num_steps: 64

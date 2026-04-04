@@ -1,6 +1,7 @@
 # Model files
 artifacts/*
 runs/*
+wandb/
 
 # Python-generated files
 __pycache__/

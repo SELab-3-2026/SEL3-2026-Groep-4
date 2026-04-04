@@ -11,8 +11,8 @@
 #PBS -l nodes=1:ppn=8:gpus=1
 #PBS -l walltime=24:00:00
 #PBS -l mem=32gb
-#PBS -o /dev/null
-#PBS -e /dev/null
+#PBS -o runs/brittlestar-ppo.o$PBS_JOBID
+#PBS -e runs/brittlestar-ppo.e$PBS_JOBID
 
 set -euo pipefail
 
@@ -27,9 +27,7 @@ export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
 RUN_ID="brittlestar_${PBS_JOBID}"
 SCRATCH_RUNDIR="$VSC_SCRATCH/runs/$RUN_ID"
 DATA_RUNDIR="$VSC_DATA/runs/$RUN_ID"
-mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR" "$SCRATCH_RUNDIR" "$DATA_RUNDIR"
-
-exec 1> "$DATA_RUNDIR/job.out" 2> "$DATA_RUNDIR/job.err"
+mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR" "$SCRATCH_RUNDIR" "$DATA_RUNDIR" runs/
 
 module load vsc-venv
 source vsc-venv --activate --modules env/hpc/modules.txt
@@ -38,7 +36,7 @@ export MUJOCO_GL=egl
 export WANDB_DIR="$SCRATCH_RUNDIR"
 
 python src/train.py \
-    --config configs/production_training.yaml \
-    --run_dir "$SCRATCH_RUNDIR"
+    --config configs/hpc/smoke_test.yaml
+    # ^^^ Replace with your production config, e.g. configs/production_training.yaml
 
 cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"
