@@ -26,6 +26,11 @@ HPC_CONFIG_DIR="$VSC_DATA/$PROJ_NAME/env/hpc"
 mkdir -p "$HPC_CONFIG_DIR"
 cp env/hpc/*.txt "$HPC_CONFIG_DIR/"
 
+# Keep caches off $VSC_HOME (quota ~3 GB).
+export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
+export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
+mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR"
+
 module load vsc-venv
 
 echo ">>> Synchronizing and activating environment (vsc-venv)..."
