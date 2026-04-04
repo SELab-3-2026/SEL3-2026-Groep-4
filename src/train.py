@@ -46,6 +46,12 @@ def train(args: PPOArgs):
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     print(f"running name: {run_name}")
 
+    if args.run_dir is None:
+        args.run_dir = f"runs/{run_name}"
+    
+    import os
+    os.makedirs(args.run_dir, exist_ok=True)
+
     if args.track:
         import wandb
 
@@ -58,7 +64,7 @@ def train(args: PPOArgs):
             save_code=True,
         )
 
-    writer = SummaryWriter(f"runs/{run_name}")
+    writer = SummaryWriter(args.run_dir)
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|---|---|\n" + "\n".join(f"|{k}|{v}|" for k, v in vars(args).items()),
@@ -297,7 +303,7 @@ def train(args: PPOArgs):
         )
 
     if args.save_model:
-        model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
+        model_path = f"{args.run_dir}/{args.exp_name}.cleanrl_model"
         with open(model_path, "wb") as f:
             f.write(
                 flax.serialization.to_bytes(
@@ -319,7 +325,7 @@ def train(args: PPOArgs):
     print("Saving loss plot...")
     plt.plot(losses)
     plt.title("PPO Loss, mean over minibatches")
-    plt.savefig(f"runs/{run_name}/{args.exp_name}_losses.png")
+    plt.savefig(f"{args.run_dir}/{args.exp_name}_losses.png")
     plt.close()
 
 

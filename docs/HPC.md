@@ -6,38 +6,14 @@ Full documentation: <https://docs.hpc.ugent.be/>
 
 Choose the appropriate cluster before submitting a job with `module swap cluster/<name>`. The default login cluster is **doduo**.
 
-| Cluster   | Type                    | Use case                                      |
-|-----------|-------------------------|-----------------------------------------------|
-| `donphan` | Interactive / debug GPU | First-time setup, interactive debugging       |
-| `doduo`   | CPU (default login)     | Rapid iteration, CPU-only smoke tests         |
-| `joltik`  | GPU (A100 ¼-slice)      | Standard training runs                        |
-| `accelgor`| GPU (A100 full)         | Large-scale / long experiments                |
-| `litleo`  | GPU                     | Alternative GPU option                        |
-
-> **Rule:** use at most **1 GPU per group at a time** on shared GPU clusters.  
 > Check the current queue load at <https://shieldon.ugent.be:8083/pbsmon-web-users/>.
-
----
 
 ## Storage Overview
 
-The HPC provides three filesystems for different purposes. Understanding this is critical to avoid filling up your home directory.
-
-| Variable        | Typical size | Purpose                                              |
-|-----------------|-------------|------------------------------------------------------|
-| `$VSC_HOME`     | ~3 GB       | Config files, SSH keys, project source code only     |
-| `$VSC_DATA`     | ~25 GB      | Persistent outputs: trained models, final logs       |
-| `$VSC_SCRATCH`  | Large       | Fast I/O during jobs: caches, intermediate files     |
-
-**Important:**
-- Clone the repository into `$VSC_HOME` — it is small in size and accessible from all clusters.
-- All caches (pip, uv, matplotlib) must be redirected to `$VSC_SCRATCH` to avoid filling `$VSC_HOME`.
 - Run outputs are written to `$VSC_SCRATCH` during the job (fast I/O) and copied to `$VSC_DATA` at the end for persistence.
 - `$VSC_SCRATCH` may be purged periodically — do not use it as long-term storage.
 
 Check your quota: <https://account.vscentrum.be> (Usage section).
-
----
 
 ## Initial Environment Setup
 
@@ -56,20 +32,9 @@ cd 2026SEL3-project-BrittleStar
 bash scripts/hpc/install.sh
 ```
 
-This uses the official [`vsc-venv`](https://docs.hpc.ugent.be/Linux/setting_up_python_virtual_environments/#vsc-venv-python-virtual-environment-wrapper-script) wrapper to:
-- Redirect caches to `$VSC_SCRATCH` (to preserve your `$VSC_HOME` quota)
-- Load the EasyBuild modules listed in `env/hpc/modules.txt` (JAX, Flax, WandB, …)
-- Create a per-cluster virtual environment in `$VSC_DATA`
-- Pip-install the remaining packages from `env/hpc/requirements.txt`
-- Register a Jupyter kernel named `SEL3 (<cluster>)`
-
 > **Note:** virtual environments are cluster-specific. Re-run the script when switching to a new cluster.
 
----
-
 ## Interactive Debugging on donphan
-
-The `donphan` cluster provides quick access and is ideal for verifying your environment before submitting batch jobs.
 
 ### Option A — Interactive shell session
 
@@ -121,8 +86,6 @@ python src/train.py --config configs/hpc/smoke_test.yaml
 
 > **Warning:** JAX can only be loaded by one kernel at a time. Shut down other kernels before switching notebooks.
 
----
-
 ## Submitting Batch Training Jobs
 
 ```bash
@@ -135,10 +98,9 @@ qsub scripts/hpc/train.pbs
 ```
 
 The job script automatically:
-- Redirects all caches to `$VSC_SCRATCH`
-- Writes run outputs to `$VSC_SCRATCH/runs/<job_id>` during the run
-- Copies final results to `$VSC_DATA/runs/<job_id>` on completion
-- Writes PBS stdout/stderr to `$VSC_DATA/runs/<job_id>/job.out` / `job.err`
+- Writes run outputs to `$VSC_SCRATCH/runs/<job_id>` during the run using the `--run_dir` argument. This ensures that frequent I/O (like tensorboard logs and checkpoints) happens on the fastest available filesystem.
+- Copies the final results to `$VSC_DATA/runs/<job_id>` on completion for long-term persistence.
+- Writes PBS stdout/stderr to `runs/brittlestar-ppo.o<job_id>` / `.e<job_id>` (standard PBS convention, relative to the project root).
 
 Monitor your jobs:
 
@@ -147,8 +109,6 @@ qstat          # list your jobs
 qstat -f <id>  # detailed info for a specific job
 qdel <id>      # cancel a job
 ```
-
----
 
 ## Managing Dependencies
 
