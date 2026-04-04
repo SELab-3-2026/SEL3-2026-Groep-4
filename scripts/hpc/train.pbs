@@ -13,32 +13,41 @@
 
 set -euo pipefail
 
-cd "$PBS_O_WORKDIR"
+# Preliminary status echo
+echo ">>> Starting training job $PBS_JOBID on $(hostname)..."
+
+if [ -n "$PBS_O_WORKDIR" ]; then
+    cd "$PBS_O_WORKDIR"
+fi
+
+# Set up storage paths immediately
+PROJ_NAME=$(basename "$PWD")
+RUN_ID="brittlestar_${PBS_JOBID}"
+SCRATCH_RUNDIR="$VSC_SCRATCH/runs/$RUN_ID"
+DATA_RUNDIR="$VSC_DATA/runs/$RUN_ID"
+mkdir -p "$SCRATCH_RUNDIR" "$DATA_RUNDIR" runs/
 
 # Keep caches off $VSC_HOME (quota ~3 GB).
 export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
 export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
-
-# Write run outputs to scratch during the job (fast I/O),
-# then stage out to $VSC_DATA at the end for persistence.
-RUN_ID="brittlestar_${PBS_JOBID}"
-SCRATCH_RUNDIR="$VSC_SCRATCH/runs/$RUN_ID"
-DATA_RUNDIR="$VSC_DATA/runs/$RUN_ID"
-mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR" "$SCRATCH_RUNDIR" "$DATA_RUNDIR" runs/
+mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR"
 
 module load vsc-venv
 
-# Activate mirrored environment from $VSC_DATA to avoid home quota
-HPC_CONFIG_DIR="$VSC_DATA/2026SEL3-project/env/hpc"
-set +u
+echo ">>> Synchronizing and activating environment (vsc-venv)..."
+HPC_CONFIG_DIR="$VSC_DATA/$PROJ_NAME/env/hpc"
+if [ ! -d "$HPC_CONFIG_DIR" ]; then
+    echo "ERROR: HPC_CONFIG_DIR ($HPC_CONFIG_DIR) does not exist. Run install.sh first."
+    exit 1
+fi
+
+set +eo pipefail
 source vsc-venv --activate \
     --modules "$HPC_CONFIG_DIR/modules.txt" \
     --requirements "$HPC_CONFIG_DIR/requirements.txt"
-set -u
+set -euo pipefail
 
-# Ensure venv versions of NumPy/Protobuf take precedence
-pip install --upgrade --no-deps numpy protobuf > /dev/null 2>&1
-
+echo ">>> Starting BrittleStar training..."
 export MUJOCO_GL=egl
 export WANDB_DIR="$SCRATCH_RUNDIR"
 
@@ -46,4 +55,7 @@ python src/train.py \
     --env-config-path configs/hpc/smoke_test.yaml \
     --run-dir "$SCRATCH_RUNDIR"
 
+echo ">>> Staging out results to $DATA_RUNDIR..."
 cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"
+
+echo ">>> Done"
