@@ -12,18 +12,12 @@
 
 set -euo pipefail
 
-echo "==> Loading vsc-venv module..."
 module load vsc-venv
 
-echo "==> Activating virtual environment (created per-cluster in \$VSC_DATA)..."
-# vsc-venv transparently creates and manages a per-cluster venv in $VSC_DATA,
-# loading the modules listed in env/hpc/modules.txt and pip-installing anything
-# in env/hpc/requirements.txt that is not already satisfied.
 source vsc-venv --activate \
     --modules env/hpc/modules.txt \
     --requirements env/hpc/requirements.txt
 
-echo "==> Registering Jupyter kernel..."
 python -m ipykernel install --user --name="sel3_${VSC_INSTITUTE_CLUSTER}" \
     --display-name "SEL3 (${VSC_INSTITUTE_CLUSTER})"
 

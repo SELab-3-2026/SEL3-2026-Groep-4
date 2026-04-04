@@ -1,4 +1,4 @@
-# HPC Guide (Ghent University Tier-2)
+# HPC Guide
 
 Full documentation: <https://docs.hpc.ugent.be/>
 
@@ -6,18 +6,7 @@ Full documentation: <https://docs.hpc.ugent.be/>
 
 Choose the appropriate cluster before submitting a job with `module swap cluster/<name>`. The default login cluster is **doduo**.
 
-| Cluster   | Type                    | Use case                                      |
-|-----------|-------------------------|-----------------------------------------------|
-| `donphan` | Interactive / debug GPU | First-time setup, interactive debugging       |
-| `doduo`   | CPU (default login)     | Rapid iteration, CPU-only smoke tests         |
-| `joltik`  | GPU (A100 ¼-slice)      | Standard training runs                        |
-| `accelgor`| GPU (A100 full)         | Large-scale / long experiments                |
-| `litleo`  | GPU                     | Alternative GPU option                        |
-
-> **Rule:** use at most **1 GPU per group at a time** on shared GPU clusters.  
 > Check the current queue load at <https://shieldon.ugent.be:8083/pbsmon-web-users/>.
-
----
 
 ## Initial Environment Setup
 
@@ -35,15 +24,7 @@ cd 2026SEL3-project-BrittleStar
 bash scripts/hpc/install.sh
 ```
 
-This uses the official [`vsc-venv`](https://docs.hpc.ugent.be/Linux/setting_up_python_virtual_environments/#vsc-venv-python-virtual-environment-wrapper-script) wrapper to:
-- Load the EasyBuild modules listed in `env/hpc/modules.txt` (JAX, Flax, WandB, …)
-- Create a per-cluster virtual environment in `$VSC_DATA`
-- Pip-install the remaining packages from `env/hpc/requirements.txt`
-- Register a Jupyter kernel named `sel3_<cluster>`
-
 > **Note:** virtual environments are cluster-specific. Re-run the script if you switch to a new cluster.
-
----
 
 ## Interactive Debugging on donphan
 
@@ -92,8 +73,6 @@ python src/train.py --config configs/hpc_smoke_test.yaml
    ```
 
 > **Warning:** JAX can only be loaded by one kernel at a time. Shut down other kernels before switching notebooks.
-
----
 
 ## Submitting Batch Training Jobs
 
