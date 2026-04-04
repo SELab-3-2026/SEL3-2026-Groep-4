@@ -1,38 +1,31 @@
 #!/bin/bash
 # scripts/hpc/install.sh
 #
-# Usage:
-#   module swap cluster/donphan
-#   qsub -I -l nodes=1:ppn=8:gpus=1
-#   (Wait for session to start, then:)
+# Usage (on any compute node):
 #   bash scripts/hpc/install.sh
 
 set -eo pipefail
 
-# Keep caches off $VSC_HOME (quota ~3 GB).
-export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
-export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
-mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR"
-
-# Ensure we are in the project root
-if [ -n "$PBS_O_WORKDIR" ]; then
-    cd "$PBS_O_WORKDIR"
-fi
+# Mirror configs to $VSC_DATA to avoid home quota limits (3GB)
+# vsc-venv manages environments relative to the requirements file
+HPC_CONFIG_DIR="$VSC_DATA/2026SEL3-project/env/hpc"
+mkdir -p "$HPC_CONFIG_DIR"
+cp env/hpc/*.txt "$HPC_CONFIG_DIR/"
 
 module load vsc-venv
 
-echo 'Synchronizing and activating environment...'
+echo ">>> Synchronizing and activating environment (vsc-venv)..."
 source vsc-venv --activate \
-    --modules env/hpc/modules.txt \
-    --requirements env/hpc/requirements.txt
+    --modules "$HPC_CONFIG_DIR/modules.txt" \
+    --requirements "$HPC_CONFIG_DIR/requirements.txt"
 
-# Step 2: Force upgrade shared system dependencies to ensure venv precedence
-echo 'Applying library overlays (NumPy, Protobuf)...'
+# Overlay specific NumPy/Protobuf versions to ensure venv precedence
+echo ">>> Applying library overlays (NumPy, Protobuf)..."
 pip install --upgrade --no-deps numpy protobuf
 
-echo 'Installing ipykernel...'
-python -m ipykernel install --user --name="sel3_${VSC_INSTITUTE_CLUSTER}" \
-    --display-name "SEL3 (${VSC_INSTITUTE_CLUSTER})"
+echo '>>> Installing ipykernel...'
+CLUSTER_ID="${VSC_INSTITUTE_CLUSTER:-generic}"
+python -m ipykernel install --user --name="sel3_${CLUSTER_ID}" \
+    --display-name "SEL3 (${CLUSTER_ID})"
 
-echo 'Done'
-
+echo '>>> Done'

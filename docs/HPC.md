@@ -2,125 +2,83 @@
 
 Full documentation: <https://docs.hpc.ugent.be/>
 
-## Cluster Selection
-
-Choose the appropriate cluster before submitting a job with `module swap cluster/<name>`. The default login cluster is **doduo**.
-
-> Check the current queue load at <https://shieldon.ugent.be:8083/pbsmon-web-users/>.
-
 ## Storage Overview
 
-- Run outputs are written to `$VSC_SCRATCH` during the job (fast I/O) and copied to `$VSC_DATA` at the end for persistence.
-- `$VSC_SCRATCH` may be purged periodically — do not use it as long-term storage.
-
-Check your quota: <https://account.vscentrum.be> (Usage section).
+- **Run Outputs**: Written to `$VSC_SCRATCH` during the job (fast I/O) and copied to `$VSC_DATA` at the end for persistence.
+- **Virtual Environments**: Managed on **`$VSC_DATA`** by mirroring configuration files. This avoids the 3GB home quota without requiring symlinks in the project root.
 
 ## Initial Environment Setup
 
-Run **once** after cloning the repository, but ensure you are logged into a **compute node** on the target cluster (e.g., `donphan` or `joltik`). The login node (`doduo`) will block the installation script to prevent architecture mismatches.
-
-```bash
-# 1. Swap to the target cluster
-module swap cluster/joltik
-
-# 2. Start an interactive session on a compute node
-qsub -I -l nodes=1:ppn=8:gpus=1
-
-# 3. Navigate to the project directory and run the install script
-cd "${PBS_O_WORKDIR}"
-bash scripts/hpc/install.sh
-
-# 4. Exit the interactive session once finished
-exit
-```
+Run **once** after cloning the repository. Ensure you are logged into a **compute node** on `donphan` or `joltik`. 
 
 > [!IMPORTANT]
-> Virtual environments are cluster-specific. If you want to switch from `joltik` to `accelgor`, you must re-run the `install.sh` script while logged into an interactive session on `accelgor`.
-
-## Interactive Debugging on donphan
-
-### Interactive shell session
+> To avoid the **3GB home directory quota limit**, the installation script mirrors your configuration files to **`$VSC_DATA`** (25GB+ quota). The `vsc-venv` tool then automatically creates and manages the environment on the larger partition.
 
 ```bash
-# Swap to the debug cluster (from any login node)
-module swap cluster/donphan
+# 1. Start an interactive session (donphan for debug, joltik for training)
+qsub -I -l nodes=1:ppn=8:gpus=1
 
-# Request an interactive job (1 node, 4 cores)
-qsub -I -l nodes=1:ppn=4 -l walltime=1:00:00
-
-# Once inside the job — redirect caches to scratch first
-export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
-export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
-
-# Change to the project directory and activate environment
-cd "$PBS_O_WORKDIR"
-module load vsc-venv
-source vsc-venv --activate \
-    --modules env/hpc/modules.txt \
-    --requirements env/hpc/requirements.txt
-
-# Set headless rendering backend
-export MUJOCO_GL=egl
-
-# Run the smoke test
-python src/train.py --env-config-path configs/hpc/smoke_test.yaml
+# 2. Run the streamlined install script
+cd "${PBS_O_WORKDIR}"
+bash scripts/hpc/install.sh
 ```
 
-### JupyterLab session (HPC web portal)
+## Interactive Debugging
 
-1. In the web portal go to **Interactive Apps → JupyterLab RHEL9**
-2. Set the following options:
+You can use the same `install.sh` script to quickly activate your environment for interactive work.
 
-   | Option              | Value                                           |
-   |---------------------|-------------------------------------------------|
-   | Cluster             | `donphan (interactive/debug)`                   |
-   | Number of nodes     | 1                                               |
-   | Number of cores     | 4                                               |
-   | JupyterLab version  | `4.2.5 GCCcore-13.3.0`                          |
-   | Custom code         | *(leave blank — vsc-venv handles modules)*      |
+```bash
+# Request an interactive job
+qsub -I -l nodes=1:ppn=4 -l walltime=1:00:00
 
-3. Click **Launch**, wait for the session to start, then **Connect**.
-4. In JupyterLab, select the kernel **`SEL3 (<cluster>)`**.
-5. Verify GPU access:
+# Change to project directory and run install.sh to sync and activate
+cd "$PBS_O_WORKDIR"
+bash scripts/hpc/install.sh
+```
 
-   ```python
-   import jax
-   print(jax.default_backend())  # expected: 'gpu'
-   print(jax.devices())          # expected: [CudaDevice(id=0)]
+### Verification Commands
+
+After installation, run these commands to ensure your environment is set up correctly:
+
+1. **Verify Location**:
+   ```bash
+   # Confirm that NO 'venvs' folder appeared in your project root
+   ls -d venvs 2>/dev/null  # Should return 'not found'
+   
+   # Confirm the environment is on the data partition
+   python -c "import torch; print(torch.__file__)"
+   # Expected: /kyukon/data/gent/vsc... or similar
    ```
 
-> **Warning:** JAX can only be loaded by one kernel at a time. Shut down other kernels before switching notebooks.
+2. **Verify GPU Access**:
+   ```bash
+   python -c "import torch; import jax; print(f'Torch CUDA: {torch.cuda.is_available()}'); print(f'JAX Devices: {jax.devices()}')"
+   ```
+   *Expected output: `Torch CUDA: True` and `JAX Devices: [CudaDevice(id=0)]`.*
+
+3. **Verify Home Quota**:
+   ```bash
+   df -h ~ # Should show low usage (< 1GB typically)
+   ```
 
 ## Submitting Batch Training Jobs
 
 ```bash
-# Default cluster (joltik — one A100 GPU slice)
+# Submit to the default cluster (joltik)
 qsub scripts/hpc/train.pbs
 
-# Switch to a different GPU cluster first
-module swap cluster/accelgor
-qsub scripts/hpc/train.pbs
+# To choose a different cluster (e.g. donphan debug) without touching code
+module swap cluster/donphan && qsub scripts/hpc/train.pbs
 ```
 
-The job script automatically:
-- Writes run outputs to `$VSC_SCRATCH/runs/<job_id>` during the run using the `--run_dir` argument. This ensures that frequent I/O (like tensorboard logs and checkpoints) happens on the fastest available filesystem.
-- Copies the final results to `$VSC_DATA/runs/<job_id>` on completion for long-term persistence.
-- Writes PBS stdout/stderr to `runs/brittlestar-ppo.o<job_id>` / `.e<job_id>` (standard PBS convention, relative to the project root).
-
-Monitor your jobs:
-
-```bash
-qstat          # list your jobs
-qstat -f <id>  # detailed info for a specific job
-qdel <id>      # cancel a job
-```
+The `train.pbs` script automatically handles its own activation using the mirrored configurations on `$VSC_DATA`.
 
 ## Managing Dependencies
 
-`env/hpc/requirements.txt` is auto-generated by CI whenever `pyproject.toml` changes. To regenerate locally:
+`env/hpc/requirements.txt` is auto-generated from `pyproject.toml`. To regenerate:
 
 ```bash
 uv run scripts/export_hpc_requirements.py
 ```
 
-Do **not** edit `env/hpc/requirements.txt` by hand — edit `pyproject.toml` instead.
+Modules listed in `env/hpc/modules.txt` are automatically excluded from the pip requirements to save space and use HPC-optimized binaries.

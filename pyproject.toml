@@ -23,6 +23,7 @@ dependencies = [
     "pyopengl-accelerate>=3.1.10",
     "tyro>=1.0.10",
     "wandb==0.24.2",
+    "torch>=2.4.0",
 ]
 
 [project.optional-dependencies]

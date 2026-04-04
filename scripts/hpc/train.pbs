@@ -3,9 +3,6 @@
 #
 # Usage (from project root):
 #   qsub scripts/hpc/train.pbs
-#
-# To target a specific GPU cluster (default: joltik):
-#   module swap cluster/accelgor && qsub scripts/hpc/train.pbs
 
 #PBS -N brittlestar-ppo
 #PBS -l nodes=1:ppn=8:gpus=1
@@ -30,11 +27,17 @@ DATA_RUNDIR="$VSC_DATA/runs/$RUN_ID"
 mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR" "$SCRATCH_RUNDIR" "$DATA_RUNDIR" runs/
 
 module load vsc-venv
+
+# Activate mirrored environment from $VSC_DATA to avoid home quota
+HPC_CONFIG_DIR="$VSC_DATA/2026SEL3-project/env/hpc"
 set +u
 source vsc-venv --activate \
-    --modules env/hpc/modules.txt \
-    --requirements env/hpc/requirements.txt
+    --modules "$HPC_CONFIG_DIR/modules.txt" \
+    --requirements "$HPC_CONFIG_DIR/requirements.txt"
 set -u
+
+# Ensure venv versions of NumPy/Protobuf take precedence
+pip install --upgrade --no-deps numpy protobuf > /dev/null 2>&1
 
 export MUJOCO_GL=egl
 export WANDB_DIR="$SCRATCH_RUNDIR"
@@ -42,6 +45,5 @@ export WANDB_DIR="$SCRATCH_RUNDIR"
 python src/train.py \
     --env-config-path configs/hpc/smoke_test.yaml \
     --run-dir "$SCRATCH_RUNDIR"
-    # ^^^ Replace with your production config, e.g. configs/production_training.yaml
 
 cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"
