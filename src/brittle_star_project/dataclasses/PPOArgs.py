@@ -8,7 +8,7 @@ class PPOArgs:
     """
 
     # path to environment config file, if None, use default config
-    config_path: str | None = None
+    env_config_path: str | None = None
 
     # the name of this experiment
     exp_name: str = "brittle_star_ppo"
