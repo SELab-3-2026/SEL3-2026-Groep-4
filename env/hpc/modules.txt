@@ -1,8 +1,6 @@
-PyTorch/2.1.2-foss-2023a-CUDA-12.1.1
-jax/0.4.25-gfbf-2023a-CUDA-12.1.1
-Flax/0.8.4-gfbf-2023a-CUDA-12.1.1
-Optax/0.2.2-gfbf-2023a-CUDA-12.1.1
-wandb/0.16.1-GCC-12.3.0
-matplotlib/3.7.2-gfbf-2023a
-PyYAML/6.0-GCCcore-12.3.0
-FFmpeg/6.0-GCCcore-12.3.0
+gfbf/2024a
+GCCcore/13.3.0
+Python/3.12.3-GCCcore-13.3.0
+PyTorch/2.6.0-foss-2024a-CUDA-12.6.0
+FFmpeg/7.0.2-GCCcore-13.3.0
+PyYAML/6.0.2-GCCcore-13.3.0
