@@ -1,0 +1,7 @@
+jax/0.4.25-gfbf-2023a-CUDA-12.1.1
+Flax/0.8.4-gfbf-2023a-CUDA-12.1.1
+Optax/0.2.2-gfbf-2023a-CUDA-12.1.1
+wandb/0.16.1-GCC-12.3.0
+matplotlib/3.7.2-gfbf-2023a
+PyYAML/6.0-GCCcore-12.3.0
+FFmpeg/5.1.2-GCCcore-12.3.0
