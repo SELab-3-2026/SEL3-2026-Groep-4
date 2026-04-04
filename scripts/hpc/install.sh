@@ -39,10 +39,6 @@ set -euo pipefail
 VENV_LIB_DIR="$VIRTUAL_ENV/lib/python$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/site-packages"
 export PYTHONPATH="$VENV_LIB_DIR:$PYTHONPATH"
 
-# Overlay modern NumPy/Protobuf versions
-echo ">>> Applying library overlays (NumPy, Protobuf)..."
-pip install --upgrade --no-deps numpy protobuf
-
 echo '>>> Installing ipykernel...'
 CLUSTER_ID="${VSC_INSTITUTE_CLUSTER:-generic}"
 python -m ipykernel install --user --name="sel3_${CLUSTER_ID}" \

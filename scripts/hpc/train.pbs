@@ -47,8 +47,8 @@ source vsc-venv --activate \
     --requirements "$HPC_CONFIG_DIR/requirements.txt"
 set -euo pipefail
 
-# Force the venv path to the front of PYTHONPATH to override system modules (e.g. NumPy 1.2x)
-# This is required because VSC system modules are appended to PYTHONPATH and would otherwise shadow your venv
+# Force the venv path to the front of PYTHONPATH so venv packages take priority
+# over system module packages (e.g. SciPy-bundle) that may be injected by loaded modules.
 VENV_LIB_DIR="$VIRTUAL_ENV/lib/python$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/site-packages"
 export PYTHONPATH="$VENV_LIB_DIR:$PYTHONPATH"
 
