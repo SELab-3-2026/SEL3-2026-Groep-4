@@ -6,8 +6,6 @@
 #PBS -N brittlestar-ppo
 #PBS -l nodes=1:ppn=8
 #PBS -l walltime=24:00:00
-#PBS -o runs/brittlestar-ppo.o$PBS_JOBID
-#PBS -e runs/brittlestar-ppo.e$PBS_JOBID
 
 set -euo pipefail
 
