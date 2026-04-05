@@ -55,10 +55,11 @@ def from_file(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
     with open(path, "r") as f:
         if path.endswith(".yaml") or path.endswith(".yml"):
             import yaml
+
             config_dict = yaml.safe_load(f)
         else:
             config_dict = json.load(f)
-            
+
         morphology = MorphologyConfig(**config_dict.get("morphology", {}))
         arena = ArenaConfig(**config_dict.get("arena", {}))
         env = EnvConfig(**config_dict.get("env", {}))

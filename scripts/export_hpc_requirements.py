@@ -53,17 +53,17 @@ def main() -> None:
     dep_dict: dict[str, str] = {}
     for dep in data.get("project", {}).get("dependencies", []):
         dep_dict[normalise(pkg_name(dep))] = dep
-    
+
     # Add cuda extras (takes precedence for HPC)
     optional_deps = data.get("project", {}).get("optional-dependencies", {})
     for group in ["cuda"]:
         for dep in optional_deps.get(group, []):
             dep_dict[normalise(pkg_name(dep))] = dep
-    
+
     deps = list(dep_dict.values())
 
     final_deps: list[str] = []
-    print(f"Checking dependencies against HPC module list...", file=sys.stderr)
+    print("Checking dependencies against HPC module list...", file=sys.stderr)
     for dep in deps:
         name = normalise(pkg_name(dep))
         # Smart check: if the package name is a substring of any loaded module name

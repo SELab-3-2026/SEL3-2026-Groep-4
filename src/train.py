@@ -52,10 +52,12 @@ def train(args: PPOArgs):
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
     args.num_iterations = args.total_timesteps // args.batch_size
-    
+
     # Try to get git short hash
     try:
-        git_hash = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
+        git_hash = (
+            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
+        )
     except Exception:
         git_hash = "none"
 
@@ -64,8 +66,9 @@ def train(args: PPOArgs):
 
     if args.run_dir is None:
         args.run_dir = f"runs/{run_name}"
-    
+
     import os
+
     os.makedirs(args.run_dir, exist_ok=True)
 
     if args.track:
@@ -348,14 +351,14 @@ def train(args: PPOArgs):
             remaining_steps = args.total_timesteps - global_step
             eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
             eta_str = str(datetime.timedelta(seconds=eta_seconds))
-            
+
             print(
                 f"Iteration {iteration}/{args.num_iterations} | "
                 f"Step {global_step}/{args.total_timesteps} | "
                 f"SPS {sps} | "
                 f"Return {avg_episodic_return:.4f} | "
-                f"ETA {eta_str}", 
-                flush=True
+                f"ETA {eta_str}",
+                flush=True,
             )
 
     if args.save_model:
@@ -388,7 +391,7 @@ def train(args: PPOArgs):
 
 def main() -> None:
     temp_args = tyro.cli(PPOArgs)
-    
+
     if temp_args.env_config_path is not None:
         with open(temp_args.env_config_path, "r") as f:
             config = yaml.safe_load(f)
@@ -397,7 +400,7 @@ def main() -> None:
                 for key, value in config.items():
                     if hasattr(temp_args, key):
                         setattr(temp_args, key, value)
-                
+
                 # Re-parse CLI to ensure they OVERRIDE the yaml
                 args = tyro.cli(PPOArgs, default=temp_args)
     else:
