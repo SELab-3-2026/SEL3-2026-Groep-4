@@ -74,25 +74,6 @@ After installation, run these commands to ensure your environment is set up corr
    python -c "import torch, jax; print(f'GPU: {torch.cuda.is_available()}'); print(f'JAX: {jax.devices()}')"
    ```
 
-## PR Verification (Quick Start)
-
-If you are a reviewer verifying a PR, run this single block:
-
-```bash
-git checkout <pr-branch>
-module swap cluster/donphan
-qsub -I -l nodes=1:gpus=1
-
-# Inside the interactive session:
-cd "$PBS_O_WORKDIR"
-bash scripts/hpc/install.sh
-python -c "import torch, jax; print(torch.cuda.is_available()); print(jax.devices())"
-exit
-
-# Verify batch submission
-qsub scripts/hpc/train.pbs
-```
-
 ## Managing Dependencies
 
 `env/hpc/requirements.txt` is auto-generated from `pyproject.toml`. To regenerate:

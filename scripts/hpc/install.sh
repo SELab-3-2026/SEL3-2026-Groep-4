@@ -19,6 +19,8 @@ if [ -n "$PBS_O_WORKDIR" ]; then
     cd "$PBS_O_WORKDIR"
 fi
 
+mkdir "${PBS_O_WORKDIR}/runs"
+
 # Mirror configs to $VSC_DATA to avoid home quota limits (3GB)
 # vsc-venv manages environments relative to the requirements file
 PROJ_NAME=$(basename "$PWD")
