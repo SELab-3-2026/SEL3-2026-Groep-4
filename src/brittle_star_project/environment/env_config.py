@@ -50,10 +50,17 @@ class EnvConfig:
     light_perlin_noise_scale: int = 0
 
 
-def from_json(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
+def from_file(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
+    """Load configurations from a JSON or YAML file."""
     with open(path, "r") as f:
-        config_json = json.load(f)
-        morphology = MorphologyConfig(**config_json.get("morphology", {}))
-        arena = ArenaConfig(**config_json.get("arena", {}))
-        env = EnvConfig(**config_json.get("env", {}))
+        if path.endswith(".yaml") or path.endswith(".yml"):
+            import yaml
+
+            config_dict = yaml.safe_load(f)
+        else:
+            config_dict = json.load(f)
+
+        morphology = MorphologyConfig(**config_dict.get("morphology", {}))
+        arena = ArenaConfig(**config_dict.get("arena", {}))
+        env = EnvConfig(**config_dict.get("env", {}))
         return morphology, arena, env

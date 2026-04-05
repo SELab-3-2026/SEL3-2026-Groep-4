@@ -1,0 +1,61 @@
+# Production training (requires GPU at runtime):
+#   qsub -l gpus=1 scripts/hpc/train.pbs
+# Debug/CPU training:
+#   qsub scripts/hpc/train.pbs
+
+#PBS -N brittlestar-ppo
+#PBS -l nodes=1:ppn=8
+#PBS -l walltime=24:00:00
+
+set -euo pipefail
+
+# Preliminary status echo
+echo ">>> Starting training job $PBS_JOBID on $(hostname)..."
+
+if [ -n "$PBS_O_WORKDIR" ]; then
+    cd "$PBS_O_WORKDIR"
+fi
+
+# Set up storage paths dynamically
+PROJ_NAME=$(basename "$PWD")
+RUN_ID="brittlestar_${PBS_JOBID}"
+SCRATCH_RUNDIR="$VSC_SCRATCH/runs/$RUN_ID"
+DATA_RUNDIR="$VSC_DATA/runs/$RUN_ID"
+mkdir -p "$SCRATCH_RUNDIR" "$DATA_RUNDIR" runs/
+
+# Keep caches off $VSC_HOME (quota ~3 GB).
+export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
+export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
+mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR"
+
+module load vsc-venv
+
+echo ">>> Synchronizing and activating environment (vsc-venv)..."
+HPC_CONFIG_DIR="$VSC_DATA/$PROJ_NAME/env/hpc"
+if [ ! -d "$HPC_CONFIG_DIR" ]; then
+    echo "ERROR: HPC_CONFIG_DIR ($HPC_CONFIG_DIR) does not exist. Run install.sh first."
+    exit 1
+fi
+
+# cd to $VSC_DATA so vsc-venv finds its venvs/ directory there, not in $HOME.
+cd "$VSC_DATA/$PROJ_NAME"
+set +euo pipefail
+source vsc-venv --activate \
+    --modules "$HPC_CONFIG_DIR/modules.txt" \
+    --requirements "$HPC_CONFIG_DIR/requirements.txt"
+set -euo pipefail
+cd "$PBS_O_WORKDIR"
+
+
+echo ">>> Starting BrittleStar training..."
+export MUJOCO_GL=egl
+export WANDB_DIR="$SCRATCH_RUNDIR"
+
+python src/train.py \
+    --env-config-path configs/hpc/smoke_test.yaml \
+    --run-dir "$SCRATCH_RUNDIR"
+
+echo ">>> Staging out results to $DATA_RUNDIR..."
+cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"
+
+echo ">>> Done"
