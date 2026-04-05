@@ -217,9 +217,13 @@ def train(args: PPOArgs):
 
     # Reset once to get initial state
     print("Resetting the environment...")
+    if not sys.stdout.isatty():
+        print(f">>> [HPC] Initial reset started: {time.ctime()}", flush=True)
     next_env_state = env.reset(seed=args.seed)
     next_obs = convert_obs_dict_to_array(next_env_state.observations)
     next_done = jnp.zeros(args.num_envs, dtype=jnp.bool_)
+    if not sys.stdout.isatty():
+        print(f">>> [HPC] Initial reset completed: {time.ctime()}", flush=True)
 
     def step_once(carry, _, env_step_fn):
         agent_state, episode_stats, obs, done, key, env_state = carry
@@ -264,18 +268,32 @@ def train(args: PPOArgs):
         disable=not sys.stdout.isatty(),
     )
     losses = []
-    for _ in iters_bar:
+    is_tty = sys.stdout.isatty()
+    for iteration in iters_bar:
         iteration_time_start = time.time()
+
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] Starting first rollout (JIT): {time.ctime()}", flush=True)
 
         agent_state, episode_stats, next_obs, next_done, storage, key, next_env_state = rollout(
             agent_state, episode_stats, next_obs, next_done, key, next_env_state
         )
 
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] First rollout completed: {time.ctime()}", flush=True)
+
         global_step += args.num_steps * args.num_envs
         storage = compute_gae(agent_state, next_obs, next_done, storage)
+
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] Starting first PPO update (JIT): {time.ctime()}", flush=True)
+
         agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = ppo_instance.update_ppo(
             agent_state, storage, key
         )
+
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] First PPO update completed: {time.ctime()}", flush=True)
 
         losses.append(jnp.mean(loss))
 
@@ -309,6 +327,21 @@ def train(args: PPOArgs):
             int(args.num_envs * args.num_steps / (time.time() - iteration_time_start)),
             global_step,
         )
+
+        if not is_tty:
+            sps = int(global_step / (time.time() - start_time))
+            remaining_steps = args.total_timesteps - global_step
+            eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
+            eta_str = str(time.timedelta(seconds=eta_seconds))
+            
+            print(
+                f"Iteration {iteration}/{args.num_iterations} | "
+                f"Step {global_step}/{args.total_timesteps} | "
+                f"SPS {sps} | "
+                f"Return {avg_episodic_return:.4f} | "
+                f"ETA {eta_str}", 
+                flush=True
+            )
 
     if args.save_model:
         model_path = f"{args.run_dir}/{args.exp_name}.cleanrl_model"
