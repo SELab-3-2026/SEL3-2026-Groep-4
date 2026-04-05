@@ -1,4 +1,6 @@
+import datetime
 import random
+import yaml
 import subprocess
 import sys
 import time
@@ -332,7 +334,7 @@ def train(args: PPOArgs):
             sps = int(global_step / (time.time() - start_time))
             remaining_steps = args.total_timesteps - global_step
             eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
-            eta_str = str(time.timedelta(seconds=eta_seconds))
+            eta_str = str(datetime.timedelta(seconds=eta_seconds))
             
             print(
                 f"Iteration {iteration}/{args.num_iterations} | "
@@ -371,7 +373,22 @@ def train(args: PPOArgs):
 
 
 def main() -> None:
-    args = tyro.cli(PPOArgs)
+    temp_args = tyro.cli(PPOArgs)
+    
+    if temp_args.env_config_path is not None:
+        with open(temp_args.env_config_path, "r") as f:
+            config = yaml.safe_load(f)
+            if config:
+                # parse PPOArgs with defaults from yaml.
+                for key, value in config.items():
+                    if hasattr(temp_args, key):
+                        setattr(temp_args, key, value)
+                
+                # Re-parse CLI to ensure they OVERRIDE the yaml
+                args = tyro.cli(PPOArgs, default=temp_args)
+    else:
+        args = temp_args
+
     train(args)
 
 
