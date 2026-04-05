@@ -8,7 +8,7 @@
 #   qsub scripts/hpc/install.sh
 
 #PBS -N brittlestar-install
-#PBS -l walltime=01:00:00
+#PBS -l walltime=00:15:00
 
 set -euo pipefail
 

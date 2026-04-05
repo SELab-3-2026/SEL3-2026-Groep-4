@@ -13,13 +13,37 @@ Run **once** after cloning the repository. This script handles all modules, mirr
 
 ```bash
 # Option A: Interactive (on a compute node)
-module swap cluster/donphan  # or joltik
-qsub -I -l nodes=1:gpus=1
+module swap cluster/donphan  # Debug cluster (CPU only)
+# OR for GPU clusters:
+# module swap cluster/joltik
+# module swap cluster/accelgor
+# module swap cluster/litleo
+
+qsub -I -l nodes=1:gpus=1  # Only for GPU clusters
 cd "${PBS_O_WORKDIR}"
 bash scripts/hpc/install.sh
 
 # Option B: Batch (Run in background)
-qsub scripts/hpc/install.sh
+# NOTE: GPU clusters (joltik/accelgor/litleo) require -l gpus=1 at runtime
+qsub -l gpus=1 scripts/hpc/install.sh
+```
+
+## Production vs. Debug Clusters
+
+Our scripts are cluster-agnostic and do **not** have hardcoded GPU requirements. Instead, you must request GPUs at runtime using the `-l gpus=1` flag when submitting to a production GPU cluster.
+
+### Debugging (Donphan)
+The `donphan` cluster does not support GPUs. Simply run the scripts without extra resource flags:
+```bash
+module swap cluster/donphan
+qsub scripts/hpc/train.pbs
+```
+
+### Production (Joltik, Accelgor, Litleo)
+These clusters provide GPU acceleration and **require** a GPU request at runtime:
+```bash
+module swap cluster/joltik  # or accelgor/litleo
+qsub -l gpus=1 scripts/hpc/train.pbs
 ```
 
 ## Interactive Debugging
