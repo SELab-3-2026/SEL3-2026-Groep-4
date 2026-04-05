@@ -49,7 +49,18 @@ def main() -> None:
     with pyproject_path.open("rb") as f:
         data = tomllib.load(f)
 
-    deps: list[str] = data.get("project", {}).get("dependencies", [])
+    # Collect all dependencies, merging 'cuda' extras into base dependencies
+    dep_dict: dict[str, str] = {}
+    for dep in data.get("project", {}).get("dependencies", []):
+        dep_dict[normalise(pkg_name(dep))] = dep
+    
+    # Add cuda extras (takes precedence for HPC)
+    optional_deps = data.get("project", {}).get("optional-dependencies", {})
+    for group in ["cuda"]:
+        for dep in optional_deps.get(group, []):
+            dep_dict[normalise(pkg_name(dep))] = dep
+    
+    deps = list(dep_dict.values())
 
     final_deps: list[str] = []
     print(f"Checking dependencies against HPC module list...", file=sys.stderr)
