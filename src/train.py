@@ -23,7 +23,13 @@ from torch.utils.tensorboard import SummaryWriter
 from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.dataclasses.EpisodeStatistics import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
-from brittle_star_project.rl import Actor, AgentParams, Critic, Network, Storage
+from MLPs.mlps import (
+    GenericDenseLayersWithActivation,
+    Actor,
+    OneDenseLayerMLP,
+    AgentParams,
+    Storage,
+)
 from ppo import PPO
 
 
@@ -83,7 +89,7 @@ def train(args: PPOArgs):
     random.seed(args.seed)
     np.random.seed(args.seed)
     key = jax.random.PRNGKey(args.seed)
-    key, network_key, actor_key, critic_key, critic_network_key = jax.random.split(key, 5)
+    key, sensor_key, actor_key, critic_key, feature_extractor_key = jax.random.split(key, 5)
 
     torch.backends.cudnn.deterministic = args.torch_deterministic
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
@@ -133,10 +139,11 @@ def train(args: PPOArgs):
         return args.learning_rate * frac
 
     print("Initializing the models...")
-    network = Network()
-    critic_network = Network()
+    sensor = GenericDenseLayersWithActivation()
+    feature_extractor = GenericDenseLayersWithActivation()
     actor = Actor(action_dim=env.single_action_space.shape[0])  # continuous actions for MJX
-    critic = Critic()
+    critic = OneDenseLayerMLP()
+    # messager = OneDenseLayerMLP()
 
     sample_obs = jnp.concatenate(
         [
@@ -145,15 +152,17 @@ def train(args: PPOArgs):
             if v.size > 0
         ]
     )
-    network_params = network.init(network_key, sample_obs)
-    critic_network_params = critic_network.init(critic_network_key, sample_obs)
-    actor_params = actor.init(actor_key, network.apply(network_params, sample_obs))
-    critic_params = critic.init(critic_key, critic_network.apply(critic_network_params, sample_obs))
+    sensor_params = sensor.init(sensor_key, sample_obs)
+    feature_extractor_params = feature_extractor.init(feature_extractor_key, sample_obs)
+    actor_params = actor.init(actor_key, sensor.apply(sensor_params, sample_obs))
+    critic_params = critic.init(
+        critic_key, feature_extractor.apply(feature_extractor_params, sample_obs)
+    )
 
     agent_state = TrainState.create(
         apply_fn=None,
         params=asdict(
-            AgentParams(network_params, actor_params, critic_params, critic_network_params)
+            AgentParams(sensor_params, actor_params, critic_params, feature_extractor_params)
         ),
         tx=optax.chain(
             optax.clip_by_global_norm(args.max_grad_norm),
@@ -163,11 +172,11 @@ def train(args: PPOArgs):
         ),
     )
 
-    network.apply = jax.jit(network.apply)
-    critic_network.apply = jax.jit(critic_network.apply)
+    sensor.apply = jax.jit(sensor.apply)
+    feature_extractor.apply = jax.jit(feature_extractor.apply)
     actor.apply = jax.jit(actor.apply)
     critic.apply = jax.jit(critic.apply)
-    ppo_instance = PPO(args, network, actor, critic, critic_network)
+    ppo_instance = PPO(args, sensor, actor, critic, feature_extractor)
 
     @jax.jit
     def get_action_and_value_noise(
@@ -175,7 +184,11 @@ def train(args: PPOArgs):
         next_obs: jnp.ndarray,
         key: jax.random.PRNGKey,
     ):
-        hidden = network.apply(agent_state.params["network_params"], next_obs)
+        hidden = sensor.apply(agent_state.params["sensor_params"], next_obs)
+        hidden_critic = feature_extractor.apply(
+            agent_state.params["feature_extractor_params"], next_obs
+        )
+
         # Continuous actions: sample from a Gaussian parameterized by the actor
         mean, log_std = actor.apply(agent_state.params["actor_params"], hidden)
         key, subkey = jax.random.split(key)
@@ -183,7 +196,7 @@ def train(args: PPOArgs):
         std = jnp.exp(log_std)
         action = mean + noise * std
         logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
-        value = critic.apply(agent_state.params["critic_params"], hidden)
+        value = critic.apply(agent_state.params["critic_params"], hidden_critic)
         return action, logprob, value.squeeze(-1), key
 
     @jax.jit
@@ -199,7 +212,7 @@ def train(args: PPOArgs):
     def compute_gae(agent_state, next_obs, next_done, storage):
         next_value = critic.apply(
             agent_state.params["critic_params"],
-            network.apply(agent_state.params["network_params"], next_obs),
+            sensor.apply(agent_state.params["sensor_params"], next_obs),
         ).squeeze(-1)
 
         advantages = jnp.zeros((args.num_envs,))
@@ -353,9 +366,10 @@ def train(args: PPOArgs):
                     [
                         vars(args),
                         [
-                            agent_state.params["network_params"],
+                            agent_state.params["sensor_params"],
                             agent_state.params["actor_params"],
                             agent_state.params["critic_params"],
+                            agent_state.params["feature_extractor_params"],
                         ],
                     ]
                 )
