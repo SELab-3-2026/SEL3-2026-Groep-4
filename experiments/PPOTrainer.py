@@ -39,7 +39,7 @@ def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
     )
 
 
-@jax.jit
+# removed jit: used in _rollout_jit, so will be compiled with _rollout_jit
 def _get_action_and_value_noise(
     sensor: GenericDenseLayersWithActivation,
     feature_extractor: GenericDenseLayersWithActivation,
@@ -65,7 +65,7 @@ def _get_action_and_value_noise(
     return action, logprob, value.squeeze(-1), key
 
 
-@jax.jit
+# removed jit: used in _rollout_jit, so will be compiled with _rollout_jit
 def _step_once(
     carry,
     _,
@@ -97,8 +97,8 @@ def _step_once(
     return (agent_state, episode_stats, next_obs, next_done, key, env_state), storage
 
 
-@jax.jit
-def _step_env_wrapped(env_step_fn, env_state, action, episode_stats):
+# removed jit: used in _rollout_jit, so will be compiled with _rollout_jit
+def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     next_env_state = env_step_fn(env_state, action)
 
     # Extract per-environment signals from the state object
@@ -127,10 +127,7 @@ def _step_env_wrapped(env_step_fn, env_state, action, episode_stats):
     )
 
 
-@partial(
-    jax.jit,
-    static_argnames=("env_step_fn", "sensor", "feature_extractor", "actor", "critic"),
-)
+# jit applied in wrapper method self._rollout_jit using partial
 def _rollout_jit(
     agent_state,
     episode_stats,
@@ -139,7 +136,7 @@ def _rollout_jit(
     next_done,
     key,
     max_steps,
-    env_step_fn,
+    step_env_fn,
     sensor: GenericDenseLayersWithActivation,
     feature_extractor: GenericDenseLayersWithActivation,
     actor: Actor,
@@ -152,7 +149,7 @@ def _rollout_jit(
             feature_extractor=feature_extractor,
             actor=actor,
             critic=critic,
-            env_step_fn=partial(_step_env_wrapped, env_step_fn=env_step_fn),
+            env_step_fn=step_env_fn,
         ),
         (agent_state, episode_stats, next_obs, next_done, key, env_state),
         (),
@@ -161,7 +158,7 @@ def _rollout_jit(
     return agent_state, episode_stats, next_obs, next_done, storage, key, env_state
 
 
-@jax.jit
+# removed jit: used in _compute_gae_jit, so will be compiled with _compute_gae_jit
 def _compute_gae_once(carry, inp, gamma, gae_lambda):
     advantages = carry
     nextdone, nextvalues, curvalues, reward = inp
@@ -171,12 +168,9 @@ def _compute_gae_once(carry, inp, gamma, gae_lambda):
     return advantages, advantages
 
 
-@partial(
-    jax.jit,
-    static_argnames=("sensor", "critic"),
-)
+# jit applied on partial-wrapped wrapper method self._compute_gae_jit
 def _compute_gae_jit(
-    agent_state, storage, next_obs, next_done, sensor, critic, gamma, gae_lambda, num_envs
+    agent_state, storage, next_obs, next_done, gamma, gae_lambda, num_envs, sensor, critic
 ):
     next_value = critic.apply(
         agent_state.params["critic_params"],
@@ -221,17 +215,26 @@ class PPOTrainer:
         self.actor.apply = jax.jit(self.actor.apply)
         self.critic.apply = jax.jit(self.critic.apply)
 
-        self._rollout_jit = partial(
-            _rollout_jit,
-            sensor=self.sensor,
-            feature_extractor=self.feature_extractor,
-            actor=self.actor,
-            critic=self.critic,
+        self._rollout_jit = jax.jit(
+            partial(
+                _rollout_jit,
+                max_steps=self.args.num_steps,
+                step_env_fn=partial(_step_env_wrapped, env_step_fn=self.env.step),
+                sensor=self.sensor,
+                feature_extractor=self.feature_extractor,
+                actor=self.actor,
+                critic=self.critic,
+            )
         )
-        self._compute_gae_jit = partial(
-            _compute_gae_jit,
-            sensor=self.sensor,
-            critic=self.critic,
+        self._compute_gae_jit = jax.jit(
+            partial(
+                _compute_gae_jit,
+                num_envs=self.args.num_envs,
+                gamma=self.args.gamma,
+                gae_lambda=self.args.gae_lambda,
+                sensor=self.sensor,
+                critic=self.critic,
+            )
         )
 
         self._ppo = PPO(self.args, self.sensor, self.actor, self.critic, self.feature_extractor)
@@ -315,8 +318,6 @@ class PPOTrainer:
             next_obs,
             next_done,
             self.key,
-            self.args.num_steps,
-            self.env.step,
         )
 
     def _compute_gae(self, storage, next_obs, next_done) -> Storage:
@@ -325,9 +326,6 @@ class PPOTrainer:
             storage,
             next_obs,
             next_done,
-            self.args.gamma,
-            self.args.gae_lambda,
-            self.args.num_envs,
         )
 
     def _log(
@@ -383,7 +381,7 @@ class PPOTrainer:
             self._ppo.update_ppo(self.agent_state, storage, self.key)
         )
 
-        avg_episodic_return = jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns))
+        avg_episodic_return = float(jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns)))
 
         return (
             next_env_state,
