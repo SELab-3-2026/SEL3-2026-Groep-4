@@ -5,9 +5,6 @@ This is a LOCAL DEVELOPER UTILITY — run it on your own machine before pushing
 code whenever pyproject.toml dependencies change. It reads the modules from
 env/hpc/modules.txt and the full dependency list from pyproject.toml, then
 writes the remainder to env/hpc/requirements.txt.
-
-Usage:
-    uv run scripts/export_hpc_requirements.py
 """
 
 from __future__ import annotations

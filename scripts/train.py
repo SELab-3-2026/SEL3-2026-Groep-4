@@ -7,7 +7,7 @@ import yaml
 import os
 
 from brittle_star_project.dataclasses import PPOArgs
-from PPOTrainer import PPOTrainer
+from brittle_star_project.trainers.PPOTrainer import PPOTrainer
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 
 

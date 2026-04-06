@@ -28,13 +28,13 @@ from ppo import PPO
 
 
 @jax.jit
-def linear_schedule(count, minibatch_count, update_epochs, num_iterations, learning_rate):
+def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, learning_rate):
     frac = 1.0 - (count // (minibatch_count * update_epochs)) / num_iterations
     return learning_rate * frac
 
 
 @jax.jit
-def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
+def _convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
     return jax.vmap(lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0]))(
         obs_dict
     )
@@ -124,7 +124,7 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     return (
         episode_stats,
         next_env_state,
-        (convert_obs_dict_to_array(next_env_state.observations), reward, done),
+        (_convert_obs_dict_to_array(next_env_state.observations), reward, done),
     )
 
 
@@ -300,7 +300,7 @@ class PPOTrainer:
                 optax.clip_by_global_norm(self.args.max_grad_norm),
                 optax.inject_hyperparams(optax.adam)(
                     learning_rate=partial(
-                        linear_schedule,
+                        _linear_schedule,
                         minibatch_count=self.args.num_minibatches,
                         update_epochs=self.args.update_epochs,
                         num_iterations=self.args.num_iterations,
@@ -467,7 +467,7 @@ class PPOTrainer:
                 print(f">>> [HPC] Initial reset started: {time.ctime()}", flush=True)
 
         env_state = self.env.reset(seed=self.args.seed)
-        next_obs = convert_obs_dict_to_array(env_state.observations)
+        next_obs = _convert_obs_dict_to_array(env_state.observations)
         next_done = jnp.zeros(self.args.num_envs, dtype=jnp.bool_)
 
         if log and not is_tty:
