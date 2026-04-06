@@ -1,4 +1,6 @@
+import datetime
 import random
+import sys
 import time
 from dataclasses import asdict, dataclass
 from functools import partial
@@ -200,11 +202,12 @@ class LossInfo:
 
 
 class PPOTrainer:
-    def __init__(self, args: PPOArgs, env: BrittleStarJaxEnvWrapper, run_name: str):
+    def __init__(self, args: PPOArgs, env: BrittleStarJaxEnvWrapper, run_dir: str, run_name: str):
         self.args = args
         self.env = env
+        self.run_dir = run_dir
         self.run_name = run_name
-        self.writer = SummaryWriter(f"runs/{self.run_name}")
+        self.writer = SummaryWriter(self.run_dir)
 
         self.key = jax.random.PRNGKey(args.seed)
 
@@ -244,11 +247,17 @@ class PPOTrainer:
 
         self._init_random()
 
-    def _init_random(self):
+    def _init_random(self, log: bool = True):
+        if log:
+            print(f"[RANDOM]: Setting random seed to {self.args.seed}")
+
         random.seed(self.args.seed)
         np.random.seed(self.args.seed)
 
-    def _init_agent(self):
+    def _init_agent(self, log: bool = True):
+        if log:
+            print("[AGENT]: Initializing agent...")
+
         sensor = GenericDenseLayersWithActivation()
         feature_extractor = GenericDenseLayersWithActivation()
         actor = Actor(
@@ -258,7 +267,10 @@ class PPOTrainer:
         # messenger = OneDenseLayerMLP()
         return sensor, feature_extractor, actor, critic
 
-    def _init_agent_state(self) -> TrainState:
+    def _init_agent_state(self, log: bool = True) -> TrainState:
+        if log:
+            print("[AGENT STATE]: Initializing agent state...")
+
         self.key, sensor_key, actor_key, critic_key, feature_extractor_key = jax.random.split(
             self.key, 5
         )
@@ -301,7 +313,10 @@ class PPOTrainer:
             ),
         )
 
-    def _init_episode_stats(self) -> EpisodeStatistics:
+    def _init_episode_stats(self, log: bool = True) -> EpisodeStatistics:
+        if log:
+            print("[EPISODE STATS]: Initializing episode stats...")
+
         return EpisodeStatistics(
             episode_returns=jnp.zeros(self.args.num_envs, dtype=jnp.float32),
             episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
@@ -335,6 +350,7 @@ class PPOTrainer:
         iteration_time_start,
         loss_info,
     ):
+
         self.writer.add_scalar(
             "charts/avg_episodic_return", loss_info.avg_episodic_return, global_step
         )
@@ -353,7 +369,6 @@ class PPOTrainer:
         self.writer.add_scalar("losses/entropy", loss_info.entropy_loss[-1, -1].item(), global_step)
         self.writer.add_scalar("losses/approx_kl", loss_info.approx_kl[-1, -1].item(), global_step)
         self.writer.add_scalar("losses/loss", loss_info.loss[-1, -1].item(), global_step)
-
         self.writer.add_scalar(
             "charts/SPS", int(global_step / (time.time() - start_time)), global_step
         )
@@ -363,7 +378,10 @@ class PPOTrainer:
             global_step,
         )
 
-    def _step(self, env_state, next_obs, next_done) -> tuple:
+    def _step(self, env_state, next_obs, next_done, is_tty: bool, iteration: int) -> tuple:
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] Starting first rollout (JIT): {time.ctime()}", flush=True)
+
         (
             self.agent_state,
             self.episode_stats,
@@ -374,11 +392,20 @@ class PPOTrainer:
             next_env_state,
         ) = self._rollout(env_state, next_obs, next_done)
 
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] First rollout completed: {time.ctime()}", flush=True)
+
         storage = self._compute_gae(storage, next_obs, next_done)
+
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] Starting first PPO update (JIT): {time.ctime()}", flush=True)
 
         self.agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, self.key = (
             self._ppo.update_ppo(self.agent_state, storage, self.key)
         )
+
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] First PPO update completed: {time.ctime()}", flush=True)
 
         avg_episodic_return = float(
             jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns))
@@ -402,7 +429,10 @@ class PPOTrainer:
         self.env.close()
         self.writer.close()
 
-    def _save_model(self, model_path: str):
+    def _save_model(self, model_path: str, log: bool = True):
+        if log:
+            print(f"[SAVE]: Saving the model to: {model_path}...")
+
         with open(model_path, "wb") as f:
             f.write(
                 flax.serialization.to_bytes(
@@ -418,20 +448,37 @@ class PPOTrainer:
                 )
             )
 
-    def train(self):
+    def train(self, log: bool = True):
         """
         Train the PPO agent for a specified number of iterations
         (passed through PPOArgs in constructor).
         Closes the environment at the end of training.
         """
+        if log:
+            print(f"running name: {self.run_name}")
+
+        is_tty = sys.stdout.isatty()
+        if log:
+            print("[TRAIN]: Resetting environment...")
+
+            if not is_tty:
+                print(f">>> [HPC] Initial reset started: {time.ctime()}", flush=True)
+
         env_state = self.env.reset(seed=self.args.seed)
         next_obs = convert_obs_dict_to_array(env_state.observations)
         next_done = jnp.zeros(self.args.num_envs, dtype=jnp.bool_)
+
+        if log and not is_tty:
+            print(f">>> [HPC] Initial reset completed: {time.ctime()}", flush=True)
+
         global_step = 0
         start_time = time.time()
 
         if self.args.track:
             import wandb
+
+            if log:
+                print("[TRAIN]: Initializing Weights and Biases...")
 
             wandb.init(
                 project=self.args.wandb_project_name,
@@ -442,21 +489,47 @@ class PPOTrainer:
                 save_code=True,
             )
 
+        if log:
+            print("[TRAIN]: Adding hyperparameters to TensorBoard...")
+
         self.writer.add_text(
             "hyperparameters",
             "|param|value|\n|---|---|\n"
             + "\n".join(f"|{k}|{v}|" for k, v in vars(self.args).items()),
         )
 
-        for _ in tqdm.tqdm(range(self.args.num_iterations)):
+        iter_bar = tqdm.tqdm(
+            range(1, self.args.num_iterations + 1),
+            disable=not sys.stdout.isatty(),
+        )
+        for iteration in iter_bar:
             iteration_time_start = time.time()
 
             env_state, next_obs, next_done, loss_info = self._step(env_state, next_obs, next_done)
+
+            if not is_tty and iteration == 1:
+                print(f">>> [HPC] First rollout completed: {time.ctime()}", flush=True)
+
             global_step += self.args.num_steps * self.args.num_envs
             self._log(global_step, self.episode_stats, start_time, iteration_time_start, loss_info)
 
+            if not is_tty:
+                sps = int(global_step / (time.time() - start_time))
+                remaining_steps = self.args.total_timesteps - global_step
+                eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
+                eta_str = str(datetime.timedelta(seconds=eta_seconds))
+
+                print(
+                    f"Iteration {iteration}/{self.args.num_iterations} | "
+                    f"Step {global_step}/{self.args.total_timesteps} | "
+                    f"SPS {sps} | "
+                    f"Return {loss_info.avg_episodic_return:.4f} | "
+                    f"ETA {eta_str}",
+                    flush=True,
+                )
+
         if self.args.save_model:
-            model_path = f"runs/{self.run_name}/{self.args.exp_name}.cleanrl_model"
+            model_path = f"{self.run_dir}/{self.args.exp_name}.cleanrl_model"
             self._save_model(model_path=model_path)
 
         self._close()

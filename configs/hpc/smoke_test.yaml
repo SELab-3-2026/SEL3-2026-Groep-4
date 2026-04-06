@@ -1,5 +1,5 @@
 # Minimal config to verify HPC setup is functional.
-# Run with: python src/train.py --config-path configs/hpc/smoke_test.yaml
+# Run with: python experiments/train.py --config-path configs/hpc/smoke_test.yaml
 exp_name: "hpc_smoke_test"
 seed: 0
 track: false           # Test WandB integration
