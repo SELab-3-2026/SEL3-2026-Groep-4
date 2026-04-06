@@ -28,7 +28,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Regenerate env/hpc/requirements.txt
-        run: uv run scripts/export_hpc_requirements.py
+        run: uv run scripts/hpc/export_requirements.py
 
       - name: Commit updated requirements if changed
         uses: stefanzweifel/git-auto-commit-action@v5

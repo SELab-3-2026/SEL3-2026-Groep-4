@@ -79,7 +79,7 @@ After installation, run these commands to ensure your environment is set up corr
 `env/hpc/requirements.txt` is auto-generated from `pyproject.toml`. To regenerate:
 
 ```bash
-uv run scripts/export_hpc_requirements.py
+uv run scripts/hpc/export_requirements.py
 ```
 
 Modules listed in `env/hpc/modules.txt` are automatically excluded from the pip requirements to save space and use HPC-optimized binaries.

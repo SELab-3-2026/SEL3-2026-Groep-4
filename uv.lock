@@ -35,6 +35,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+analysis = [
+    { name = "tensorboard" },
+]
 cuda = [
     { name = "jax", extra = ["cuda13"] },
 ]
@@ -64,12 +67,13 @@ requires-dist = [
     { name = "protobuf", specifier = ">=5.0.0" },
     { name = "pyopengl", specifier = ">=3.1.10" },
     { name = "pyopengl-accelerate", specifier = ">=3.1.10" },
+    { name = "tensorboard", marker = "extra == 'analysis'" },
     { name = "torch", specifier = ">=2.4.0" },
     { name = "tyro", specifier = ">=1.0.10" },
     { name = "wandb", specifier = "==0.24.2" },
     { name = "warp-lang" },
 ]
-provides-extras = ["cuda"]
+provides-extras = ["cuda", "analysis"]
 
 [package.metadata.requires-dev]
 dev = [

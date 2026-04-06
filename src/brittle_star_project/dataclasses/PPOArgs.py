@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
+import jax
 
+
+@jax.tree_util.register_dataclass
 @dataclass
 class PPOArgs:
     """
@@ -9,6 +12,9 @@ class PPOArgs:
 
     # path to environment config file, if None, use default config
     env_config_path: str | None = None
+
+    # path to hyperparameter config file (yaml), if None, use default config
+    hyperparameter_config_path: str | None = None
 
     # the name of this experiment
     exp_name: str = "brittle_star_ppo"
