@@ -1,4 +1,8 @@
+import datetime
 import random
+import yaml
+import subprocess
+import sys
 import time
 from dataclasses import asdict
 from functools import partial
@@ -7,6 +11,7 @@ from typing import Callable
 import flax
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy as np
 import optax
 import torch
@@ -35,11 +40,11 @@ def convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
     )
 
 
-def make_env(config_path: str | None, num_envs: int) -> Callable:
+def make_env(env_config_path: str | None, num_envs: int) -> Callable:
     def thunk():
-        if config_path is None:
+        if env_config_path is None:
             return BrittleStarJaxEnvWrapper.default(num_envs=num_envs)
-        return BrittleStarJaxEnvWrapper.from_config(config_path, num_envs=num_envs)
+        return BrittleStarJaxEnvWrapper.from_config(env_config_path, num_envs=num_envs)
 
     return thunk
 
@@ -63,10 +68,28 @@ def save_model(model_path: str, agent_state: TrainState, args: PPOArgs):
 def train(args: PPOArgs):
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
+    args.num_iterations = args.total_timesteps // args.batch_size
+
+    # Try to get git short hash
+    try:
+        git_hash = (
+            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
+        )
+    except Exception:
+        git_hash = "none"
+
+    run_name = f"{args.exp_name}__seed_{args.seed}__{git_hash}__{int(time.time())}"
     # args.num_iterations = args.total_timesteps // args.batch_size
     args.num_iterations = 5
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     print(f"running name: {run_name}")
+
+    if args.run_dir is None:
+        args.run_dir = f"runs/{run_name}"
+
+    import os
+
+    os.makedirs(args.run_dir, exist_ok=True)
 
     if args.track:
         import wandb
@@ -80,7 +103,7 @@ def train(args: PPOArgs):
             save_code=True,
         )
 
-    writer = SummaryWriter(f"runs/{run_name}")
+    writer = SummaryWriter(args.run_dir)
     writer.add_text(
         "hyperparameters",
         "|param|value|\n|---|---|\n" + "\n".join(f"|{k}|{v}|" for k, v in vars(args).items()),
@@ -96,7 +119,7 @@ def train(args: PPOArgs):
     print(f"Running on device: {device}")
 
     print("Creating the environment...")
-    env = make_env(config_path=args.config_path, num_envs=args.num_envs)()
+    env = make_env(env_config_path=args.env_config_path, num_envs=args.num_envs)()
     print(f"Environment: {env}")
 
     episode_stats = EpisodeStatistics(
@@ -235,9 +258,13 @@ def train(args: PPOArgs):
 
     # Reset once to get initial state
     print("Resetting the environment...")
+    if not sys.stdout.isatty():
+        print(f">>> [HPC] Initial reset started: {time.ctime()}", flush=True)
     next_env_state = env.reset(seed=args.seed)
     next_obs = convert_obs_dict_to_array(next_env_state.observations)
     next_done = jnp.zeros(args.num_envs, dtype=jnp.bool_)
+    if not sys.stdout.isatty():
+        print(f">>> [HPC] Initial reset completed: {time.ctime()}", flush=True)
 
     def step_once(carry, _, env_step_fn):
         agent_state, episode_stats, obs, done, key, env_state = carry
@@ -277,27 +304,44 @@ def train(args: PPOArgs):
     )
 
     print("Starting training...")
-    iters_bar = tqdm.tqdm(range(1, args.num_iterations + 1))
+    iters_bar = tqdm.tqdm(
+        range(1, args.num_iterations + 1),
+        disable=not sys.stdout.isatty(),
+    )
     returns = []
-    for _ in iters_bar:
+    is_tty = sys.stdout.isatty()
+    for iteration in iters_bar:
         iteration_time_start = time.time()
+
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] Starting first rollout (JIT): {time.ctime()}", flush=True)
 
         agent_state, episode_stats, next_obs, next_done, storage, key, next_env_state = rollout(
             agent_state, episode_stats, next_obs, next_done, key, next_env_state
         )
 
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] First rollout completed: {time.ctime()}", flush=True)
+
         global_step += args.num_steps * args.num_envs
         storage = compute_gae(agent_state, next_obs, next_done, storage)
+
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] Starting first PPO update (JIT): {time.ctime()}", flush=True)
+
         agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key = ppo_instance.update_ppo(
             agent_state, storage, key
         )
+
+        if not is_tty and iteration == 1:
+            print(f">>> [HPC] First PPO update completed: {time.ctime()}", flush=True)
+
+        losses.append(jnp.mean(loss))
 
         avg_episodic_return = np.mean(jax.device_get(episode_stats.returned_episode_returns))
         iters_bar.set_postfix_str(
             f"global_step={global_step}, avg_episodic_return={avg_episodic_return}"
         )
-
-        returns.append(avg_episodic_return)
 
         writer.add_scalar("charts/avg_episodic_return", avg_episodic_return, global_step)
         writer.add_scalar(
@@ -325,9 +369,39 @@ def train(args: PPOArgs):
             global_step,
         )
 
+        if not is_tty:
+            sps = int(global_step / (time.time() - start_time))
+            remaining_steps = args.total_timesteps - global_step
+            eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
+            eta_str = str(datetime.timedelta(seconds=eta_seconds))
+
+            print(
+                f"Iteration {iteration}/{args.num_iterations} | "
+                f"Step {global_step}/{args.total_timesteps} | "
+                f"SPS {sps} | "
+                f"Return {avg_episodic_return:.4f} | "
+                f"ETA {eta_str}",
+                flush=True,
+            )
+
     if args.save_model:
         model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
         save_model(model_path, agent_state, args)
+        model_path = f"{args.run_dir}/{args.exp_name}.cleanrl_model"
+        with open(model_path, "wb") as f:
+            f.write(
+                flax.serialization.to_bytes(
+                    [
+                        vars(args),
+                        [
+                            agent_state.params["sensor_params"],
+                            agent_state.params["actor_params"],
+                            agent_state.params["critic_params"],
+                            agent_state.params["feature_extractor_params"],
+                        ],
+                    ]
+                )
+            )
         print(f"model saved to {model_path}")
 
     env.close()
@@ -340,10 +414,29 @@ def train(args: PPOArgs):
         show_window=True,
         filename=f"runs/{run_name}/{args.exp_name}_losses.png",
     )
+    plt.plot(losses)
+    plt.title("PPO Loss, mean over minibatches")
+    plt.savefig(f"{args.run_dir}/{args.exp_name}_losses.png")
+    plt.close()
 
 
 def main() -> None:
-    args = tyro.cli(PPOArgs)
+    temp_args = tyro.cli(PPOArgs)
+
+    if temp_args.env_config_path is not None:
+        with open(temp_args.env_config_path, "r") as f:
+            config = yaml.safe_load(f)
+            if config:
+                # parse PPOArgs with defaults from yaml.
+                for key, value in config.items():
+                    if hasattr(temp_args, key):
+                        setattr(temp_args, key, value)
+
+                # Re-parse CLI to ensure they OVERRIDE the yaml
+                args = tyro.cli(PPOArgs, default=temp_args)
+    else:
+        args = temp_args
+
     train(args)
 
 
