@@ -394,3 +394,6 @@ extend-ignore = [
   "PLW0603",  # global-statement
   # "PLW1404",  # implicit-str-concat
 ]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]
