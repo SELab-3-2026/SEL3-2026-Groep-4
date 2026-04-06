@@ -43,6 +43,7 @@ def make_env(config_path: str | None, num_envs: int) -> Callable:
 
     return thunk
 
+
 def save_model(model_path: str, agent_state: TrainState, args: PPOArgs):
     with open(model_path, "wb") as f:
         f.write(
@@ -198,7 +199,6 @@ def train(args: PPOArgs):
         value = critic.apply(agent_state.params["critic_params"], hidden_critic)
         return action, logprob, value.squeeze(-1), key
 
-
     # GAE
     @jax.jit
     def compute_gae_once(carry, inp, gamma, gae_lambda):
@@ -226,6 +226,7 @@ def train(args: PPOArgs):
             reverse=True,
         )
         return storage.replace(advantages=advantages, returns=advantages + storage.values)
+
     # END GAE
 
     # --- Main training loop ---

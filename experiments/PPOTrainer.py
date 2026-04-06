@@ -9,7 +9,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-import torch
 import tqdm
 from flax.training.train_state import TrainState
 from torch.utils.tensorboard import SummaryWriter
@@ -381,7 +380,9 @@ class PPOTrainer:
             self._ppo.update_ppo(self.agent_state, storage, self.key)
         )
 
-        avg_episodic_return = float(jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns)))
+        avg_episodic_return = float(
+            jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns))
+        )
 
         return (
             next_env_state,
