@@ -17,11 +17,14 @@ def make_env(config_path: str | None, num_envs: int) -> BrittleStarJaxEnvWrapper
     return BrittleStarJaxEnvWrapper.from_config(config_path, num_envs=num_envs)
 
 
-def parse_args() -> PPOArgs:
+def parse_args(log: bool = True) -> PPOArgs:
     temp_args = tyro.cli(PPOArgs)
 
-    if temp_args.env_config_path is not None:
-        with open(temp_args.env_config_path, "r") as f:
+    if temp_args.hyperparameter_config_path is not None:
+        if log:
+            print(f"Loading hyperparameter config from {temp_args.hyperparameter_config_path}")
+
+        with open(temp_args.hyperparameter_config_path, "r") as f:
             config = yaml.safe_load(f)
             if config:
                 # parse PPOArgs with defaults from yaml.
@@ -32,6 +35,9 @@ def parse_args() -> PPOArgs:
                 # Reparse CLI to ensure they OVERRIDE the yaml
                 args = tyro.cli(PPOArgs, default=temp_args)
     else:
+        if log:
+            print("No hyperparameter config provided, using default config")
+
         args = temp_args
     return args
 

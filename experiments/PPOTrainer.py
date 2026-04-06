@@ -500,12 +500,14 @@ class PPOTrainer:
 
         iter_bar = tqdm.tqdm(
             range(1, self.args.num_iterations + 1),
-            disable=not sys.stdout.isatty(),
+            disable=not is_tty,
         )
         for iteration in iter_bar:
             iteration_time_start = time.time()
 
-            env_state, next_obs, next_done, loss_info = self._step(env_state, next_obs, next_done)
+            env_state, next_obs, next_done, loss_info = self._step(
+                env_state, next_obs, next_done, is_tty=is_tty, iteration=iteration
+            )
 
             if not is_tty and iteration == 1:
                 print(f">>> [HPC] First rollout completed: {time.ctime()}", flush=True)
