@@ -378,8 +378,10 @@ class PPOTrainer:
             global_step,
         )
 
-    def _step(self, env_state, next_obs, next_done, is_tty: bool, iteration: int) -> tuple:
-        if not is_tty and iteration == 1:
+    def _step(
+        self, env_state, next_obs, next_done, is_tty: bool, iteration: int, log: bool = True
+    ) -> tuple:
+        if log and not is_tty and iteration == 1:
             print(f">>> [HPC] Starting first rollout (JIT): {time.ctime()}", flush=True)
 
         (
@@ -392,23 +394,23 @@ class PPOTrainer:
             next_env_state,
         ) = self._rollout(env_state, next_obs, next_done)
 
-        if not is_tty and iteration == 1:
+        if log and not is_tty and iteration == 1:
             print(f">>> [HPC] First rollout completed: {time.ctime()}", flush=True)
 
         storage = self._compute_gae(storage, next_obs, next_done)
 
-        if not is_tty and iteration == 1:
+        if log and not is_tty and iteration == 1:
             print(f">>> [HPC] Starting first PPO update (JIT): {time.ctime()}", flush=True)
 
         self.agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, self.key = (
             self._ppo.update_ppo(self.agent_state, storage, self.key)
         )
 
-        if not is_tty and iteration == 1:
+        if log and not is_tty and iteration == 1:
             print(f">>> [HPC] First PPO update completed: {time.ctime()}", flush=True)
 
         avg_episodic_return = float(
-            jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns))
+            jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns)).item()
         )
 
         return (
@@ -509,13 +511,10 @@ class PPOTrainer:
                 env_state, next_obs, next_done, is_tty=is_tty, iteration=iteration
             )
 
-            if not is_tty and iteration == 1:
-                print(f">>> [HPC] First rollout completed: {time.ctime()}", flush=True)
-
             global_step += self.args.num_steps * self.args.num_envs
             self._log(global_step, self.episode_stats, start_time, iteration_time_start, loss_info)
 
-            if not is_tty:
+            if log and not is_tty:
                 sps = int(global_step / (time.time() - start_time))
                 remaining_steps = self.args.total_timesteps - global_step
                 eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
