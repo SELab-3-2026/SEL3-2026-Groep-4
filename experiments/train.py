@@ -19,8 +19,7 @@ if __name__ == "__main__":
 
     args.batch_size = args.num_envs * args.num_steps
     args.minibatch_size = args.batch_size // args.num_minibatches
-    # args.num_iterations = args.total_timesteps // args.batch_size
-    args.num_iterations = 5
+    args.num_iterations = args.total_timesteps // args.batch_size
     run_name = f"{args.exp_name}__seed_{args.seed}__{int(time.time())}"
     env = make_env(args.config_path, args.num_envs)
 
