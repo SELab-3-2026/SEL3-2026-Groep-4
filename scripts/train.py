@@ -10,6 +10,9 @@ from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.trainers.PPOTrainer import PPOTrainer
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 
+from experiment_logger.unified_logger import get_logger
+from experiment_logger.config_utils import merge_config_with_cli, print_config
+
 
 def make_env(config_path: str | None, num_envs: int) -> BrittleStarJaxEnvWrapper:
     if config_path is None:
@@ -17,28 +20,15 @@ def make_env(config_path: str | None, num_envs: int) -> BrittleStarJaxEnvWrapper
     return BrittleStarJaxEnvWrapper.from_config(config_path, num_envs=num_envs)
 
 
-def parse_args(log: bool = True) -> PPOArgs:
-    temp_args = tyro.cli(PPOArgs)
+def parse_args() -> PPOArgs:
+    import argparse
 
-    if temp_args.hyperparameter_config_path is not None:
-        if log:
-            print(f"Loading hyperparameter config from {temp_args.hyperparameter_config_path}")
+    # Use argparse to reliably extract just the config path without swallowing --help
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--hyperparameter-config-path", type=str, default=None)
+    known_args, _ = parser.parse_known_args()
 
-        with open(temp_args.hyperparameter_config_path, "r") as f:
-            config = yaml.safe_load(f)
-            if config:
-                # parse PPOArgs with defaults from yaml.
-                for key, value in config.items():
-                    if hasattr(temp_args, key):
-                        setattr(temp_args, key, value)
-
-                # Reparse CLI to ensure they OVERRIDE the yaml
-                args = tyro.cli(PPOArgs, default=temp_args)
-    else:
-        if log:
-            print("No hyperparameter config provided, using default config")
-
-        args = temp_args
+    args = merge_config_with_cli(PPOArgs, config_file=known_args.hyperparameter_config_path)
     return args
 
 
@@ -60,12 +50,24 @@ if __name__ == "__main__":
 
     git_hash = get_git_hash()
     run_name = f"{args.exp_name}__seed_{args.seed}__{git_hash}__{int(time.time())}"
+
     if args.run_dir is None:
         run_dir = f"runs/{run_name}"
     else:
         run_dir = args.run_dir
 
     os.makedirs(run_dir, exist_ok=True)
+
+    # Initialize Global Logger
+    logger = get_logger()
+    logger.init(
+        project_name=args.wandb_project_name,  # or default PPO-Modularity if missing
+        run_name=run_name,
+        base_dir=os.path.dirname(run_dir),
+        use_wandb=args.track,
+    )
+
+    print_config(args, title="PPO Training Configuration")
 
     env = make_env(args.env_config_path, args.num_envs)
 
