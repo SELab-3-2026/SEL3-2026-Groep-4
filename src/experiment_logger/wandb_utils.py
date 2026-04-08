@@ -36,6 +36,27 @@ def init_wandb(
     """
     try:
         import wandb
+        import os
+        import sys
+
+        # Robust HPC checking: check for API key
+        has_key = os.environ.get("WANDB_API_KEY") is not None
+        if not has_key:
+            try:
+                # Check if logged in locally via settings/netrc
+                has_key = wandb.setup().settings.api_key is not None
+            except Exception:
+                pass
+
+        is_interactive = sys.stdout.isatty()
+
+        if not has_key and not is_interactive and os.environ.get("WANDB_MODE") != "offline":
+            logger.warning(
+                "WANDB_API_KEY not found and environment is non-interactive. Switching to offline mode."
+            )
+            sync_path = f"runs/{name}" if name else "runs"
+            logger.warning(f"WandB is offline. Use 'wandb sync {sync_path}' to upload logs later.")
+            os.environ["WANDB_MODE"] = "offline"
 
         run = wandb.init(
             project=project,

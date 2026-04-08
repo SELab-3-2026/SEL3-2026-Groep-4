@@ -124,6 +124,16 @@ class UnifiedLogger:
         # Save config to disk
         self._save_config()
 
+        # Setup TensorBoard
+        self.writer = None
+        try:
+            from torch.utils.tensorboard import SummaryWriter
+
+            self.writer = SummaryWriter(self.run_dir)
+            self.info("TensorBoard SummaryWriter initialized.")
+        except ImportError:
+            self.warning("tensorboard not installed. Skipping SummaryWriter.")
+
         # Initialize WandB if requested
         if self.use_wandb:
             self._init_wandb(project_name, entity, save_code)
@@ -205,6 +215,16 @@ class UnifiedLogger:
                 self.wandb_run.log(metrics, step=step, commit=commit)
             except Exception as e:
                 self.warning(f"WandB logging failed: {e}")
+
+        # Log to TensorBoard
+        if self.writer is not None:
+            for k, v in metrics.items():
+                if isinstance(v, (int, float, np.floating, np.integer)):
+                    self.writer.add_scalar(k, v, step)
+                elif hasattr(v, "item"):
+                    self.writer.add_scalar(k, v.item(), step)
+                elif isinstance(v, (np.ndarray, jnp.ndarray)) and v.size == 1:
+                    self.writer.add_scalar(k, v.item(), step)
 
         # Buffer for disk storage
         self.metrics_buffer.append(metrics_with_metadata)
@@ -330,6 +350,9 @@ class UnifiedLogger:
         """Finalize logging and cleanup."""
         # Flush remaining metrics
         self._flush_metrics()
+
+        if self.writer is not None:
+            self.writer.close()
 
         self.info(f"Run complete. Results saved to: {self.run_dir.absolute()}")
 
