@@ -1,14 +1,29 @@
 from dataclasses import dataclass
 
+import jax
 
+
+@jax.tree_util.register_dataclass
 @dataclass
 class PPOArgs:
     """
     source: https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_atari_envpool_xla_jax_scan.py
     """
 
+    # path to environment config file, if None, use default config
+    env_config_path: str | None = None
+
+    # path to hyperparameter config file (yaml), if None, use default config
+    hyperparameter_config_path: str | None = None
+
     # the name of this experiment
     exp_name: str = "brittle_star_ppo"
+
+    # the directory to save the experiment results
+    run_dir: str | None = None
+
+    # how often to save checkpoints (0 to disable)
+    checkpoint_frequency: int = 0
 
     # seed of the experiment
     seed: int = 1
@@ -44,8 +59,6 @@ class PPOArgs:
     hf_entity: str = ""
 
     # ==== Algorithm specific dataclasses ====
-    # the id of the environment
-    env_id: str = ""  # todo
 
     # total timesteps of the experiments
     total_timesteps: int = 10000000
@@ -54,7 +67,7 @@ class PPOArgs:
     learning_rate: float = 2.5e-4
 
     # the number of parallel game environments
-    num_envs: int = 16
+    num_envs: int = 100
 
     # the number of steps to run in each environment per policy rollout
     num_steps: int = 128
