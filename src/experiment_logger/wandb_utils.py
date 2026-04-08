@@ -52,7 +52,8 @@ def init_wandb(
 
         if not has_key and not is_interactive and os.environ.get("WANDB_MODE") != "offline":
             logger.warning(
-                "WANDB_API_KEY not found and environment is non-interactive. Switching to offline mode."
+                "WANDB_API_KEY not found and environment is non-interactive. "
+                "Switching to offline mode."
             )
             sync_path = f"runs/{name}" if name else "runs"
             logger.warning(f"WandB is offline. Use 'wandb sync {sync_path}' to upload logs later.")

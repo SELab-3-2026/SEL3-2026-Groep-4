@@ -5,7 +5,6 @@ from dataclasses import asdict, dataclass
 from functools import partial
 from typing import Any
 
-import flax
 import jax
 import jax.numpy as jnp
 import numpy as np
