@@ -105,6 +105,7 @@ class UnifiedLogger:
         self.text_log_file = self.run_dir / "run.log"
         self._text_logger = logging.getLogger(f"UnifiedLogger_{self.run_name}")
         self._text_logger.setLevel(log_level)
+        self._text_logger.propagate = False
 
         # Avoid duplicate handlers if re-instantiated
         if not self._text_logger.handlers:
