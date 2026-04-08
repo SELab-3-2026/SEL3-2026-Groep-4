@@ -6,6 +6,7 @@ This logger ensures all experimental data is preserved by writing to:
 3. stdout (for real-time monitoring)
 """
 
+import datetime
 import json
 import logging
 import subprocess
@@ -38,8 +39,8 @@ def get_logger() -> "UnifiedLogger":
         except Exception:
             commit_hash = "unknown"
 
-        timestamp = int(time.time())
-        generic_name = f"brittle_star_{commit_hash}_{timestamp}"
+        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        generic_name = f"{timestamp_str}_{commit_hash}_brittle_star"
 
         # Initialize generic fallback logger without WandB
         _global_logger = UnifiedLogger(
@@ -65,6 +66,7 @@ class UnifiedLogger:
         base_dir: str = "runs",
         use_wandb: bool = True,
         save_code: bool = True,
+        log_level: int = logging.INFO,
         _set_as_global: bool = True,
     ):
         """Initialize the unified logger.
@@ -100,7 +102,7 @@ class UnifiedLogger:
         # Setup standard Python logging mirror
         self.text_log_file = self.run_dir / "run.log"
         self._text_logger = logging.getLogger(f"UnifiedLogger_{self.run_name}")
-        self._text_logger.setLevel(logging.INFO)
+        self._text_logger.setLevel(log_level)
 
         # Avoid duplicate handlers if re-instantiated
         if not self._text_logger.handlers:
@@ -133,6 +135,10 @@ class UnifiedLogger:
         self.info(f"Initialized UnifiedLogger for run: {run_name}")
         self.info(f"Local storage: {self.run_dir.absolute()}")
         self.info(f"WandB logging: {self.wandb_available}")
+
+    def set_level(self, level: int):
+        """Dynamically update the verbosity of the stdout/text logger."""
+        self._text_logger.setLevel(level)
 
     def info(self, msg: str, *args, **kwargs):
         """Log an info message to stdout and disk."""
