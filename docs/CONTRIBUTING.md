@@ -32,4 +32,4 @@ Code readability is paramount, as code is read far more frequently than it is wr
 * **Algorithms & Frameworks:** Proximal Policy Optimization (PPO) is the recommended baseline algorithm. CleanRL should be used as a starting point and adapted for continuous action spaces. All Artificial Neural Network (ANN) controller architectures must be implemented using Flax.
 * **Simulation:** The simulation environment utilizes a MuJoCo brittle star. XML MuJoCo structures must remain realistic and respect morphological constraints.
 * **Experiment Tracking:** Weights & Biases (wandb) must be utilized for tracking and logging all experiments.
-* **Code Styling:** All code must conform to the chosen style guide (i.e. Google standard). This is enforced using build tools and pre-commit hooks such as flake8, black, or isort.
+* **Code Styling:** All code must conform to the chosen style guide (Google standard). This is enforced via `uv` using **ruff** and pre-commit hooks.

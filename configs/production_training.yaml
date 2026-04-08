@@ -1,0 +1,24 @@
+# Full PPO training config for Brittle Star (HPC Production)
+exp_name: "production_training"
+seed: 1
+track: true
+capture_video: true
+save_model: true
+checkpoint_frequency: 100  # not yet implemented in train.py but here for future use
+
+# Scaling for HPC (using A100 GPU slices)
+num_envs: 128
+total_timesteps: 10000000
+num_steps: 128
+num_minibatches: 4
+update_epochs: 4
+
+# Algorithm
+learning_rate: 2.5e-4
+anneal_lr: true
+gamma: 0.99
+gae_lambda: 0.95
+clip_coef: 0.1
+ent_coef: 0.01
+vf_coef: 0.5
+cuda: true

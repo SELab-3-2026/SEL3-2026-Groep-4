@@ -12,6 +12,10 @@ dependencies = [
     "gymnasium>=1.2.3",
     "ipykernel==7.2.0",
     "jax==0.9.0.1",
+    "numpy>=2.0.0",
+    "protobuf>=5.0.0",
+    "warp-lang",
+    "mujoco-warp",
     "matplotlib==3.10.8",
     "mediapy==1.2.6",
     "optax>=0.2.6",
@@ -19,11 +23,15 @@ dependencies = [
     "pyopengl-accelerate>=3.1.10",
     "tyro>=1.0.10",
     "wandb==0.24.2",
+    "torch>=2.4.0",
 ]
 
 [project.optional-dependencies]
 cuda = [
     "jax[cuda13]==0.9.0.1",
+]
+analysis = [
+    "tensorboard",
 ]
 
 [dependency-groups]
