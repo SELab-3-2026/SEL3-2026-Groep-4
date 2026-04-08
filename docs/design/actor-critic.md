@@ -20,7 +20,6 @@ This pipeline treats the agent as a single entity and uses standard Proximal Pol
 Our policy and value networks use separate input networks/feature extractors as advised by the SEL3 course assistants and the blog. For continuous actions this should allow better learning at a small cost.
 
 ```mermaid
-%%{ init: { 'flowchart': {'defaultRenderer': 'elk' } } }%%
 graph TD
     Obs([Global Observation])
 
@@ -69,7 +68,6 @@ critic for all nodes at once, for the following reasons:
   mathematically equivalent.
 
 ```mermaid
-%%{ init: { 'flowchart': {'defaultRenderer': 'elk' } } }%%
 graph TD
     Obs([Local Observation])
 
@@ -96,7 +94,6 @@ graph TD
     Crit --> OutCrit
 
     Prop -.->|"message passing"|Prop
-
 ```
 
 ## Implementation Details (Network Depth)
