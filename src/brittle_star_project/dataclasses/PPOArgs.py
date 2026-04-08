@@ -22,9 +22,6 @@ class PPOArgs:
     # the directory to save the experiment results
     run_dir: str | None = None
 
-    # how often to save checkpoints (0 to disable)
-    checkpoint_frequency: int = 0
-
     # seed of the experiment
     seed: int = 1
 

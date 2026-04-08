@@ -312,14 +312,14 @@ class PPOTrainer:
     def _init_episode_stats(self) -> EpisodeStatistics:
         self.logger.info("[EPISODE STATS]: Initializing episode stats...")
 
-        return EpisodeStatistics(
+        return EpisodeStatistics(  # type: ignore[call-arg]
             episode_returns=jnp.zeros(self.args.num_envs, dtype=jnp.float32),
             episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
             returned_episode_returns=jnp.zeros(self.args.num_envs, jnp.float32),
             returned_episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
         )
 
-    def _rollout(self, env_state, next_obs, next_done) -> tuple[Storage, ...]:
+    def _rollout(self, env_state, next_obs, next_done) -> tuple[Any, ...]:
         return self._rollout_jit(
             self.agent_state,
             self.episode_stats,

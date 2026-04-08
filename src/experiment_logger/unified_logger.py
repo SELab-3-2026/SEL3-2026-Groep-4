@@ -224,7 +224,7 @@ class UnifiedLogger:
         self._log_to_stdout(metrics_with_metadata)
 
         # Log to WandB
-        if self.wandb_available:
+        if self.wandb_run is not None:
             try:
                 self.wandb_run.log(metrics, step=step, commit=commit)
             except Exception as e:
@@ -306,7 +306,7 @@ class UnifiedLogger:
             self.info(f"Checkpoint saved: {checkpoint_path}")
 
             # Log to WandB as artifact
-            if self.wandb_available:
+            if self.wandb_run is not None:
                 try:
                     import wandb
 
@@ -342,7 +342,7 @@ class UnifiedLogger:
             self.info(f"Final model saved: {final_model_path}")
 
             # Log to WandB
-            if self.wandb_available:
+            if self.wandb_run is not None:
                 try:
                     import wandb
 

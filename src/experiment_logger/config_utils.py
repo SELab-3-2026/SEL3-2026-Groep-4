@@ -44,10 +44,10 @@ def dataclass_from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:
         raise ValueError(f"{cls} is not a dataclass")
 
     # Get field names and types
-    field_map = {f.name: f for f in fields(cls)}
+    field_map = {f.name: f for f in fields(cls)}  # type: ignore
 
     # Filter config to only include valid fields
-    filtered_config = {}
+    filtered_config: Dict[str, Any] = {}
     for key, value in config_dict.items():
         if key in field_map:
             field = field_map[key]
@@ -64,7 +64,7 @@ def dataclass_from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:
                     if field.type is bool and isinstance(value, str):
                         filtered_config[key] = value.lower() in ("true", "1", "yes", "on")
                     else:
-                        filtered_config[key] = field.type(value) if value is not None else None
+                        filtered_config[key] = field.type(value) if value is not None else None  # type: ignore
             except (ValueError, TypeError) as e:
                 log.warning(f"Could not convert {key}={value} to {field.type}: {e}")
                 filtered_config[key] = value
@@ -74,7 +74,7 @@ def dataclass_from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:
     return cls(**filtered_config)
 
 
-def merge_config_with_cli(config_class: Type[T], config_file: str = None) -> T:
+def merge_config_with_cli(config_class: Type[T], config_file: str | None = None) -> T:
     """Merge YAML config with CLI arguments, with CLI taking precedence.
 
     Args:
@@ -107,16 +107,16 @@ def merge_config_with_cli(config_class: Type[T], config_file: str = None) -> T:
 
     # Create default instance to know what the defaults are
     default_instance = config_class()
-    default_dict = {f.name: getattr(default_instance, f.name) for f in fields(config_class)}
+    default_dict = {f.name: getattr(default_instance, f.name) for f in fields(config_class)}  # type: ignore
 
     # Parse CLI args
     cli_instance = tyro.cli(config_class)
-    cli_dict = {f.name: getattr(cli_instance, f.name) for f in fields(config_class)}
+    cli_dict = {f.name: getattr(cli_instance, f.name) for f in fields(config_class)}  # type: ignore
 
     # Merge configs: YAML as base, CLI overrides non-default values
     final_config = {}
 
-    for field in fields(config_class):
+    for field in fields(config_class):  # type: ignore
         field_name = field.name
         default_value = default_dict[field_name]
         yaml_value = yaml_config.get(field_name, default_value)

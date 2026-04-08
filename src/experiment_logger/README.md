@@ -9,16 +9,19 @@ This library is designed to be a standalone package that decouples the logging l
 The recommended way to use the logger is through the `get_logger()` singleton:
 
 ```python
-from experiment_logger import get_logger
+from experiment_logger import UnifiedLogger, get_logger
 
-logger = get_logger()
 # Initialize at the start of your script (e.g., in train.py)
-logger.init(
-    project_name="MyProject",
+logger = UnifiedLogger(
     run_name="my_experiment_run",
+    config={"learning_rate": 3e-4},
+    project_name="MyProject",
     base_dir="runs",
     use_wandb=True
 )
+
+# In other files, retrieve the initialized singleton:
+# logger = get_logger()
 
 # Log metrics (Scalar values, numpy scalars, or JAX types)
 logger.log({"loss": 0.5, "accuracy": 0.98}, step=100)

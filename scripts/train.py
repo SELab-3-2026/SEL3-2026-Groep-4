@@ -10,7 +10,7 @@ from brittle_star_project.dataclasses import PPOArgs
 from brittle_star_project.trainers.PPOTrainer import PPOTrainer
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 
-from experiment_logger.unified_logger import get_logger
+from experiment_logger import UnifiedLogger
 from experiment_logger.config_utils import merge_config_with_cli, print_config
 
 
@@ -37,7 +37,7 @@ def get_git_hash() -> str:
         return (
             subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
         )
-    except subprocess.CalledProcessError | UnicodeDecodeError:
+    except (subprocess.CalledProcessError, UnicodeDecodeError):
         return "none"
 
 
@@ -59,8 +59,8 @@ if __name__ == "__main__":
     os.makedirs(run_dir, exist_ok=True)
 
     # Initialize Global Logger
-    logger = get_logger()
-    logger.init(
+    logger = UnifiedLogger(
+        config=vars(args),
         project_name=args.wandb_project_name,  # or default PPO-Modularity if missing
         run_name=run_name,
         base_dir=os.path.dirname(run_dir),
