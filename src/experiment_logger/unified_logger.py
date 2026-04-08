@@ -7,9 +7,9 @@ This logger ensures all experimental data is preserved by writing to:
 """
 
 import datetime
-import json
 import logging
 import subprocess
+import yaml
 import sys
 import time
 from pathlib import Path
@@ -99,7 +99,7 @@ class UnifiedLogger:
         self.metrics_dir = self.run_dir / "metrics"
         self.metrics_dir.mkdir(exist_ok=True)
 
-        self.config_file = self.run_dir / "config.json"
+        self.config_file = self.run_dir / "config.yaml"
 
         # Setup standard Python logging mirror
         self.text_log_file = self.run_dir / "run.log"
@@ -196,7 +196,7 @@ class UnifiedLogger:
         """Save configuration to disk."""
         try:
             with open(self.config_file, "w") as f:
-                json.dump(self.config, f, indent=2)
+                yaml.dump(self.config, f, default_flow_style=False, indent=2, sort_keys=False)
             self.info(f"Config saved to {self.config_file}")
         except Exception as e:
             self.error(f"Error saving config: {e}")
@@ -263,10 +263,10 @@ class UnifiedLogger:
             return
 
         try:
-            metrics_file = self.metrics_dir / "metrics.jsonl"
+            metrics_file = self.metrics_dir / "metrics.yaml"
             with open(metrics_file, "a") as f:
                 for metric in self.metrics_buffer:
-                    # Convert numpy/jax types to native Python types for JSON serialization
+                    # Convert numpy/jax types to native Python types for YAML serialization
                     serializable_metric = {}
                     for k, v in metric.items():
                         if hasattr(v, "item"):  # numpy/jax scalar
@@ -275,7 +275,8 @@ class UnifiedLogger:
                             serializable_metric[k] = v.tolist()
                         else:
                             serializable_metric[k] = v
-                    f.write(json.dumps(serializable_metric) + "\n")
+                    f.write("---\n")
+                    yaml.dump(serializable_metric, f, default_flow_style=False)
             self.metrics_buffer.clear()
         except Exception as e:
             self.error(f"Error flushing metrics: {e}")
@@ -298,9 +299,9 @@ class UnifiedLogger:
 
             # Save metadata if provided
             if metadata:
-                metadata_path = self.checkpoints_dir / f"{prefix}_step_{step}_metadata.json"
+                metadata_path = self.checkpoints_dir / f"{prefix}_step_{step}_metadata.yaml"
                 with open(metadata_path, "w") as f:
-                    json.dump(metadata, f, indent=2)
+                    yaml.dump(metadata, f, default_flow_style=False)
 
             self.info(f"Checkpoint saved: {checkpoint_path}")
 
@@ -334,9 +335,9 @@ class UnifiedLogger:
                 f.write(flax.serialization.to_bytes(params))
 
             if metadata:
-                metadata_path = self.run_dir / "final_model_metadata.json"
+                metadata_path = self.run_dir / "final_model_metadata.yaml"
                 with open(metadata_path, "w") as f:
-                    json.dump(metadata, f, indent=2)
+                    yaml.dump(metadata, f, default_flow_style=False)
 
             self.info(f"Final model saved: {final_model_path}")
 
