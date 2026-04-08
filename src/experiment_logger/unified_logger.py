@@ -10,6 +10,7 @@ import datetime
 import json
 import logging
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -86,6 +87,7 @@ class UnifiedLogger:
         self.use_wandb = use_wandb
         self.wandb_available = False
         self.wandb_run = None
+        self.is_interactive = sys.stdout.isatty()
 
         # Setup local storage
         self.run_dir = Path(base_dir) / run_name
@@ -149,6 +151,18 @@ class UnifiedLogger:
     def set_level(self, level: int):
         """Dynamically update the verbosity of the stdout/text logger."""
         self._text_logger.setLevel(level)
+
+    def log_non_interactive(self, msg: str, *args, **kwargs):
+        """Log an info message only if running in a non-interactive environment."""
+        if not self.is_interactive:
+            self.info(msg, *args, **kwargs)
+
+    def progress_bar(self, iterable=None, *args, **kwargs):
+        """Wrapper around tqdm that automatically disables in non-interactive environments."""
+        import tqdm
+
+        kwargs.setdefault("disable", not self.is_interactive)
+        return tqdm.tqdm(iterable, *args, **kwargs)
 
     def info(self, msg: str, *args, **kwargs):
         """Log an info message to stdout and disk."""

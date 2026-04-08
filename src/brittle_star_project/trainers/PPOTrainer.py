@@ -1,6 +1,5 @@
 import datetime
 import random
-import sys
 import time
 from dataclasses import asdict, dataclass
 from functools import partial
@@ -11,7 +10,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-import tqdm
 from flax.training.train_state import TrainState
 
 from experiment_logger import get_logger
@@ -367,9 +365,9 @@ class PPOTrainer:
         }
         self.logger.log(metrics, step=global_step)
 
-    def _step(self, env_state, next_obs, next_done, is_tty: bool, iteration: int) -> tuple:
-        if not is_tty and iteration == 1:
-            self.logger.info(f">>> [HPC] Starting first rollout (JIT): {time.ctime()}")
+    def _step(self, env_state, next_obs, next_done, iteration: int) -> tuple:
+        if iteration == 1:
+            self.logger.log_non_interactive(f"Starting first rollout (JIT): {time.ctime()}")
 
         (
             self.agent_state,
@@ -381,20 +379,20 @@ class PPOTrainer:
             next_env_state,
         ) = self._rollout(env_state, next_obs, next_done)
 
-        if not is_tty and iteration == 1:
-            self.logger.info(f">>> [HPC] First rollout completed: {time.ctime()}")
+        if iteration == 1:
+            self.logger.log_non_interactive(f"First rollout completed: {time.ctime()}")
 
         storage = self._compute_gae(storage, next_obs, next_done)
 
-        if not is_tty and iteration == 1:
-            self.logger.info(f">>> [HPC] Starting first PPO update (JIT): {time.ctime()}")
+        if iteration == 1:
+            self.logger.log_non_interactive(f"Starting first PPO update (JIT): {time.ctime()}")
 
         self.agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, self.key = (
             self._ppo.update_ppo(self.agent_state, storage, self.key)
         )
 
-        if not is_tty and iteration == 1:
-            self.logger.info(f">>> [HPC] First PPO update completed: {time.ctime()}")
+        if iteration == 1:
+            self.logger.log_non_interactive(f"First PPO update completed: {time.ctime()}")
 
         avg_episodic_return = float(
             jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns)).item()
@@ -439,49 +437,41 @@ class PPOTrainer:
         """
         self.logger.info(f"running name: {self.run_name}")
 
-        is_tty = sys.stdout.isatty()
         self.logger.info("[TRAIN]: Resetting environment...")
-
-        if not is_tty:
-            self.logger.info(f">>> [HPC] Initial reset started: {time.ctime()}")
+        self.logger.log_non_interactive(f"Initial reset started: {time.ctime()}")
 
         env_state = self.env.reset(seed=self.args.seed)
         next_obs = _convert_obs_dict_to_array(env_state.observations)
         next_done = jnp.zeros(self.args.num_envs, dtype=jnp.bool_)
 
-        if not is_tty:
-            self.logger.info(f">>> [HPC] Initial reset completed: {time.ctime()}")
+        self.logger.log_non_interactive(f"Initial reset completed: {time.ctime()}")
 
         global_step = 0
         start_time = time.time()
 
-        iter_bar = tqdm.tqdm(
-            range(1, self.args.num_iterations + 1),
-            disable=not is_tty,
-        )
+        iter_bar = self.logger.progress_bar(range(1, self.args.num_iterations + 1))
         for iteration in iter_bar:
             iteration_time_start = time.time()
 
             env_state, next_obs, next_done, loss_info = self._step(
-                env_state, next_obs, next_done, is_tty=is_tty, iteration=iteration
+                env_state, next_obs, next_done, iteration=iteration
             )
 
             global_step += self.args.num_steps * self.args.num_envs
             self._log(global_step, self.episode_stats, start_time, iteration_time_start, loss_info)
 
-            if not is_tty:
-                sps = int(global_step / (time.time() - start_time))
-                remaining_steps = self.args.total_timesteps - global_step
-                eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
-                eta_str = str(datetime.timedelta(seconds=eta_seconds))
+            sps = int(global_step / (time.time() - start_time))
+            remaining_steps = self.args.total_timesteps - global_step
+            eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
+            eta_str = str(datetime.timedelta(seconds=eta_seconds))
 
-                self.logger.info(
-                    f"Iteration {iteration}/{self.args.num_iterations} | "
-                    f"Step {global_step}/{self.args.total_timesteps} | "
-                    f"SPS {sps} | "
-                    f"Return {loss_info.avg_episodic_return:.4f} | "
-                    f"ETA {eta_str}"
-                )
+            self.logger.log_non_interactive(
+                f"Iteration {iteration}/{self.args.num_iterations} | "
+                f"Step {global_step}/{self.args.total_timesteps} | "
+                f"SPS {sps} | "
+                f"Return {loss_info.avg_episodic_return:.4f} | "
+                f"ETA {eta_str}"
+            )
 
         if self.args.save_model:
             model_path = f"{self.run_dir}/{self.args.exp_name}.cleanrl_model"
