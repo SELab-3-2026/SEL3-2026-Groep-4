@@ -16,14 +16,14 @@ from experiment_logger import get_logger
 
 from brittle_star_project.dataclasses import EpisodeStatistics, PPOArgs
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
-from MLPs.mlps import (
+from brittle_star_project.MLPs.mlps import (
     Actor,
     AgentParams,
     GenericDenseLayersWithActivation,
     OneDenseLayerMLP,
     Storage,
 )
-from ppo import PPO
+from brittle_star_project.ppo import PPO
 
 
 @jax.jit
