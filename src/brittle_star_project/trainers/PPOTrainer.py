@@ -203,6 +203,8 @@ class LossInfo:
     avg_episodic_return: Any
     # Example of better typing
     explained_variance: float
+    num_terminated: int
+    num_truncated: int
 
 
 class PPOTrainer:
@@ -359,6 +361,8 @@ class PPOTrainer:
             .hyperparams["learning_rate"]
             .item(),
             "charts/explained_variance": loss_info.explained_variance,
+            "charts/num_terminated": loss_info.num_terminated,
+            "charts/num_truncated": loss_info.num_truncated,
             "losses/value_loss": loss_info.v_loss[-1, -1].item(),
             "losses/policy_loss": loss_info.pg_loss[-1, -1].item(),
             "losses/entropy": loss_info.entropy_loss[-1, -1].item(),
@@ -408,6 +412,12 @@ class PPOTrainer:
             storage.values, storage.returns
         )
 
+        terminated = next_env_state.terminated  # (num_envs,)
+        truncated = next_env_state.truncated  # (num_envs,)
+
+        num_terminated = int(jnp.sum(terminated).item())
+        num_truncated  = int(jnp.sum(truncated).item())
+        
         return (
             next_env_state,
             next_obs,
@@ -419,7 +429,9 @@ class PPOTrainer:
                 entropy_loss=entropy_loss,
                 approx_kl=approx_kl,
                 avg_episodic_return=avg_episodic_return,
-                explained_variance=explained_var
+                explained_variance=explained_var,
+                num_terminated=num_terminated,
+                num_truncated=num_truncated
             ),
         )
 
