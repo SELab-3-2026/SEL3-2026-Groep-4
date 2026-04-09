@@ -24,6 +24,10 @@ from brittle_star_project.MLPs.mlps import (
 )
 from brittle_star_project.ppo import PPO
 
+def _compute_explained_variance(values: jnp.ndarray, returns: jnp.ndarray) -> float:
+    var_returns = jnp.var(returns)
+    explained_var = 1.0 - jnp.var(returns - values) / (var_returns + 1e-8)
+    return float(explained_var)
 
 @jax.jit
 def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, learning_rate):
@@ -197,6 +201,8 @@ class LossInfo:
     entropy_loss: Any
     approx_kl: Any
     avg_episodic_return: Any
+    # Example of better typing
+    explained_variance: float
 
 
 class PPOTrainer:
@@ -352,6 +358,7 @@ class PPOTrainer:
             "charts/learning_rate": self.agent_state.opt_state[1]
             .hyperparams["learning_rate"]
             .item(),
+            "charts/explained_variance": loss_info.explained_variance,
             "losses/value_loss": loss_info.v_loss[-1, -1].item(),
             "losses/policy_loss": loss_info.pg_loss[-1, -1].item(),
             "losses/entropy": loss_info.entropy_loss[-1, -1].item(),
@@ -397,6 +404,10 @@ class PPOTrainer:
             jnp.mean(jax.device_get(self.episode_stats.returned_episode_returns)).item()
         )
 
+        explained_var = _compute_explained_variance(
+            storage.values, storage.returns
+        )
+
         return (
             next_env_state,
             next_obs,
@@ -408,6 +419,7 @@ class PPOTrainer:
                 entropy_loss=entropy_loss,
                 approx_kl=approx_kl,
                 avg_episodic_return=avg_episodic_return,
+                explained_variance=explained_var
             ),
         )
 
