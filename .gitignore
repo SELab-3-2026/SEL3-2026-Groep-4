@@ -3,9 +3,6 @@ artifacts/*
 runs/*
 wandb/
 
-# Experiment tracking
-wandb/
-
 # Python-generated files
 __pycache__/
 *.py[oc]

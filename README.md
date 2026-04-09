@@ -34,19 +34,19 @@ uv sync --frozen
 example command:
 
 ```bash
-uv run python src/train.py
+uv run python scripts/train.py
 ```
 
 Or use a custom config file:
 
 ```bash
-uv run python src/train.py --config configs/my_experiment.yaml
+uv run python scripts/train.py --config configs/my_experiment.yaml
 ```
 
 Override specific parameters:
 
 ```bash
-uv run python src/train.py --learning-rate 0.001 --num-envs 32 --track
+uv run python scripts/train.py --learning-rate 0.001 --num-envs 32 --track
 ```
 
 ### Logging
