@@ -7,6 +7,11 @@ inputs must be distributed fairly to guarantee an objective comparison between d
 - Positions and joints, which are normalized to floating-point values between 0 and 1, are considered local inputs.
 - The reward function is centered around minimizing the distance to the goal or maximizing the movement towards the goal
   within a finite number of timesteps $T$.
+- To motivate efficient movement, the amount of timesteps taken to reach the goal will be used as penalty.
+
+## From reward to PPO
+
+The resulting reward is passed to our PPO library. Our critic network (value function) predicts how good our eventual reward will be for the current state, this value is combined with the reward from the reward function to get advantages. These advantages are then used to calculate the losses to update both our critic and actor pipeline.
 
 ## Rationale
 

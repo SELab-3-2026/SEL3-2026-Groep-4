@@ -1,8 +1,11 @@
 # Brittle Star
 
-## Quick Start
+> What is the impact of different levels of controller-modularity on the learning-speed, coordination and tolerance for
+defects (e.g. amputations) in brittle-star-like robots trained with Reinforcement Learning?
 
-### Installation
+## Quick start
+
+### Local setup
 
 To set up the UV module, you can run the following command:
 
@@ -49,15 +52,10 @@ Override specific parameters:
 uv run python scripts/train.py --learning-rate 0.001 --num-envs 32 --track
 ```
 
-### Logging
-
-The training script uses a unified logging framework that:
-- Logs to **WandB** (when enabled)
-- Saves metrics to **local disk** (JSON files in `runs/`)
-- Displays progress in **stdout**
-
-All experiment data is preserved locally, even if WandB is unavailable.
-
 ## HPC
 
 See **[docs/HPC.md](docs/HPC.md)** for the full guide, including environment setup, cluster selection, interactive debugging, and job submission.
+
+## Documentation
+
+Please find all documentation and a starting point for more information in [corresponding README](./docs/README.md).
