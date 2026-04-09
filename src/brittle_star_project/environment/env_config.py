@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import json
 
 from .env_types import Task
 
@@ -51,14 +50,11 @@ class EnvConfig:
 
 
 def from_file(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
-    """Load configurations from a JSON or YAML file."""
-    with open(path, "r") as f:
-        if path.endswith(".yaml") or path.endswith(".yml"):
-            import yaml
+    """Load configurations from a YAML file."""
+    import yaml
 
-            config_dict = yaml.safe_load(f)
-        else:
-            config_dict = json.load(f)
+    with open(path, "r") as f:
+        config_dict = yaml.safe_load(f)
 
         morphology = MorphologyConfig(**config_dict.get("morphology", {}))
         arena = ArenaConfig(**config_dict.get("arena", {}))

@@ -53,8 +53,20 @@ echo ">>> Starting BrittleStar training..."
 export MUJOCO_GL=egl
 export WANDB_DIR="$SCRATCH_RUNDIR"
 
-python src/train.py \
+export PYTHONPATH="$PBS_O_WORKDIR/src:${PYTHONPATH:-}"
+
+if [ -f "$VSC_DATA/$PROJ_NAME/.env" ]; then
+    echo ">>> Sourcing API keys from .env..."
+    export $(grep -v '^#' "$VSC_DATA/$PROJ_NAME/.env" | xargs)
+elif [ -f "$PBS_O_WORKDIR/.env" ]; then
+    echo ">>> Sourcing API keys from .env..."
+    export $(grep -v '^#' "$PBS_O_WORKDIR/.env" | xargs)
+fi
+
+# TODO Once experiments get serious, change the config
+python scripts/train.py \
     --env-config-path configs/hpc/smoke_test.yaml \
+    --hyperparameter-config-path configs/hpc/smoke_test.yaml \
     --run-dir "$SCRATCH_RUNDIR"
 
 echo ">>> Staging out results to $DATA_RUNDIR..."

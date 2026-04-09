@@ -33,3 +33,12 @@ Code readability is paramount, as code is read far more frequently than it is wr
 * **Simulation:** The simulation environment utilizes a MuJoCo brittle star. XML MuJoCo structures must remain realistic and respect morphological constraints.
 * **Experiment Tracking:** Weights & Biases (wandb) must be utilized for tracking and logging all experiments.
 * **Code Styling:** All code must conform to the chosen style guide (Google standard). This is enforced via `uv` using **ruff** and pre-commit hooks.
+
+## 5. AI-Assisted Development & Code Review
+
+This project supports AI-assisted development to enhance productivity, but contributors must take full responsibility for all AI-generated outputs.
+
+* **Self-Review Requirement:** Contributors must thoroughly self-review all AI-assisted code, documentation, and configurations before requesting peer review. This includes verifying correctness, adherence to project standards, scientific validity, and integration with existing code.
+* **Quality Standards:** AI-generated content must meet the same rigorous standards as manually written code, including proper testing, documentation, and alignment with the scientific methodology outlined in Section 1.
+* **Available Skills:** This project provides specific AI skills for common tasks (located in `.agents/skills/`), including linting and testing workflows. Contributors should leverage these skills to maintain consistency and quality.
+* **Transparency:** When using AI assistance for complex algorithmic decisions or scientific design choices, contributors should document the rationale in commit messages or code comments where appropriate.

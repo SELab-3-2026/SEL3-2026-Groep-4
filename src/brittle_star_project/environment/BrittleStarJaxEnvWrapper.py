@@ -35,6 +35,13 @@ class BrittleStarJaxEnvWrapper:
 
         self._action_rng = None
 
+        from experiment_logger import get_logger
+
+        self.logger = get_logger()
+        self.logger.info(
+            f"Initialized BrittleStarJaxEnvWrapper with {num_envs} envs on {backend.value}"
+        )
+
     @property
     def backend(self):
         return self._backend
@@ -52,6 +59,7 @@ class BrittleStarJaxEnvWrapper:
         return self._env.observation_space
 
     def reset(self, seed: int = 0):
+        self.logger.info(f"Resetting vectorized environment environments with seed {seed}")
         self._action_rng, env_rng = jax.random.split(jax.random.PRNGKey(seed), 2)
         env_rngs = jnp.array(jax.random.split(env_rng, self._num_envs))
         return self._vectorized_reset(rng=env_rngs)

@@ -11,7 +11,7 @@ resolution-markers = [
 [[package]]
 name = "2026sel3-project"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "biorobot" },
     { name = "cleanrl" },
@@ -28,6 +28,7 @@ dependencies = [
     { name = "protobuf" },
     { name = "pyopengl" },
     { name = "pyopengl-accelerate" },
+    { name = "pyyaml" },
     { name = "torch" },
     { name = "tyro" },
     { name = "wandb" },
@@ -67,6 +68,7 @@ requires-dist = [
     { name = "protobuf", specifier = ">=5.0.0" },
     { name = "pyopengl", specifier = ">=3.1.10" },
     { name = "pyopengl-accelerate", specifier = ">=3.1.10" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "tensorboard", marker = "extra == 'analysis'" },
     { name = "torch", specifier = ">=2.4.0" },
     { name = "tyro", specifier = ">=1.0.10" },
