@@ -10,7 +10,7 @@ from brittle_star_project import (
     SimulationConfig,
     simulate_policy,
 )
-from brittle_star_project.environment import from_json
+from brittle_star_project.environment import from_file
 from brittle_star_project.rl import RLModel  # imports concrete models via rl.__init__
 from brittle_star_project.rl.base import get_rl_model_registry
 
@@ -44,7 +44,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    morphology_cfg, arena_cfg, env_cfg = from_json("../configs/test.json")
+    morphology_cfg, arena_cfg, env_cfg = from_file("../configs/test.yaml")
 
     # ======= ENVIRONMENT SETUP =======
 

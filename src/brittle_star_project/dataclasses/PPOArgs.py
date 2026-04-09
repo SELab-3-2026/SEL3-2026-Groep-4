@@ -22,9 +22,6 @@ class PPOArgs:
     # the directory to save the experiment results
     run_dir: str | None = None
 
-    # how often to save checkpoints (0 to disable)
-    checkpoint_frequency: int = 0
-
     # seed of the experiment
     seed: int = 1
 
@@ -41,13 +38,16 @@ class PPOArgs:
     wandb_project_name: str = "PPO-Modularity"
 
     # the entity (team) of wandb's project
-    wandb_entity: str | None = None
+    wandb_entity: str | None = "SEL3-2026-Groep-4"
 
     # whether to capture videos of the agent performances (check out `videos` folder)
     capture_video: bool = False
 
     # whether to save model into the `runs/{run_name}` folder
     save_model: bool = True
+
+    # checkpoint frequency (in iterations, 0 = no intermediate checkpoints)
+    checkpoint_frequency: int = 100
 
     # whether to upload the saved model to huggingface
     upload_model: bool = False

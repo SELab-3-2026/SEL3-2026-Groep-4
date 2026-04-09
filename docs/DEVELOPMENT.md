@@ -59,3 +59,25 @@ Verify your setup by running the JAX initialization test:
 uv run pytest tests/test_jax_init.py
 ```
 In the devcontainer, this will succeed on both CPU and GPU. A `GpuDevice` is expected if a GPU is detected and the `cuda` extra was installed.
+
+## Logging & Monitoring
+
+This project uses a unified logging system through the `experiment_logger` package. For a full API reference, see the [package README](../src/experiment_logger/README.md).
+
+### Quick Setup
+
+1.  **Authorization**: Export your API key in your terminal to enable WandB synchronization:
+    ```bash
+    export WANDB_API_KEY=your_copied_api_key_here
+    ```
+2.  **Toggle Tracking**: Use the `--track` flag in `scripts/train.py` to enable online sync.
+3.  **Local Monitoring**: All runs are recorded in the `runs/` directory. View scalars with TensorBoard:
+    ```bash
+    tensorboard --logdir runs/
+    ```
+
+### Environment Awareness
+
+The logger automatically detects if it is running in an interactive terminal or a non-interactive environment (like an HPC Slurm job). It will automatically disable progress bars and switch to robust fallback modes (offline logging) to ensure your experiments never hang.
+
+
