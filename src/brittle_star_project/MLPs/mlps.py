@@ -49,14 +49,14 @@ class AgentParams:
 @jax.tree_util.register_dataclass
 @dataclass
 class Storage:
-    obs: jnp.array
-    actions: jnp.array
-    logprobs: jnp.array
-    dones: jnp.array
-    values: jnp.array
-    advantages: jnp.array
-    returns: jnp.array
-    rewards: jnp.array
+    obs: jax.Array
+    actions: jax.Array
+    logprobs: jax.Array
+    dones: jax.Array
+    values: jax.Array
+    advantages: jax.Array
+    returns: jax.Array
+    rewards: jax.Array
 
     def replace(self, **kwargs) -> "Storage":
         fs = fields(self)

@@ -169,11 +169,19 @@ def _compute_gae_once(carry, inp, gamma, gae_lambda):
 
 # jit applied on partial-wrapped wrapper method self._compute_gae_jit
 def _compute_gae_jit(
-    agent_state, storage, next_obs, next_done, gamma, gae_lambda, num_envs, sensor, critic
+    agent_state,
+    storage,
+    next_obs,
+    next_done,
+    gamma,
+    gae_lambda,
+    num_envs,
+    feature_extractor,
+    critic,
 ):
     next_value = critic.apply(
         agent_state.params["critic_params"],
-        sensor.apply(agent_state.params["sensor_params"], next_obs),
+        feature_extractor.apply(agent_state.params["sensor_params"], next_obs),
     ).squeeze(-1)
 
     advantages = jnp.zeros((num_envs,))
@@ -232,7 +240,7 @@ class PPOTrainer:
                 num_envs=self.args.num_envs,
                 gamma=self.args.gamma,
                 gae_lambda=self.args.gae_lambda,
-                sensor=self.sensor,
+                feature_extractor=self.feature_extractor,
                 critic=self.critic,
             )
         )
