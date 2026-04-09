@@ -205,6 +205,8 @@ class LossInfo:
     explained_variance: float
     num_terminated: int
     num_truncated: int
+    avg_terminated_length: Any
+    avg_truncated_length: Any
 
 
 class PPOTrainer:
@@ -363,6 +365,8 @@ class PPOTrainer:
             "charts/explained_variance": loss_info.explained_variance,
             "charts/num_terminated": loss_info.num_terminated,
             "charts/num_truncated": loss_info.num_truncated,
+            "charts/avg_terminated_ep_length": loss_info.avg_terminated_length,
+            "charts/avg_truncated_ep_length": loss_info.avg_truncated_length,
             "losses/value_loss": loss_info.v_loss[-1, -1].item(),
             "losses/policy_loss": loss_info.pg_loss[-1, -1].item(),
             "losses/entropy": loss_info.entropy_loss[-1, -1].item(),
@@ -414,10 +418,21 @@ class PPOTrainer:
 
         terminated = next_env_state.terminated  # (num_envs,)
         truncated = next_env_state.truncated  # (num_envs,)
+        episode_lengths = self.episode_stats.returned_episode_lengths
 
         num_terminated = int(jnp.sum(terminated).item())
         num_truncated  = int(jnp.sum(truncated).item())
         
+        avg_terminated_length = (
+            jnp.sum(episode_lengths * terminated) /
+            jnp.maximum(jnp.sum(terminated), 1)
+        )
+
+        avg_truncated_length = (
+            jnp.sum(episode_lengths * truncated) /
+            jnp.maximum(jnp.sum(truncated), 1)
+        )
+
         return (
             next_env_state,
             next_obs,
@@ -431,7 +446,9 @@ class PPOTrainer:
                 avg_episodic_return=avg_episodic_return,
                 explained_variance=explained_var,
                 num_terminated=num_terminated,
-                num_truncated=num_truncated
+                num_truncated=num_truncated,
+                avg_terminated_length=avg_terminated_length,
+                avg_truncated_length=avg_truncated_length
             ),
         )
 
