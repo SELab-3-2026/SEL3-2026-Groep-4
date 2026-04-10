@@ -1,0 +1,13 @@
+# Configuration for debug session
+exp_name: "debug-experiment-10042026" # started on april 10
+seed: 42
+track: true
+wandb_project_name: "Let's-find-that-bug"
+wandb_entity: "SEL3-2026-Groep-4"
+
+num_envs: 32
+num_steps: 32
+total_timesteps: 102400
+
+cuda: true
+

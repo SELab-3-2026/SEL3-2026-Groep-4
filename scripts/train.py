@@ -68,7 +68,19 @@ if __name__ == "__main__":
     print_config(args, title="PPO Training Configuration")
 
     env = make_env(args.env_config_path, args.num_envs)
-
+    raw_env = env.raw
+    print(
+        "\n\n\n Observation space \n",
+        raw_env.observation_space,
+        "Action space \n",
+        raw_env.action_space,
+    )
+    print(
+        "\n\n\n Observation space \n",
+        raw_env.observation_space,
+        "Action space \n",
+        raw_env.action_space,
+    )
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
     ppo_trainer = PPOTrainer(args, env, run_dir, run_name)
