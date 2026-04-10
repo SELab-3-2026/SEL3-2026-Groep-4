@@ -27,12 +27,19 @@ from brittle_star_project.ppo import PPO
 
 @jax.jit
 def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, learning_rate):
+    """
+    Linear scheduler, as first approach for our models.
+    First setup assumes that we want to adapt less in later stages, linearly scaled.
+    """
     frac = 1.0 - (count // (minibatch_count * update_epochs)) / num_iterations
     return learning_rate * frac
 
 
 @jax.jit
 def _convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
+    """
+    Turn observation into a vectorized jax map, needed for efficient jax jit
+    """
     return jax.vmap(lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0]))(
         obs_dict
     )
@@ -48,6 +55,10 @@ def _get_action_and_value_noise(
     next_obs: jnp.ndarray,
     key: jax.random.PRNGKey,
 ):
+    """
+    Sample an action and value from our MLP pipeline.
+    This is used during rollout to test our model in the training phase.
+    """
     hidden = sensor.apply(agent_state.params["sensor_params"], next_obs)
     hidden_critic = feature_extractor.apply(
         agent_state.params["feature_extractor_params"], next_obs
@@ -74,6 +85,10 @@ def _step_once(
     actor: Actor,
     critic: OneDenseLayerMLP,
 ):
+    """
+    Takes one step in the environment and updates our storage state.
+    Makes our code more modular.
+    """
     agent_state, episode_stats, obs, done, key, env_state = carry
     action, logprob, value, key = _get_action_and_value_noise(
         sensor, feature_extractor, actor, critic, agent_state, obs, key
@@ -98,6 +113,10 @@ def _step_once(
 
 # removed jit: used in _rollout_jit, so will be compiled with _rollout_jit
 def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
+    """
+    Wrapped step function for jax jitting.
+    Takes a jax jitted step and updates state.
+    """
     next_env_state = env_step_fn(env_state, action)
 
     # Extract per-environment signals from the state object
@@ -141,6 +160,11 @@ def _rollout_jit(
     actor: Actor,
     critic: OneDenseLayerMLP,
 ):
+    """
+    Rollout steps.
+    Takes steps in environment and updates states.
+    Jax.lax for efficiently applying it on all envs.
+    """
     (agent_state, episode_stats, next_obs, next_done, key, env_state), storage = jax.lax.scan(
         partial(
             _step_once,
@@ -159,6 +183,9 @@ def _rollout_jit(
 
 # removed jit: used in _compute_gae_jit, so will be compiled with _compute_gae_jit
 def _compute_gae_once(carry, inp, gamma, gae_lambda):
+    """
+    Helper to compute advantages, needed to see how good our model was.
+    """
     advantages = carry
     nextdone, nextvalues, curvalues, reward = inp
     nextnonterminal = 1.0 - nextdone
@@ -171,6 +198,12 @@ def _compute_gae_once(carry, inp, gamma, gae_lambda):
 def _compute_gae_jit(
     agent_state, storage, next_obs, next_done, gamma, gae_lambda, num_envs, sensor, critic
 ):
+    """
+    Gets value prediction from critic, and calls the
+    advantage helper with jax.lax.scan for
+    efficient application on all envs.
+    Finally returns updated storage.
+    """
     next_value = critic.apply(
         agent_state.params["critic_params"],
         sensor.apply(agent_state.params["sensor_params"], next_obs),
@@ -190,6 +223,10 @@ def _compute_gae_jit(
 
 @dataclass
 class LossInfo:
+    """
+    Helper class to store data for logging
+    """
+
     # todo: better typing
     loss: Any
     pg_loss: Any
@@ -200,7 +237,14 @@ class LossInfo:
 
 
 class PPOTrainer:
+    """
+    Main training loop class.
+    """
+
     def __init__(self, args: PPOArgs, env: BrittleStarJaxEnvWrapper, run_dir: str, run_name: str):
+        """
+        Sets args and prepares partial jitted functions to be used later.
+        """
         self.args = args
         self.env = env
         self.run_dir = run_dir
@@ -246,12 +290,18 @@ class PPOTrainer:
         self._init_random()
 
     def _init_random(self):
+        """
+        Set seed, used for randomized environment.
+        """
         self.logger.info(f"[RANDOM]: Setting random seed to {self.args.seed}")
 
         random.seed(self.args.seed)
         np.random.seed(self.args.seed)
 
     def _init_agent(self):
+        """
+        Sets up MLPs.
+        """
         self.logger.info("[AGENT]: Initializing agent...")
 
         sensor = GenericDenseLayersWithActivation()
@@ -264,6 +314,11 @@ class PPOTrainer:
         return sensor, feature_extractor, actor, critic
 
     def _init_agent_state(self) -> TrainState:
+        """
+        Prepares the full training state,
+        this contains the MLP configs
+        and their params.
+        """
         self.logger.info("[AGENT STATE]: Initializing agent state...")
 
         self.key, sensor_key, actor_key, critic_key, feature_extractor_key = jax.random.split(
@@ -309,6 +364,10 @@ class PPOTrainer:
         )
 
     def _init_episode_stats(self) -> EpisodeStatistics:
+        """
+        Epiosde stats tell us how long a rollout ran,
+        we use this for debugging.
+        """
         self.logger.info("[EPISODE STATS]: Initializing episode stats...")
 
         return EpisodeStatistics(  # type: ignore[call-arg]
@@ -344,6 +403,9 @@ class PPOTrainer:
         iteration_time_start,
         loss_info,
     ):
+        """
+        Helper to log our metrics to the logger backend.
+        """
         metrics = {
             "charts/avg_episodic_return": loss_info.avg_episodic_return,
             "charts/avg_episodic_length": np.mean(
@@ -365,6 +427,9 @@ class PPOTrainer:
         self.logger.log(metrics, step=global_step)
 
     def _step(self, env_state, next_obs, next_done, iteration: int) -> tuple:
+        """
+        Main step helper
+        """
         if iteration == 1:
             self.logger.log_non_interactive(f"Starting first rollout (JIT): {time.ctime()}")
 
