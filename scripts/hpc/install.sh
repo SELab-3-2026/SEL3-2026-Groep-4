@@ -46,8 +46,6 @@ source vsc-venv --activate \
 set -euo pipefail
 cd "$PBS_O_WORKDIR"
 
-uv run pip install .
-
 echo '>>> Installing ipykernel...'
 CLUSTER_ID="${VSC_INSTITUTE_CLUSTER:-generic}"
 python -m ipykernel install --user --name="sel3_${CLUSTER_ID}" \
