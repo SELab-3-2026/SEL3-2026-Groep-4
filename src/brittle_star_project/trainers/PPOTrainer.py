@@ -44,7 +44,6 @@ def _convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
     )
 
 
-# removed jit: used in _rollout_jit, so will be compiled with _rollout_jit
 def _get_action_and_value_noise(
     sensor: GenericDenseLayersWithActivation,
     feature_extractor: GenericDenseLayersWithActivation,
@@ -59,7 +58,6 @@ def _get_action_and_value_noise(
         agent_state.params["feature_extractor_params"], next_obs
     )
 
-    # Continuous actions: sample from a Gaussian parameterized by the actor
     mean, log_std = actor.apply(agent_state.params["actor_params"], hidden)
     key, subkey = jax.random.split(key)
     noise = jax.random.normal(subkey, shape=mean.shape)
@@ -70,7 +68,6 @@ def _get_action_and_value_noise(
     return action, logprob, value.squeeze(-1), key
 
 
-# removed jit: used in _rollout_jit, so will be compiled with _rollout_jit
 def _step_once(
     carry,
     _,
@@ -102,15 +99,13 @@ def _step_once(
     return (agent_state, episode_stats, next_obs, next_done, key, env_state), storage
 
 
-# removed jit: used in _rollout_jit, so will be compiled with _rollout_jit
 def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     next_env_state = env_step_fn(env_state, action)
 
-    # Extract per-environment signals from the state object
-    reward = next_env_state.reward  # (num_envs,)
-    terminated = next_env_state.terminated  # (num_envs,)
-    truncated = next_env_state.truncated  # (num_envs,)
-    done = terminated | truncated  # (num_envs,)
+    reward = next_env_state.reward
+    terminated = next_env_state.terminated
+    truncated = next_env_state.truncated
+    done = terminated | truncated
 
     new_episode_return = episode_stats.episode_returns + reward
     new_episode_length = episode_stats.episode_lengths + 1
@@ -132,7 +127,6 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     )
 
 
-# jit applied in wrapper method self._rollout_jit using partial
 def _rollout_jit(
     agent_state,
     episode_stats,
@@ -163,7 +157,6 @@ def _rollout_jit(
     return agent_state, episode_stats, next_obs, next_done, storage, key, env_state
 
 
-# removed jit: used in _compute_gae_jit, so will be compiled with _compute_gae_jit
 def _compute_gae_once(carry, inp, gamma, gae_lambda):
     advantages = carry
     nextdone, nextvalues, curvalues, reward = inp
@@ -173,7 +166,6 @@ def _compute_gae_once(carry, inp, gamma, gae_lambda):
     return advantages, advantages
 
 
-# jit applied on partial-wrapped wrapper method self._compute_gae_jit
 def _compute_gae_jit(
     agent_state,
     storage,
@@ -203,15 +195,13 @@ def _compute_gae_jit(
 
 
 @dataclass
-class LossInfo:
-    # todo: better typing
-    loss: Any
-    pg_loss: Any
-    v_loss: Any
-    entropy_loss: Any
-    approx_kl: Any
-    avg_episodic_return: Any
-    # Example of better typing
+class TrainingMeasurements:
+    loss: jnp.ndarray
+    pg_loss: jnp.ndarray
+    v_loss: jnp.ndarray
+    entropy_loss: jnp.ndarray
+    approx_kl: jnp.ndarray
+    avg_episodic_return: float
     explained_variance: float
     num_terminated: int
     num_truncated: int
@@ -276,11 +266,8 @@ class PPOTrainer:
 
         sensor = GenericDenseLayersWithActivation()
         feature_extractor = GenericDenseLayersWithActivation()
-        actor = Actor(
-            action_dim=self.env.single_action_space.shape[0]
-        )  # continuous actions for MJX
+        actor = Actor(action_dim=self.env.single_action_space.shape[0])
         critic = OneDenseLayerMLP()
-        # messenger = OneDenseLayerMLP()
         return sensor, feature_extractor, actor, critic
 
     def _init_agent_state(self) -> TrainState:
@@ -331,7 +318,7 @@ class PPOTrainer:
     def _init_episode_stats(self) -> EpisodeStatistics:
         self.logger.info("[EPISODE STATS]: Initializing episode stats...")
 
-        return EpisodeStatistics(  # type: ignore[call-arg]
+        return EpisodeStatistics(
             episode_returns=jnp.zeros(self.args.num_envs, dtype=jnp.float32),
             episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
             returned_episode_returns=jnp.zeros(self.args.num_envs, jnp.float32),
@@ -362,26 +349,26 @@ class PPOTrainer:
         episode_stats,
         start_time,
         iteration_time_start,
-        loss_info,
+        training_measurements,
     ):
         metrics = {
-            "charts/avg_episodic_return": loss_info.avg_episodic_return,
+            "charts/avg_episodic_return": training_measurements.avg_episodic_return,
             "charts/avg_episodic_length": np.mean(
                 jax.device_get(episode_stats.returned_episode_lengths)
             ),
             "charts/learning_rate": self.agent_state.opt_state[1]
             .hyperparams["learning_rate"]
             .item(),
-            "charts/explained_variance": loss_info.explained_variance,
-            "charts/num_terminated": loss_info.num_terminated,
-            "charts/num_truncated": loss_info.num_truncated,
-            "charts/avg_terminated_ep_length": loss_info.avg_terminated_length,
-            "charts/avg_truncated_ep_length": loss_info.avg_truncated_length,
-            "losses/value_loss": loss_info.v_loss[-1, -1].item(),
-            "losses/policy_loss": loss_info.pg_loss[-1, -1].item(),
-            "losses/entropy": loss_info.entropy_loss[-1, -1].item(),
-            "losses/approx_kl": loss_info.approx_kl[-1, -1].item(),
-            "losses/loss": loss_info.loss[-1, -1].item(),
+            "charts/explained_variance": training_measurements.explained_variance,
+            "charts/num_terminated": training_measurements.num_terminated,
+            "charts/num_truncated": training_measurements.num_truncated,
+            "charts/avg_terminated_ep_length": training_measurements.avg_terminated_length,
+            "charts/avg_truncated_ep_length": training_measurements.avg_truncated_length,
+            "losses/value_loss": training_measurements.v_loss[-1, -1].item(),
+            "losses/policy_loss": training_measurements.pg_loss[-1, -1].item(),
+            "losses/entropy": training_measurements.entropy_loss[-1, -1].item(),
+            "losses/approx_kl": training_measurements.approx_kl[-1, -1].item(),
+            "losses/loss": training_measurements.loss[-1, -1].item(),
             "charts/SPS": int(global_step / (time.time() - start_time)),
             "charts/SPS_update": int(
                 self.args.num_envs * self.args.num_steps / (time.time() - iteration_time_start)
@@ -424,8 +411,8 @@ class PPOTrainer:
 
         explained_var = _compute_explained_variance(storage.values, storage.returns)
 
-        terminated = next_env_state.terminated  # (num_envs,)
-        truncated = next_env_state.truncated  # (num_envs,)
+        terminated = next_env_state.terminated
+        truncated = next_env_state.truncated
         episode_lengths = self.episode_stats.returned_episode_lengths
 
         num_terminated = int(jnp.sum(terminated).item())
@@ -443,7 +430,7 @@ class PPOTrainer:
             next_env_state,
             next_obs,
             next_done,
-            LossInfo(
+            TrainingMeasurements(
                 loss=loss,
                 pg_loss=pg_loss,
                 v_loss=v_loss,
@@ -499,12 +486,18 @@ class PPOTrainer:
         for iteration in iter_bar:
             iteration_time_start = time.time()
 
-            env_state, next_obs, next_done, loss_info = self._step(
+            env_state, next_obs, next_done, training_measurements = self._step(
                 env_state, next_obs, next_done, iteration=iteration
             )
 
             global_step += self.args.num_steps * self.args.num_envs
-            self._log(global_step, self.episode_stats, start_time, iteration_time_start, loss_info)
+            self._log(
+                global_step,
+                self.episode_stats,
+                start_time,
+                iteration_time_start,
+                training_measurements,
+            )
 
             sps = int(global_step / (time.time() - start_time))
             remaining_steps = self.args.total_timesteps - global_step
@@ -515,7 +508,7 @@ class PPOTrainer:
                 f"Iteration {iteration}/{self.args.num_iterations} | "
                 f"Step {global_step}/{self.args.total_timesteps} | "
                 f"SPS {sps} | "
-                f"Return {loss_info.avg_episodic_return:.4f} | "
+                f"Return {training_measurements.avg_episodic_return:.4f} | "
                 f"ETA {eta_str}"
             )
 
