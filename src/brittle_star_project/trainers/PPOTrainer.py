@@ -24,6 +24,9 @@ from brittle_star_project.MLPs.mlps import (
 )
 from brittle_star_project.ppo import PPO
 
+@jax.jit
+def _clip_action(action: jnp.ndarray, low: jnp.ndarray, high: jnp.ndarray) -> jnp.ndarray:
+    return jnp.clip(action, low, high)
 
 @jax.jit
 def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, learning_rate):
@@ -47,6 +50,8 @@ def _get_action_and_value_noise(
     agent_state: TrainState,
     next_obs: jnp.ndarray,
     key: jax.random.PRNGKey,
+    action_low,
+    action_high
 ):
     hidden = sensor.apply(agent_state.params["sensor_params"], next_obs)
     hidden_critic = feature_extractor.apply(
@@ -59,9 +64,14 @@ def _get_action_and_value_noise(
     noise = jax.random.normal(subkey, shape=mean.shape)
     std = jnp.exp(log_std)
     action = mean + noise * std
-    logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
+    clipped_action = _clip_action(
+        action,
+        action_low,
+        action_high
+    )
+    logprob = -0.5 * (((clipped_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
     value = critic.apply(agent_state.params["critic_params"], hidden_critic)
-    return action, logprob, value.squeeze(-1), key
+    return clipped_action, logprob, value.squeeze(-1), key
 
 
 # removed jit: used in _rollout_jit, so will be compiled with _rollout_jit
@@ -73,10 +83,12 @@ def _step_once(
     feature_extractor: GenericDenseLayersWithActivation,
     actor: Actor,
     critic: OneDenseLayerMLP,
+    action_low,
+    action_high
 ):
     agent_state, episode_stats, obs, done, key, env_state = carry
     action, logprob, value, key = _get_action_and_value_noise(
-        sensor, feature_extractor, actor, critic, agent_state, obs, key
+        sensor, feature_extractor, actor, critic, agent_state, obs, key, action_low, action_high
     )
 
     episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
@@ -140,6 +152,8 @@ def _rollout_jit(
     feature_extractor: GenericDenseLayersWithActivation,
     actor: Actor,
     critic: OneDenseLayerMLP,
+    action_low,
+    action_high
 ):
     (agent_state, episode_stats, next_obs, next_done, key, env_state), storage = jax.lax.scan(
         partial(
@@ -149,6 +163,8 @@ def _rollout_jit(
             actor=actor,
             critic=critic,
             env_step_fn=step_env_fn,
+            action_low=action_low,
+            action_high=action_high
         ),
         (agent_state, episode_stats, next_obs, next_done, key, env_state),
         (),
@@ -215,6 +231,9 @@ class PPOTrainer:
         self.actor.apply = jax.jit(self.actor.apply)
         self.critic.apply = jax.jit(self.critic.apply)
 
+        action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
+        action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
+
         self._rollout_jit = jax.jit(
             partial(
                 _rollout_jit,
@@ -224,6 +243,8 @@ class PPOTrainer:
                 feature_extractor=self.feature_extractor,
                 actor=self.actor,
                 critic=self.critic,
+                action_low=action_low,
+                action_high=action_high
             )
         )
         self._compute_gae_jit = jax.jit(

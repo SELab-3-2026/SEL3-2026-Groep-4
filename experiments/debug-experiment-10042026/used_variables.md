@@ -46,7 +46,7 @@ wall_height: float = 1.5
 wall_thickness: float = 0.1
 
 ## Morphology:
-num_arms: int = 5
+num_arms: int = 2
 num_segments_per_arm: int = 4
 use_p_control: bool = True
 use_torque_control: bool = False

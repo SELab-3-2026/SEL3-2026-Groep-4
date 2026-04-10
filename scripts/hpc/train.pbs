@@ -65,8 +65,8 @@ fi
 
 # TODO Once experiments get serious, change the config
 python scripts/train.py \
-    --env-config-path configs/hpc/smoke_test.yaml \
-    --hyperparameter-config-path configs/hpc/smoke_test.yaml \
+    --env-config-path configs/hpc/debug.yaml \
+    --hyperparameter-config-path configs/hpc/debug.yaml \
     --run-dir "$SCRATCH_RUNDIR"
 
 echo ">>> Staging out results to $DATA_RUNDIR..."
