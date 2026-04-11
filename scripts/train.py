@@ -50,7 +50,7 @@ if __name__ == "__main__":
     run_name = f"{args.exp_name}__seed_{args.seed}__{git_hash}__{int(time.time())}"
 
     if args.run_dir is None:
-        run_dir = f"runs/{run_name}"
+        run_dir = f"/data/gent/465/vsc46589/runs/{run_name}"
     else:
         run_dir = args.run_dir
 
@@ -69,9 +69,6 @@ if __name__ == "__main__":
 
     env = make_env(args.env_config_path, args.num_envs)
     raw_env = env.raw
-    logger.log(
-        {"run_dir": run_dir}
-    )
 
     torch.backends.cudnn.deterministic = args.torch_deterministic
 

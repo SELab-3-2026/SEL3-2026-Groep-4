@@ -58,6 +58,10 @@ class Storage:
     returns: jnp.array
     rewards: jnp.array
 
+    raw_actions: jnp.ndarray = None   # before clipping 
+    means: jnp.ndarray = None         # policy mean
+    stds: jnp.ndarray = None          # policy std
+
     def replace(self, **kwargs) -> "Storage":
         fs = fields(self)
         return Storage(**{f.name: kwargs.get(f.name, getattr(self, f.name)) for f in fs})
