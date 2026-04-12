@@ -23,6 +23,21 @@ from brittle_star_project.MLPs.mlps import (
 from brittle_star_project.ppo import PPO
 from experiment_logger import get_logger
 
+# TODO: move to config
+_ALLOWED_OBS_KEYS = {
+    "joint_position",
+    "joint_velocity",
+    "joint_actuator_force",
+    "actuator_force",
+    "disk_position",
+    "disk_rotation",
+    "disk_linear_velocity",
+    "disk_angular_velocity",
+    "unit_xy_direction_to_target",
+    "xy_distance_to_target",
+}
+# TODO: clip scaled reward?
+
 @jax.jit
 def _clip_action(action: jnp.ndarray, low: jnp.ndarray, high: jnp.ndarray) -> jnp.ndarray:
     return jnp.clip(action, low, high)
@@ -41,9 +56,17 @@ def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, lear
 
 @jax.jit
 def _convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
-    return jax.vmap(lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0]))(
-        obs_dict
-    )
+    """Convert the raw observation dict → flat array, filtering unwanted keys."""
+    def _filter_and_flatten(o: dict) -> jnp.ndarray:
+        values = []
+        for key in sorted(o.keys()):
+            if key in _ALLOWED_OBS_KEYS: #TODO: NORMALIZATION or .. of observations??
+                v = o[key]
+                if v.size > 0:
+                    values.append(jnp.asarray(v).flatten())
+        return jnp.concatenate(values)
+        
+    return jax.vmap(_filter_and_flatten)(obs_dict)
 
 
 def _get_action_and_value_noise(
@@ -63,6 +86,7 @@ def _get_action_and_value_noise(
     )
 
     mean, log_std = actor.apply(agent_state.params["actor_params"], hidden)
+    log_std = jnp.clip(log_std, -5, 2)
     key, subkey = jax.random.split(key)
     noise = jax.random.normal(subkey, shape=mean.shape)
     std = jnp.exp(log_std)
@@ -75,7 +99,7 @@ def _get_action_and_value_noise(
     logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
     value = critic.apply(agent_state.params["critic_params"], hidden_critic)
     
-    return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
+    return raw_action, raw_action, logprob, value.squeeze(-1), mean, std, key
 
 
 
@@ -119,6 +143,7 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     next_env_state = env_step_fn(env_state, action)
 
     reward = next_env_state.reward
+    reward *= 100
     terminated = next_env_state.terminated
     truncated = next_env_state.truncated
     done = terminated | truncated
@@ -211,7 +236,9 @@ def _compute_gae_jit(
         (dones[1:], values[1:], values[:-1], storage.rewards),
         reverse=True,
     )
-    return storage.replace(advantages=advantages, returns=advantages + storage.values)
+    returns = advantages + storage.values
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    return storage.replace(advantages=advantages, returns=returns)
 
 
 @dataclass
@@ -289,8 +316,8 @@ class PPOTrainer:
     def _init_agent(self):
         self.logger.info("[AGENT]: Initializing agent...")
 
-        sensor = GenericDenseLayersWithActivation()
-        feature_extractor = GenericDenseLayersWithActivation()
+        sensor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
+        feature_extractor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
         actor = Actor(action_dim=self.env.single_action_space.shape[0])
         critic = OneDenseLayerMLP()
         return sensor, feature_extractor, actor, critic
@@ -302,15 +329,9 @@ class PPOTrainer:
             self.key, 5
         )
 
-        sample_obs = jnp.concatenate(
-            [
-                v.flatten()
-                for v in self.env.single_observation_space.sample(
-                    rng=jax.random.PRNGKey(0)
-                ).values()
-                if v.size > 0
-            ]
-        )
+        dummy_reset = self.env.reset(seed=0)
+        sample_obs = _convert_obs_dict_to_array(dummy_reset.observations)[0]  # take first env
+
         sensor_params = self.sensor.init(sensor_key, sample_obs)
         feature_extractor_params = self.feature_extractor.init(feature_extractor_key, sample_obs)
         actor_params = self.actor.init(actor_key, self.sensor.apply(sensor_params, sample_obs))

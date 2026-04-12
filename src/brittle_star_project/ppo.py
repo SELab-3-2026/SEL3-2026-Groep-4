@@ -99,6 +99,7 @@ def get_action_and_value(
     hidden_critic = feature_extractor_apply(params["feature_extractor_params"], x)
     hidden_sensor = message_passer(hidden_sensor)
     mean, log_std = actor_apply(params["actor_params"], hidden_sensor)
+    log_std = jnp.clip(log_std, -5, 2)
     std = jnp.exp(log_std)
 
     logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
