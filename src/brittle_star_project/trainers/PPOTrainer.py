@@ -407,10 +407,10 @@ class PPOTrainer:
         xy_distance
     ):
         data = jax.device_get({
-            'rewards': storage.rewards[0],      # (num_steps,)
+            'rewards': storage.rewards[0],
             'values': storage.values[0],
-            'returns': storage.returns[0],      # NEW
-            'advantages': storage.advantages[0],# NEW
+            'returns': storage.returns[0],
+            'advantages': storage.advantages[0],
             'actions': storage.actions[0],
             'raw_actions': storage.raw_actions[0],
             'means': storage.means[0],
@@ -433,10 +433,10 @@ class PPOTrainer:
 
             "rollout/env0/action_mean": float(np.mean(data['actions'])),
             "rollout/env0/raw_action_mean": float(np.mean(data['raw_actions'])),
-
-            "charts/env0_xy_distance_to_target": float(xy_distance[0]),
-            "charts/env1_xy_distance_to_target": float(xy_distance[1]),
         }
+
+        for i in range(len(xy_distance)):
+            storage_metrics[f"env_data/env{i}_xy_dist_target"] = float(xy_distance[i]) 
 
         metrics = {
             "charts/avg_episodic_return": training_measurements.avg_episodic_return,
