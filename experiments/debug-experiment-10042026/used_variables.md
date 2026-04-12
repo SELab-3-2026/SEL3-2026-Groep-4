@@ -1,6 +1,6 @@
 ## Default envconfig
 task: Task = Task.DIRECTED_LOCOMOTION
-simulation_time: float = 5.0
+simulation_time: float = 500.0
 num_physics_steps_per_control_step: int = 10
 time_scale: int = 2
 camera_ids: list[int] = field(default_factory=lambda: [0, 1])
@@ -53,6 +53,8 @@ use_torque_control: bool = False
 
 ## MLPs:
 ### Sensor & Feature_extractor:
+Both with 3 layers of 300 neurons per layer.
+
 class GenericDenseLayersWithActivation(nn.Module):
     layer_sizes: Sequence[int] = field(default_factory=lambda: [64, 64])
     activation: Callable = nn.tanh
@@ -80,3 +82,15 @@ class OneDenseLayerMLP(nn.Module):
         return nn.Dense(1, kernel_init=orthogonal(1), bias_init=constant(0.0))(x)
 
 ### Observations:
+_ALLOWED_OBS_KEYS = {
+    "joint_position",
+    "joint_velocity",
+    "joint_actuator_force",
+    "actuator_force",
+    "disk_position",
+    "disk_rotation",
+    "disk_linear_velocity",
+    "disk_angular_velocity",
+    "unit_xy_direction_to_target",
+    "xy_distance_to_target",
+}

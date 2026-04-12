@@ -39,6 +39,12 @@ _ALLOWED_OBS_KEYS = {
 # TODO: clip scaled reward?
 
 @jax.jit
+def _get_xy_distance_to_target(obs_dict: dict) -> jnp.ndarray:
+    """Extract xy_distance_to_target for all environments."""
+    # obs_dict is a dict of arrays with leading batch dimension (num_envs, ...)
+    return obs_dict["xy_distance_to_target"].squeeze(-1)  # shape: (num_envs,)
+
+@jax.jit
 def _clip_action(action: jnp.ndarray, low: jnp.ndarray, high: jnp.ndarray) -> jnp.ndarray:
     return jnp.clip(action, low, high)
 
@@ -143,7 +149,7 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     next_env_state = env_step_fn(env_state, action)
 
     reward = next_env_state.reward
-    reward *= 100
+    reward *= 1000
     terminated = next_env_state.terminated
     truncated = next_env_state.truncated
     done = terminated | truncated
@@ -396,7 +402,9 @@ class PPOTrainer:
         start_time,
         iteration_time_start,
         training_measurements,
-        storage
+        storage,
+        next_obs,
+        xy_distance
     ):
         data = jax.device_get({
             'rewards': storage.rewards[0],      # (num_steps,)
@@ -425,6 +433,9 @@ class PPOTrainer:
 
             "rollout/env0/action_mean": float(np.mean(data['actions'])),
             "rollout/env0/raw_action_mean": float(np.mean(data['raw_actions'])),
+
+            "charts/env0_xy_distance_to_target": float(xy_distance[0]),
+            "charts/env1_xy_distance_to_target": float(xy_distance[1]),
         }
 
         metrics = {
@@ -568,6 +579,8 @@ class PPOTrainer:
                 env_state, next_obs, next_done, iteration=iteration
             )
 
+            xy_distance = _get_xy_distance_to_target(env_state.observations)
+
             global_step += self.args.num_steps * self.args.num_envs
             self._log(
                 global_step,
@@ -575,7 +588,9 @@ class PPOTrainer:
                 start_time,
                 iteration_time_start,
                 training_measurements,
-                storage
+                storage,
+                next_obs,
+                xy_distance
             )
 
             sps = int(global_step / (time.time() - start_time))
