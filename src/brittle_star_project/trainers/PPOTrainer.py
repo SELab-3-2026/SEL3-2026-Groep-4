@@ -59,6 +59,9 @@ def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, lear
     frac = 1.0 - (count // (minibatch_count * update_epochs)) / num_iterations
     return learning_rate * frac
 
+@jax.jit
+def _normalize_obs(obs, mean, var, eps=1e-8):
+    return jnp.clip((obs - mean) / jnp.sqrt(var + eps), -10.0, 10.0)
 
 @jax.jit
 def _convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
@@ -105,7 +108,7 @@ def _get_action_and_value_noise(
     logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
     value = critic.apply(agent_state.params["critic_params"], hidden_critic)
     
-    return raw_action, raw_action, logprob, value.squeeze(-1), mean, std, key
+    return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
 
 
 
@@ -337,7 +340,9 @@ class PPOTrainer:
 
         dummy_reset = self.env.reset(seed=0)
         sample_obs = _convert_obs_dict_to_array(dummy_reset.observations)[0]  # take first env
-
+        self.obs_mean = jnp.zeros((len(sample_obs),))
+        self.obs_var = jnp.ones((len(sample_obs),))
+        self.obs_count = 1e-4
         sensor_params = self.sensor.init(sensor_key, sample_obs)
         feature_extractor_params = self.feature_extractor.init(feature_extractor_key, sample_obs)
         actor_params = self.actor.init(actor_key, self.sensor.apply(sensor_params, sample_obs))
@@ -376,6 +381,25 @@ class PPOTrainer:
             returned_episode_returns=jnp.zeros(self.args.num_envs, jnp.float32),
             returned_episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
         )
+    
+    def _update_obs_stats(self, obs: jnp.ndarray):
+        batch_mean = jnp.mean(obs, axis=0)
+        batch_var = jnp.var(obs, axis=0)
+        batch_count = obs.shape[0]
+
+        delta = batch_mean - self.obs_mean
+        total_count = self.obs_count + batch_count
+
+        new_mean = self.obs_mean + delta * batch_count / total_count
+
+        m_a = self.obs_var * self.obs_count
+        m_b = batch_var * batch_count
+        M2 = m_a + m_b + delta**2 * self.obs_count * batch_count / total_count
+        new_var = M2 / total_count
+
+        self.obs_mean = new_mean
+        self.obs_var = new_var
+        self.obs_count = total_count
 
     def _rollout(self, env_state, next_obs, next_done) -> tuple[Any, ...]:
         return self._rollout_jit(
@@ -578,6 +602,8 @@ class PPOTrainer:
             env_state, next_obs, next_done, training_measurements, storage = self._step(
                 env_state, next_obs, next_done, iteration=iteration
             )
+            self._update_obs_stats(next_obs)
+            next_obs = _normalize_obs(next_obs, self.obs_mean, self.obs_var)
 
             xy_distance = _get_xy_distance_to_target(env_state.observations)
 
