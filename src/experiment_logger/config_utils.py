@@ -8,8 +8,6 @@ from dataclasses import fields, is_dataclass
 
 from experiment_logger.unified_logger import get_logger
 
-log = get_logger()
-
 T = TypeVar("T")
 
 
@@ -24,7 +22,7 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
     if config is None:
         return {}
 
-    log.info(f"Loaded configuration from: {config_path}")
+    get_logger().info(f"Loaded configuration from: {config_path}")
     return config
 
 
@@ -35,7 +33,7 @@ def save_yaml_config(config: Dict[str, Any], config_path: str):
     with open(config_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False, indent=2, sort_keys=False)
 
-    log.info(f"Saved configuration to: {config_path}")
+    get_logger().info(f"Saved configuration to: {config_path}")
 
 
 def dataclass_from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:
@@ -66,10 +64,10 @@ def dataclass_from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:
                     else:
                         filtered_config[key] = field.type(value) if value is not None else None  # type: ignore
             except (ValueError, TypeError) as e:
-                log.warning(f"Could not convert {key}={value} to {field.type}: {e}")
+                get_logger().warning(f"Could not convert {key}={value} to {field.type}: {e}")
                 filtered_config[key] = value
         else:
-            log.warning(f"Unknown configuration parameter: {key}")
+            get_logger().warning(f"Unknown configuration parameter: {key}")
 
     return cls(**filtered_config)
 
@@ -101,9 +99,9 @@ def merge_config_with_cli(config_class: Type[T], config_file: str | None = None)
     yaml_config = {}
     if extracted_config_file and os.path.exists(extracted_config_file):
         yaml_config = load_yaml_config(extracted_config_file)
-        log.info(f"Merging YAML config from {extracted_config_file} with CLI args")
+        get_logger().info(f"Merging YAML config from {extracted_config_file} with CLI args")
     elif extracted_config_file:
-        log.warning(f"Config file not found: {extracted_config_file}, using CLI args only")
+        get_logger().warning(f"Config file not found: {extracted_config_file}, using CLI args only")
 
     # Create default instance to know what the defaults are
     default_instance = config_class()
@@ -126,22 +124,22 @@ def merge_config_with_cli(config_class: Type[T], config_file: str | None = None)
         if cli_value != default_value:
             final_config[field_name] = cli_value
             if yaml_value != default_value and yaml_value != cli_value:
-                log.info(f"CLI override: {field_name}={cli_value} (YAML had {yaml_value})")
+                get_logger().info(f"CLI override: {field_name}={cli_value} (YAML had {yaml_value})")
         else:
             final_config[field_name] = yaml_value
             if yaml_value != default_value:
-                log.info(f"YAML config: {field_name}={yaml_value}")
+                get_logger().info(f"YAML config: {field_name}={yaml_value}")
 
     return config_class(**final_config)
 
 
 def print_config(config: Any, title: str = "Configuration"):
     """Pretty print configuration."""
-    log.info(f"{title}:")
+    get_logger().info(f"{title}:")
     if is_dataclass(config):
         for field in fields(config):
             value = getattr(config, field.name)
-            log.info(f"  {field.name}: {value}")
+            get_logger().info(f"  {field.name}: {value}")
     else:
         for key, value in vars(config).items():
-            log.info(f"  {key}: {value}")
+            get_logger().info(f"  {key}: {value}")

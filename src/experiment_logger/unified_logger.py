@@ -21,38 +21,67 @@ import numpy as np
 
 from experiment_logger.wandb_utils import finish_wandb, init_wandb
 
-# Global singleton storage
-_global_logger = None
+# Global storage for the active logger and the proxy singleton
+_active_logger: Optional[Any] = None
+_proxy_instance: Optional["LoggerProxy"] = None
 
 
-def get_logger() -> "UnifiedLogger":
-    """Retrieve the global UnifiedLogger. If not initialized, fallback to auto-initialization."""
-    global _global_logger
-    if _global_logger is None:
-        try:
-            commit_hash = (
-                subprocess.check_output(
-                    ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.STDOUT
-                )
-                .decode("utf-8")
-                .strip()
-            )
-        except Exception:
-            commit_hash = "unknown"
+def get_logger() -> "LoggerProxy":
+    """Retrieve the global LoggerProxy.
 
-        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        generic_name = f"{timestamp_str}_{commit_hash}_brittle_star"
+    This should be used for all logging calls. It returns a proxy that
+    delegates to the active logger (defaulting to a SimpleLogger until
+    init_logger is called).
+    """
+    global _proxy_instance, _active_logger
+    if _proxy_instance is None:
+        if _active_logger is None:
+            # Fallback to SimpleLogger to avoid premature directory creation
+            from experiment_logger.simple_logger import SimpleLogger
 
-        # Initialize generic fallback logger without WandB
-        _global_logger = UnifiedLogger(
-            run_name=generic_name,
-            config={"auto_initialized": True},
-            use_wandb=False,
-            _set_as_global=False,  # Prevent recursive call inside __init__
-        )
-        _global_logger.warning(f"UnifiedLogger auto-initialized with name: {generic_name}")
+            _active_logger = SimpleLogger(run_name="pre_init")
 
-    return _global_logger
+        _proxy_instance = LoggerProxy()
+
+    return _proxy_instance
+
+
+def init_logger(**kwargs) -> "UnifiedLogger":
+    """Initialize the full UnifiedLogger and set it as the active logger.
+
+    This should be called once the configuration is ready. It will create
+    the output directories and set up all logging backends.
+    """
+    global _active_logger
+    logger = UnifiedLogger(_set_as_global=False, **kwargs)
+    _active_logger = logger
+    return logger
+
+
+class LoggerProxy:
+    """Proxy that delegates all method calls to the active logger instance.
+
+    This allows the logger to be swapped out (e.g., from a SimpleLogger to
+    a UnifiedLogger) without any clients needing to update their references.
+    """
+
+    def _get_logger(self) -> Any:
+        global _active_logger
+        if _active_logger is None:
+            # This shouldn't normally happen since get_logger handles it
+            from experiment_logger.simple_logger import SimpleLogger
+
+            _active_logger = SimpleLogger(run_name="pre_init_fallback")
+        return _active_logger
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._get_logger(), name)
+
+    def __enter__(self):
+        return self._get_logger().__enter__()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        return self._get_logger().__exit__(exc_type, exc_val, exc_tb)
 
 
 class UnifiedLogger:
@@ -68,7 +97,6 @@ class UnifiedLogger:
         use_wandb: bool = True,
         save_code: bool = True,
         log_level: int = logging.INFO,
-        _set_as_global: bool = True,
     ):
         """Initialize the unified logger.
 
@@ -80,7 +108,6 @@ class UnifiedLogger:
             base_dir: Base directory for local storage
             use_wandb: Whether to use WandB logging
             save_code: Whether to save code to WandB
-            _set_as_global: Internal flag to override the global singleton
         """
         self.run_name = run_name
         self.config = config
@@ -118,11 +145,6 @@ class UnifiedLogger:
 
             self._text_logger.addHandler(fh)
             self._text_logger.addHandler(ch)
-
-        # Set as global singleton
-        global _global_logger
-        if _set_as_global:
-            _global_logger = self
 
         # Save config to disk
         self._save_config()
