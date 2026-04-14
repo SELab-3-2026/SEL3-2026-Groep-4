@@ -1,0 +1,7 @@
+# Base Experiment Configuration
+# Default values align with ExperimentConfig dataclass.
+
+exp_name: "brittle_star_ppo"
+seed: 1
+torch_deterministic: true
+cuda: true

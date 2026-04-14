@@ -1,0 +1,6 @@
+# 3 Arms Morphology Configuration
+# Symmetric amputation (arms 1 and 3 removed).
+
+segments_per_arm: [4, 0, 4, 0, 4]
+use_p_control: true
+use_torque_control: false
