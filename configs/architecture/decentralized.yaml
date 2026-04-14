@@ -1,0 +1,31 @@
+# Decentralized Actor Architecture (NerveNet-MLP variant)
+# Multi-agent/distributed configuration using local sensors, propagators, and motors.
+
+# Default values are defined in DecentralizedConfig dataclass.
+# Use this configuration for decentralized execution experiments.
+
+sensor:
+  hidden_dims: [64, 64]
+  activation: "tanh"
+
+propagator:
+  hidden_dims: [64, 64]
+  activation: "tanh"
+
+motor:
+  hidden_dims: []
+  activation: "tanh"
+
+feature_extractor:
+  hidden_dims: [64, 64]
+  activation: "tanh"
+
+critic:
+  hidden_dims: []
+  activation: "tanh"
+
+# Synchronous message-passing rounds per control step
+message_passing_steps: 1
+
+# Connectivity topology (e.g., ring, fully_connected)
+topology_type: "ring"
