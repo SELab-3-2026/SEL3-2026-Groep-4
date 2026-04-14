@@ -1,5 +1,4 @@
 morphology:
-  num_arms: 2
-  num_segments_per_arm: 4
+  segments_per_arm: [4, 4]
   use_p_control: true
   use_torque_control: false

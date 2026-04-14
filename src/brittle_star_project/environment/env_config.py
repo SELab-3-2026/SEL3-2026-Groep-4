@@ -7,10 +7,23 @@ from .env_types import Task
 
 @dataclass(frozen=True, slots=True)
 class MorphologyConfig:
-    num_arms: int = 5
-    num_segments_per_arm: int = 4
+    """Brittle star morphology configuration.
+
+    segments_per_arm defines the number of segments for each arm. The length of
+    this list implicitly sets the number of arms. Use 0 segments to represent
+    a fully amputated arm (e.g., [4, 0, 4, 2, 4] for a 5-arm morphology with
+    arm 1 removed and arm 3 shortened).
+
+    The upstream biorobot library natively supports per-arm segment counts.
+    """
+
+    segments_per_arm: tuple[int, ...] = (4, 4, 4, 4, 4)
     use_p_control: bool = True
     use_torque_control: bool = False
+
+    @property
+    def num_arms(self) -> int:
+        return len(self.segments_per_arm)
 
 
 @dataclass(frozen=True, slots=True)
