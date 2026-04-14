@@ -7,7 +7,14 @@ wandb_entity: "SEL3-2026-Groep-4"
 run_dir: "/data/gent/465/vsc46589"
 num_envs: 32
 num_steps: 32
+num_minibatches: 32
 total_timesteps: 409600 
 num_arms: 2
 cuda: true
 
+ent_coef: 0.005
+vf_coef: 1.0
+clip_coef: 0.2
+
+anneal_lr: true
+learning_rate: 0.0003

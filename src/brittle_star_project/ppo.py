@@ -143,7 +143,7 @@ def ppo_loss(
     pg_loss1 = -mb_advantages * ratio
     pg_loss2 = -mb_advantages * jnp.clip(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
     pg_loss = jnp.maximum(pg_loss1, pg_loss2).mean()
-    
+
     v_loss = 0.5 * ((newvalue - mb_returns) ** 2).mean()
     entropy_loss = entropy.mean()
     loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
