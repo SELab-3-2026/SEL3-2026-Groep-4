@@ -134,7 +134,7 @@ def _step_once(
 
     storage = Storage(
         obs=obs,
-        actions=clipped_action,
+        actions=raw_action,
         raw_actions=raw_action,
         logprobs=logprob,
         dones=done,
@@ -152,7 +152,8 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     next_env_state = env_step_fn(env_state, action)
 
     reward = next_env_state.reward
-    reward *= 1000
+    reward *= 5000
+    reward = jnp.clip(reward, -1, 1)
     terminated = next_env_state.terminated
     truncated = next_env_state.truncated
     done = terminated | truncated
