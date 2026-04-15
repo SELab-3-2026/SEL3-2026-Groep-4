@@ -49,4 +49,6 @@ python scripts/train.py --cfg job
 
 - **Adding a new group**: Create a subdirectory in `configs/` and register the new dataclass in `src/brittle_star_project/configs/register_configs.py`.
 - **Typo Catching**: If you see a `ConfigAttributeError`, check for typos in your YAML keys or CLI overrides.
-- **Output Redirection**: Hydra automatically creates `outputs/` directories. On HPC, ensure `hydra.run.dir` is set to a fast scratch storage.
+- **Output Redirection**: We use `experiment.base_run_dir` to configure where logs and models are stored (defaults to `runs/`).
+  - To change it locally: `python scripts/train.py experiment.base_run_dir=/path/to/custom/dir`
+  - On HPC, ensure this points to a fast scratch storage.

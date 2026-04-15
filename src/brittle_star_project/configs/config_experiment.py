@@ -8,3 +8,4 @@ class ExperimentConfig:
     torch_deterministic: bool = True
     cuda: bool = True
     debug_sanity: bool = False
+    base_run_dir: str = "runs"

@@ -12,3 +12,9 @@ defaults:
   - arena: default
   - environment: directed_locomotion
   - _self_
+
+hydra:
+  job:
+    chdir: True
+  run:
+    dir: ${experiment.base_run_dir}/${experiment.exp_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}

@@ -4,6 +4,7 @@ runs/*
 wandb/
 outputs/
 multirun/
+metrics/
 
 # Python-generated files
 __pycache__/
