@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import json
 
 from .env_types import Task
 
@@ -50,10 +49,14 @@ class EnvConfig:
     light_perlin_noise_scale: int = 0
 
 
-def from_json(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
+def from_file(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
+    """Load configurations from a YAML file."""
+    import yaml
+
     with open(path, "r") as f:
-        config_json = json.load(f)
-        morphology = MorphologyConfig(**config_json.get("morphology", {}))
-        arena = ArenaConfig(**config_json.get("arena", {}))
-        env = EnvConfig(**config_json.get("env", {}))
+        config_dict = yaml.safe_load(f)
+
+        morphology = MorphologyConfig(**config_dict.get("morphology", {}))
+        arena = ArenaConfig(**config_dict.get("arena", {}))
+        env = EnvConfig(**config_dict.get("env", {}))
         return morphology, arena, env

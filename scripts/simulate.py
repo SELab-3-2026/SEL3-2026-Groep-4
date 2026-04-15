@@ -12,7 +12,7 @@ import numpy as np
 from brittle_star_project import (
     Backend,
 )
-from brittle_star_project.environment import from_json
+from brittle_star_project.environment import from_file
 
 def _flatten_obs_dict(obs_dict: dict[str, Any]) -> jnp.ndarray:
     """Flatten the env's observation dict into a 1D vector.
@@ -317,7 +317,7 @@ def main() -> None:
 
     args = parse_args()
 
-    morphology_cfg, arena_cfg, env_cfg = from_json("../configs/test.json")
+    morphology_cfg, arena_cfg, env_cfg = from_file("../configs/test.yaml")
 
     # ======= ENVIRONMENT SETUP =======
 

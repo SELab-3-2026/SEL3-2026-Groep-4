@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
+import jax
 
+
+@jax.tree_util.register_dataclass
 @dataclass
 class PPOArgs:
     """
@@ -8,10 +11,16 @@ class PPOArgs:
     """
 
     # path to environment config file, if None, use default config
-    config_path: str | None = None
+    env_config_path: str | None = None
+
+    # path to hyperparameter config file (yaml), if None, use default config
+    hyperparameter_config_path: str | None = None
 
     # the name of this experiment
     exp_name: str = "brittle_star_ppo"
+
+    # the directory to save the experiment results
+    run_dir: str | None = None
 
     # seed of the experiment
     seed: int = 1
@@ -29,13 +38,16 @@ class PPOArgs:
     wandb_project_name: str = "PPO-Modularity"
 
     # the entity (team) of wandb's project
-    wandb_entity: str | None = None
+    wandb_entity: str | None = "SEL3-2026-Groep-4"
 
     # whether to capture videos of the agent performances (check out `videos` folder)
     capture_video: bool = False
 
     # whether to save model into the `runs/{run_name}` folder
     save_model: bool = True
+
+    # checkpoint frequency (in iterations, 0 = no intermediate checkpoints)
+    checkpoint_frequency: int = 100
 
     # whether to upload the saved model to huggingface
     upload_model: bool = False

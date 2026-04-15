@@ -1,0 +1,11 @@
+# Configuration to verify WandB online tracking
+exp_name: "hpc_wandb_verification"
+seed: 42
+track: true               # Enabled for testing WandB
+wandb_project_name: "PPO-Modularity"
+wandb_entity: "SEL3-2026-Groep-4"
+
+num_envs: 128
+total_timesteps: 50000    # Short run for quick verification
+num_steps: 128
+cuda: true

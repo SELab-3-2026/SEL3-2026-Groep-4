@@ -1,0 +1,42 @@
+# Production Training Configuration
+#
+# Full-scale training configuration for production runs
+# with wandb logging enabled.
+
+# Experiment settings
+exp_name: "brittle_star_production_training"
+seed: 42
+
+# Tracking
+track: true
+capture_video: false
+wandb_project_name: "PPO-Modularity"
+wandb_entity: "SEL3-2026-Groep-4"
+
+# Model saving
+save_model: true
+checkpoint_frequency: 100  # Save checkpoint every 100 iterations
+
+# Environment settings
+num_envs: 512
+
+# Training hyperparameters
+total_timesteps: 50000000
+num_steps: 256
+num_minibatches: 4
+update_epochs: 4
+
+learning_rate: 2.5e-4
+anneal_lr: true
+gamma: 0.99
+gae_lambda: 0.95
+clip_coef: 0.1
+clip_vloss: true
+ent_coef: 0.01
+vf_coef: 0.5
+max_grad_norm: 0.5
+target_kl: null
+
+# Hardware
+cuda: true
+torch_deterministic: true

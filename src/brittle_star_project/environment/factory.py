@@ -98,9 +98,15 @@ class BrittleStarEnvFactory:
             case _:
                 raise ValueError(f"Unsupported task: {env_config.task}")
 
-        return env_class.from_morphology_and_arena(
+        env = env_class.from_morphology_and_arena(
             morphology=morphology,
             arena=arena,
             configuration=env_configuration,
             backend=backend.value,
         )
+
+        from experiment_logger import get_logger
+
+        get_logger().info(f"Created {env_config.task.value} env on backend {backend.value}")
+
+        return env

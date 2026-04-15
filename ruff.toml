@@ -1,4 +1,5 @@
 line-length = 100
+exclude = ["wandb"]
 
 [lint]
 extend-select = [
@@ -349,7 +350,7 @@ extend-ignore = [
   # "PLR1705",  # no-else-return
   # "PLR1706",  # consider-using-ternary
   # "PLR1707",  # trailing-comma-tuple
-  "PLR1708",  # stop-iteration-return
+  # "PLR1708",  # stop-iteration-return (deprecated)
   # "PLR1709",  # simplify-boolean-expression
   # "PLR1710",  # inconsistent-return-statements
   "PLR1711",  # useless-return
@@ -393,3 +394,6 @@ extend-ignore = [
   "PLW0603",  # global-statement
   # "PLW1404",  # implicit-str-concat
 ]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]

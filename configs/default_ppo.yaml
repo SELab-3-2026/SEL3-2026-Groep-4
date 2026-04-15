@@ -1,0 +1,48 @@
+# PPO Training Configuration Template
+#
+# This file provides an example configuration for PPO training.
+# Copy this file and modify it for your specific experiments.
+#
+# Usage:
+#   python src/train.py --config-path configs/my_config.yaml
+# Or override specific parameters:
+#   python src/train.py --learning-rate 0.001 --num-envs 32
+
+# Experiment settings
+exp_name: "brittle_star_ppo"
+seed: 1
+
+# Tracking settings
+track: false  # Set to true to enable WandB logging
+wandb_project_name: "PPO-Modularity"
+wandb_entity: "SEL3-2026-Groep-4"  # Set to your WandB username or team name
+
+# Model saving
+save_model: true
+checkpoint_frequency: 100  # Save checkpoint every N iterations (0 = no checkpoints)
+
+# Environment settings
+num_envs: 16
+
+# Training hyperparameters
+total_timesteps: 10000000
+learning_rate: 0.00025
+num_steps: 128
+anneal_lr: true
+
+# PPO specific
+gamma: 0.99
+gae_lambda: 0.95
+num_minibatches: 4
+update_epochs: 4
+norm_adv: true
+clip_coef: 0.1
+clip_vloss: true
+ent_coef: 0.01
+vf_coef: 0.5
+max_grad_norm: 0.5
+target_kl: null
+
+# Hardware
+cuda: true
+torch_deterministic: true

@@ -1,6 +1,7 @@
 # Model files
 artifacts/*
 runs/*
+wandb/
 
 # Python-generated files
 __pycache__/
@@ -372,7 +373,6 @@ celerybeat.pid
 # Environments
 .env
 .venv
-env/
 venv/
 ENV/
 env.bak/
@@ -472,7 +472,6 @@ tags
 [Ll]ib
 [Ll]ib64
 [Ll]ocal
-[Ss]cripts
 pyvenv.cfg
 .venv
 pip-selfcheck.json
@@ -519,3 +518,4 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+*.pdf

@@ -1,0 +1,38 @@
+name: Update HPC requirements
+
+on:
+  push:
+    paths:
+      - pyproject.toml
+    branches:
+      - main
+      - dev
+      - "ci/**"
+
+jobs:
+  update-hpc-requirements:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Regenerate env/hpc/requirements.txt
+        run: uv run scripts/hpc/export_requirements.py
+
+      - name: Commit updated requirements if changed
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(hpc): update env/hpc/requirements.txt from pyproject.toml [skip ci]"
+          file_pattern: env/hpc/requirements.txt
+          commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"

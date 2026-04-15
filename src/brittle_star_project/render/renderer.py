@@ -36,6 +36,9 @@ def simulate_policy(
 
     import mujoco.viewer
 
+    if state is None:
+        raise ValueError("A valid environment state must be provided.")
+
     model = state.mj_model
     data = state.mj_data
 

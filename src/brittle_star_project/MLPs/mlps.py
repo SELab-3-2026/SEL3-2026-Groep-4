@@ -1,36 +1,27 @@
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
 
 import flax
 import flax.linen as nn
 import jax.numpy as jnp
 import jax.tree_util
-import numpy as np
+from typing import Sequence, Callable
 from flax.linen.initializers import constant, orthogonal
 
 
-class Network(nn.Module):
-    """
-    Dummy model only used for testing purposes
-
-    inspired by: https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo_atari_envpool_xla_jax_scan.py
-    """
-
-    hidden_dim: int = 195
+# semi generic so we can easily make a config for it in experiments
+class GenericDenseLayersWithActivation(nn.Module):
+    layer_sizes: Sequence[int] = field(default_factory=lambda: [64, 64])
+    activation: Callable = nn.tanh
 
     @nn.compact
     def __call__(self, x):
-        x = nn.Dense(self.hidden_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            x
-        )
-        x = nn.relu(x)
-        x = nn.Dense(self.hidden_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))(
-            x
-        )
-        x = nn.relu(x)
+        for size in self.layer_sizes:
+            x = nn.Dense(size, kernel_init=orthogonal(jnp.sqrt(2)))(x)
+            x = self.activation(x)
         return x
 
 
-class Critic(nn.Module):
+class OneDenseLayerMLP(nn.Module):
     @nn.compact
     def __call__(self, x):
         return nn.Dense(1, kernel_init=orthogonal(1), bias_init=constant(0.0))(x)
@@ -49,10 +40,10 @@ class Actor(nn.Module):
 @jax.tree_util.register_dataclass
 @dataclass
 class AgentParams:
-    network_params: flax.core.FrozenDict
+    sensor_params: flax.core.FrozenDict
     actor_params: flax.core.FrozenDict
     critic_params: flax.core.FrozenDict
-    critic_network_params: flax.core.FrozenDict
+    feature_extractor_params: flax.core.FrozenDict
 
 
 @jax.tree_util.register_dataclass
