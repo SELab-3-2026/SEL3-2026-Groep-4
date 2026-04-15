@@ -1,7 +1,6 @@
 """Configuration utilities for loading YAML configs and merging with CLI args."""
 
 import os
-import sys
 from typing import Dict, Any, Type, TypeVar
 import yaml
 from dataclasses import fields, is_dataclass

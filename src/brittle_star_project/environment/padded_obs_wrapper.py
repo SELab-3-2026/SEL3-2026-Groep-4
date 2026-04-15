@@ -5,23 +5,28 @@ a constant size regardless of how many segments are amputated. This wrapper pads
 the observation dictionary values with zeros using spatial insertion so that the
 flattened observation maintains the correct physical mapping to the neural network.
 """
+
 from __future__ import annotations
 
 from typing import Any
 import jax.numpy as jnp
 
 # Observation keys whose size scales with the number of joints (2 per segment).
-_JOINT_SCALED_KEYS = frozenset({
-    "joint_position",
-    "joint_velocity",
-    "joint_actuator_force",
-    "actuator_force",
-})
+_JOINT_SCALED_KEYS = frozenset(
+    {
+        "joint_position",
+        "joint_velocity",
+        "joint_actuator_force",
+        "actuator_force",
+    }
+)
 
 # Observation keys whose size scales with the number of segments (1 per segment).
-_SEGMENT_SCALED_KEYS = frozenset({
-    "segment_contact",
-})
+_SEGMENT_SCALED_KEYS = frozenset(
+    {
+        "segment_contact",
+    }
+)
 
 
 def compute_padding_masks(

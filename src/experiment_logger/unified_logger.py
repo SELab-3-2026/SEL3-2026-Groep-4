@@ -6,9 +6,7 @@ This logger ensures all experimental data is preserved by writing to:
 3. stdout (for real-time monitoring)
 """
 
-import datetime
 import logging
-import subprocess
 import yaml
 import sys
 import time

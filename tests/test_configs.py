@@ -1,4 +1,3 @@
-import pytest
 from hydra import compose, initialize
 from omegaconf import OmegaConf
 from brittle_star_project.configs.main_config import BrittleStarConfig

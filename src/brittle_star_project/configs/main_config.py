@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from experiment_logger.config_logger import LoggingConfig
 from brittle_star_project.configs.config_experiment import ExperimentConfig
 from brittle_star_project.configs.config_ppo import PPOConfig
-from brittle_star_project.configs.config_architecture import ArchitectureConfig, CentralizedConfig
+from brittle_star_project.configs.config_architecture import ArchitectureConfig
 from brittle_star_project.environment.env_config import MorphologyConfig, ArenaConfig, EnvConfig
 
 

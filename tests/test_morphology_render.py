@@ -1,4 +1,3 @@
-import jax
 import pytest
 import os
 import mujoco
