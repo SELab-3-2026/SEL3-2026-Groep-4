@@ -7,3 +7,4 @@ class ExperimentConfig:
     seed: int = 1
     torch_deterministic: bool = True
     cuda: bool = True
+    debug_sanity: bool = False

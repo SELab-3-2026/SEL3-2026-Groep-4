@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from .env_types import Task
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class MorphologyConfig:
     """Brittle star morphology configuration.
 
@@ -17,7 +17,7 @@ class MorphologyConfig:
     The upstream biorobot library natively supports per-arm segment counts.
     """
 
-    segments_per_arm: tuple[int, ...] = (4, 4, 4, 4, 4)
+    segments_per_arm: list[int] = field(default_factory=lambda: [4, 4, 4, 4, 4])
     use_p_control: bool = True
     use_torque_control: bool = False
 
@@ -26,16 +26,16 @@ class MorphologyConfig:
         return len(self.segments_per_arm)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class ArenaConfig:
-    size: tuple[float, float] = (10.0, 5.0)
+    size: list[float] = field(default_factory=lambda: [10.0, 5.0])
     sand_ground_color: bool = True
     attach_target: bool = True
     wall_height: float = 1.5
     wall_thickness: float = 0.1
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class EnvConfig:
     """Shared environment settings.
 
@@ -50,7 +50,7 @@ class EnvConfig:
 
     camera_ids: list[int] = field(default_factory=lambda: [0, 1])
     # (height, width)
-    render_size: tuple[int, int] = (480, 640)
+    render_size: list[int] = field(default_factory=lambda: [480, 640])
 
     joint_randomization_noise_scale: float = 0.0
 

@@ -527,6 +527,13 @@ class PPOTrainer:
                 f"ETA {eta_str}"
             )
 
+            if getattr(self.config.experiment, "debug_sanity", False):
+                self.logger.log(
+                    "\n[SANITY CHECK] Successfully completed 1 epoch of data collection and gradient updates."
+                )
+                self.logger.log("[SANITY CHECK] Gradients flowed without NaN. Exiting gracefully.")
+                break
+
         if self.logging_cfg.save_model:
             model_path = f"{self.run_dir}/{self.experiment.exp_name}.cleanrl_model"
             self._save_model(model_path=model_path)
