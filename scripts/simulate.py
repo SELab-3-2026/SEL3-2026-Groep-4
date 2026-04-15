@@ -296,7 +296,7 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help=(
-            "Path to an environment JSON config (morphology/arena/env). "
+            "Path to an environment YAML config (morphology/arena/env). "
             "If omitted, uses the environment defaults. "
             "Relative paths are resolved from the repository root."
         ),
