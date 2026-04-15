@@ -20,23 +20,35 @@ learning_rate: float = 2.5e-4
 anneal_lr: bool = True
 gamma: float = 0.99
 gae_lambda: float = 0.95
-num_minibatches: int = 4
 update_epochs: int = 4
 norm_adv: bool = True
-clip_coef: float = 0.1
 clip_vloss: bool = True
-ent_coef: float = 0.01
-vf_coef: float = 0.5
 max_grad_norm: float = 0.5
 target_kl: float | None = None
 batch_size: int = 0
 minibatch_size: int = 0
 num_iterations: int = 0
 
-## Used config file:
+## Used config file: (hpc/debug.yaml)
+exp_name: "debug-experiment"
+seed: 42
+track: true
+wandb_project_name: "Let's-find-that-bug"
+wandb_entity: "SEL3-2026-Groep-4"
+run_dir: "/data/gent/465/vsc46589"
 num_envs: 32
 num_steps: 32
-total_timesteps: 102400
+num_minibatches: 32
+total_timesteps: 409600 
+num_arms: 2
+cuda: true
+
+ent_coef: 0.005
+vf_coef: 1.0
+clip_coef: 0.2
+
+anneal_lr: true
+learning_rate: 0.0003
 
 ## Arena config:
 size: tuple[float, float] = (10.0, 5.0)
@@ -46,7 +58,6 @@ wall_height: float = 1.5
 wall_thickness: float = 0.1
 
 ## Morphology:
-num_arms: int = 2
 num_segments_per_arm: int = 4
 use_p_control: bool = True
 use_torque_control: bool = False
