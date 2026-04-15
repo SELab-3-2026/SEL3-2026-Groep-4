@@ -1,5 +1,11 @@
 import pytest
 import os
+import sys
+
+# CRITICAL for headless cross-platform testing (devcontainers etc)
+if sys.platform == "linux" and "DISPLAY" not in os.environ and "WAYLAND_DISPLAY" not in os.environ:
+    os.environ.setdefault("MUJOCO_GL", "egl")
+
 import mujoco
 from PIL import Image
 from brittle_star_project.environment.env_config import EnvConfig, MorphologyConfig, ArenaConfig

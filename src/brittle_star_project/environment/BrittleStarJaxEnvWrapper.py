@@ -28,6 +28,10 @@ class BrittleStarJaxEnvWrapper:
             self._backend, self._morphology, self._arena, self._env_config
         )
 
+        from brittle_star_project.environment.padded_obs_wrapper import compute_padding_masks
+
+        self._padding_masks = compute_padding_masks(self._morphology.segments_per_arm)
+
         self._vectorized_reset = jax.jit(jax.vmap(self._env.reset))
         self._vectorized_step = jax.jit(jax.vmap(self._env.step))
         self._vectorized_action_sample = jax.jit(jax.vmap(self._env.action_space.sample))
@@ -61,7 +65,13 @@ class BrittleStarJaxEnvWrapper:
         self.logger.info(f"Resetting vectorized environment environments with seed {seed}")
         self._action_rng, env_rng = jax.random.split(jax.random.PRNGKey(seed), 2)
         env_rngs = jnp.array(jax.random.split(env_rng, self._num_envs))
-        return self._vectorized_reset(rng=env_rngs)
+        state = self._vectorized_reset(rng=env_rngs)
+        from brittle_star_project.environment.padded_obs_wrapper import pad_observations_batched
+
+        state = state.replace(
+            observations=pad_observations_batched(state.observations, self._padding_masks)
+        )
+        return state
 
     def sample_actions(self):
         assert self._action_rng is not None, "Call reset() before sample_actions()"
@@ -71,7 +81,13 @@ class BrittleStarJaxEnvWrapper:
         return self._vectorized_action_sample(rng=jnp.array(sub_rngs))
 
     def step(self, state, action):
-        return self._vectorized_step(state=state, action=action)
+        next_state = self._vectorized_step(state=state, action=action)
+        from brittle_star_project.environment.padded_obs_wrapper import pad_observations_batched
+
+        next_state = next_state.replace(
+            observations=pad_observations_batched(next_state.observations, self._padding_masks)
+        )
+        return next_state
 
     def close(self):
         self._env.close()

@@ -12,7 +12,6 @@ from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 
 from brittle_star_project import (
-    Backend,
     BrittleStarEnv,
     BrittleStarEnvFactory,
     SimulationConfig,
@@ -37,7 +36,12 @@ def main(dict_cfg: DictConfig) -> None:
     # Use the configurable settings from the simulation group
     backend = config.simulation.backend
     model_type = config.simulation.model_type
+
+    # Hydra chdir changes CWD; we map CLI relative paths relative to invocation originally.
     model_path = config.simulation.model_path
+    if model_path is not None:
+        model_path = hydra.utils.to_absolute_path(model_path)
+
     seed = config.experiment.seed
 
     # ======= ENVIRONMENT SETUP =======
