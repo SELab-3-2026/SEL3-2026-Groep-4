@@ -12,7 +12,7 @@ import numpy as np
 from brittle_star_project import (
     Backend,
 )
-from brittle_star_project.environment import from_file
+from brittle_star_project.environment import ArenaConfig, EnvConfig, MorphologyConfig, from_file
 
 def _flatten_obs_dict(obs_dict: dict[str, Any]) -> jnp.ndarray:
     """Flatten the env's observation dict into a 1D vector.
@@ -280,6 +280,16 @@ def parse_args() -> argparse.Namespace:
         description="Run a trained policy for exactly one episode (viewer or headless)."
     )
     p.add_argument(
+        "--config-path",
+        type=str,
+        default=None,
+        help=(
+            "Path to an environment JSON config (morphology/arena/env). "
+            "If omitted, uses the environment defaults. "
+            "Relative paths are resolved from the repository root."
+        ),
+    )
+    p.add_argument(
         "--model",
         type=str,
         required=True,
@@ -317,7 +327,16 @@ def main() -> None:
 
     args = parse_args()
 
-    morphology_cfg, arena_cfg, env_cfg = from_file("../configs/test.yaml")
+    if args.config_path is None:
+        morphology_cfg = MorphologyConfig()
+        arena_cfg = ArenaConfig()
+        env_cfg = EnvConfig()
+    else:
+        repo_root = Path(__file__).resolve().parents[1]
+        config_path = Path(args.config_path)
+        if not config_path.is_absolute():
+            config_path = repo_root / config_path
+        morphology_cfg, arena_cfg, env_cfg = from_file(str(config_path))
 
     # ======= ENVIRONMENT SETUP =======
 
@@ -325,7 +344,12 @@ def main() -> None:
 
     factory = BrittleStarEnvFactory()
     raw_env = factory.create_environment(backend, morphology_cfg, arena_cfg, env_cfg)
-    env = BrittleStarEnv(raw_env, backend=backend, config=env_cfg)
+    env = BrittleStarEnv(
+        raw_env,
+        backend=backend,
+        config=env_cfg,
+        morphology_config=morphology_cfg,
+    )
 
     seed_for_env = int(args.seed) if args.seed is not None else 0
     state = env.reset(seed=seed_for_env)
