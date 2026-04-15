@@ -68,6 +68,7 @@ if __name__ == "__main__":
     print_config(args, title="PPO Training Configuration")
 
     env = make_env(args.env_config_path, args.num_envs)
+    raw_env = env.raw
 
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
