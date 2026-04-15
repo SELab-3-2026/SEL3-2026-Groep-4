@@ -4,6 +4,7 @@
 # Default values are defined in DecentralizedConfig dataclass.
 # Use this configuration for decentralized execution experiments.
 
+name: "decentralized"
 sensor:
   hidden_dims: [64, 64]
   activation: "tanh"

@@ -18,7 +18,8 @@ def test_config_composition_centralized():
         structured_cfg = OmegaConf.to_object(OmegaConf.merge(BrittleStarConfig, cfg))
 
         # Basic assertions
-        assert "CentralizedConfig" in str(type(structured_cfg.architecture))
+        assert structured_cfg.architecture.name == "centralized"
+        assert structured_cfg.architecture.propagator is None
         assert isinstance(structured_cfg.ppo.learning_rate, float)
         assert structured_cfg.ppo.learning_rate > 0
 
@@ -32,7 +33,7 @@ def test_config_composition_decentralized():
         structured_cfg = OmegaConf.to_object(OmegaConf.merge(BrittleStarConfig, cfg))
 
         # Basic assertions
-        assert "DecentralizedConfig" in str(type(structured_cfg.architecture))
+        assert structured_cfg.architecture.name == "decentralized"
         assert isinstance(structured_cfg.ppo.learning_rate, float)
         assert structured_cfg.ppo.learning_rate > 0
 

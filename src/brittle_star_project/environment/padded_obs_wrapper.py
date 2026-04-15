@@ -42,10 +42,22 @@ def compute_padding_masks(
     Returns:
         A dict containing 1D boolean masks and target sizes.
     """
+    if len(segments_per_arm) != len(reference_segments_per_arm):
+        raise ValueError(
+            f"Morphology mismatch: current has {len(segments_per_arm)} arms, "
+            f"but reference requires {len(reference_segments_per_arm)} arms."
+        )
+
     mask_1x = []
     mask_2x = []
 
-    for actual, ref in zip(segments_per_arm, reference_segments_per_arm):
+    for arm_idx, (actual, ref) in enumerate(zip(segments_per_arm, reference_segments_per_arm)):
+        if not (0 <= actual <= ref):
+            raise ValueError(
+                f"Invalid amputation at arm {arm_idx}: "
+                f"actual segments ({actual}) must be between 0 and reference ({ref})."
+            )
+        # 1x scaling (e.g., contacts: 1 value per segment)
         # 1x scaling (e.g., contacts: 1 value per segment)
         mask_1x.extend([True] * actual + [False] * (ref - actual))
         # 2x scaling (e.g., joints: 2 values per segment)
