@@ -15,6 +15,7 @@ from brittle_star_project import (
 )
 from brittle_star_project.environment import ArenaConfig, EnvConfig, MorphologyConfig, from_file
 
+
 def _flatten_obs_dict(obs_dict: dict[str, Any]) -> jnp.ndarray:
     """Flatten the env's observation dict into a 1D vector.
 
@@ -35,7 +36,6 @@ def _flatten_obs_dict(obs_dict: dict[str, Any]) -> jnp.ndarray:
 
 # A minimal policy class to load a CleanRL/Flax checkpoint and run inference.
 class CleanRLPPOPolicy:
-
     def __init__(
         self,
         *,
@@ -242,9 +242,7 @@ def _run_one_episode_viewer(
     # Use the viewer as a context manager to avoid GLX teardown races
     # (e.g. GLXBadDrawable from X_GLXSwapBuffers after a window is destroyed).
     with mujoco.viewer.launch_passive(model, data) as viewer:
-        step_iter = (
-            range(int(max_steps)) if max_steps is not None else itertools.count()
-        )
+        step_iter = range(int(max_steps)) if max_steps is not None else itertools.count()
         for _step_idx in step_iter:
             if not viewer.is_running():
                 break
@@ -307,9 +305,7 @@ def parse_args() -> argparse.Namespace:
         "--model",
         type=str,
         required=True,
-        help=(
-            "Path to the Flax checkpoint saved by scripts/train.py (final_model.flax)."
-        ),
+        help=("Path to the Flax checkpoint saved by scripts/train.py (final_model.flax)."),
     )
     p.add_argument(
         "--headless",
@@ -379,8 +375,7 @@ def main() -> None:
     model_path = Path(args.model)
     if model_path.name != "final_model.flax" or model_path.suffix != ".flax":
         raise ValueError(
-            "Expected the training artifact 'final_model.flax', "
-            f"got '{model_path.name}'."
+            f"Expected the training artifact 'final_model.flax', got '{model_path.name}'."
         )
 
     policy = CleanRLPPOPolicy.load(
