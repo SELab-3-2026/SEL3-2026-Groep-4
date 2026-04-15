@@ -53,7 +53,7 @@ def init_logger(**kwargs) -> "UnifiedLogger":
     the output directories and set up all logging backends.
     """
     global _active_logger
-    logger = UnifiedLogger(_set_as_global=False, **kwargs)
+    logger = UnifiedLogger(**kwargs)
     _active_logger = logger
     return logger
 

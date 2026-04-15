@@ -23,7 +23,7 @@ def make_env(cfg: BrittleStarConfig) -> BrittleStarJaxEnvWrapper:
 @hydra.main(config_path="../configs", config_name="main_config", version_base="1.3")
 def main(dict_cfg: DictConfig):
     # 1. Convert DictConfig to structured dataclass
-    cfg: BrittleStarConfig = OmegaConf.to_object(dict_cfg)
+    config: BrittleStarConfig = OmegaConf.to_object(dict_cfg)
 
     # 2. Setup run metadata
     # Hydra changes CWD to the output directory by default.
@@ -31,25 +31,25 @@ def main(dict_cfg: DictConfig):
     run_name = os.path.basename(run_dir)
 
     # 3. Initialize Logger
-    resolved_cfg_dict = OmegaConf.to_container(dict_cfg, resolve=True, throw_on_missing=True)
+    cfg_dict = OmegaConf.to_container(dict_cfg, resolve=True, throw_on_missing=True)
     init_logger(
         run_name=run_name,
-        config=resolved_cfg_dict,
-        project_name=cfg.logging.wandb_project_name,
-        entity=cfg.logging.wandb_entity,
+        config=cfg_dict,
+        project_name=config.logging.wandb_project_name,
+        entity=config.logging.wandb_entity,
         base_dir=os.path.dirname(run_dir),
-        use_wandb=cfg.logging.track,
+        use_wandb=config.logging.track,
     )
     logger = get_logger()
     logger.info(f"Hydra-initialized run: {run_name}")
     logger.info(f"Output directory: {run_dir}")
 
     # 4. Setup Environment and Torch
-    env = make_env(cfg)
-    torch.backends.cudnn.deterministic = cfg.experiment.torch_deterministic
+    env = make_env(config)
+    torch.backends.cudnn.deterministic = config.experiment.torch_deterministic
 
     # 5. Train - pass structured config directly
-    ppo_trainer = PPOTrainer(cfg, env, run_dir, run_name)
+    ppo_trainer = PPOTrainer(config, env, run_dir, run_name)
     ppo_trainer.train()
 
 

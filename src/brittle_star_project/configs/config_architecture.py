@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -18,14 +18,20 @@ class ArchitectureConfig:
     See docs/design/actor-critic.md for the full design rationale.
     """
 
-    # Input network: maps global observation to a hidden representation.
-    feature_extractor: LayerConfig = field(
-        default_factory=lambda: LayerConfig(hidden_dims=[64, 64], activation="tanh")
-    )
-    # Output network: maps the hidden representation to a scalar value estimate.
-    critic: LayerConfig = field(
-        default_factory=lambda: LayerConfig(hidden_dims=[], activation="tanh")
-    )
+    name: str = "base"
+
+    # Actor pipeline
+    sensor: Optional[LayerConfig] = None
+    propagator: Optional[LayerConfig] = None
+    motor: Optional[LayerConfig] = None
+
+    # Critic pipeline
+    feature_extractor: Optional[LayerConfig] = None
+    critic: Optional[LayerConfig] = None
+
+    # Decentralized
+    message_passing_steps: Optional[int] = None
+    topology_type: Optional[str] = None  # Supported values: "ring", "fully_connected"
 
 
 @dataclass
@@ -39,14 +45,7 @@ class CentralizedConfig(ArchitectureConfig):
     See docs/design/actor-critic.md for the full design rationale.
     """
 
-    # Input network: maps the global observation to a hidden state.
-    sensor: LayerConfig = field(
-        default_factory=lambda: LayerConfig(hidden_dims=[64, 64], activation="tanh")
-    )
-    # Output network: projects hidden state to (mean, log_std) over all joints.
-    motor: LayerConfig = field(
-        default_factory=lambda: LayerConfig(hidden_dims=[], activation="tanh")
-    )
+    name: str = "centralized"
 
 
 @dataclass
@@ -64,21 +63,4 @@ class DecentralizedConfig(ArchitectureConfig):
     full design rationale.
     """
 
-    # Input network: local observation -> initial hidden state per node.
-    sensor: LayerConfig = field(
-        default_factory=lambda: LayerConfig(hidden_dims=[64, 64], activation="tanh")
-    )
-    # Message-passing network: aggregates neighbour messages and updates hidden state.
-    propagator: LayerConfig = field(
-        default_factory=lambda: LayerConfig(hidden_dims=[64, 64], activation="tanh")
-    )
-    # Output network: final hidden state -> joint offset for this node only.
-    motor: LayerConfig = field(
-        default_factory=lambda: LayerConfig(hidden_dims=[], activation="tanh")
-    )
-
-    # Number of synchronous message-passing rounds per control step.
-    message_passing_steps: int = 1
-    # Graph topology used for neighbour connections.
-    # Supported values: "ring", "fully_connected".
-    topology_type: str = "ring"
+    name: str = "decentralized"

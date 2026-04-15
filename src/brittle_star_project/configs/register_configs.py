@@ -29,8 +29,8 @@ def register_configs() -> None:
     cs.store(group="ppo", name="base_ppo", node=PPOConfig)
 
     # Architecture variants — swap via CLI: architecture=decentralized
-    cs.store(group="architecture", name="centralized", node=CentralizedConfig)
-    cs.store(group="architecture", name="decentralized", node=DecentralizedConfig)
+    cs.store(group="architecture", name="centralized_schema", node=CentralizedConfig)
+    cs.store(group="architecture", name="decentralized_schema", node=DecentralizedConfig)
 
     # Environment configs
     cs.store(group="morphology", name="base_morphology", node=MorphologyConfig)

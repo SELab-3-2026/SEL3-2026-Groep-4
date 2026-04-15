@@ -527,11 +527,11 @@ class PPOTrainer:
                 f"ETA {eta_str}"
             )
 
-            if getattr(self.config.experiment, "debug_sanity", False):
-                self.logger.log(
+            if getattr(self.cfg.experiment, "debug_sanity", False):
+                self.logger.info(
                     "\n[SANITY CHECK] Successfully completed 1 epoch of data collection and gradient updates."
                 )
-                self.logger.log("[SANITY CHECK] Gradients flowed without NaN. Exiting gracefully.")
+                self.logger.info("[SANITY CHECK] Gradients flowed without NaN. Exiting gracefully.")
                 break
 
         if self.logging_cfg.save_model:

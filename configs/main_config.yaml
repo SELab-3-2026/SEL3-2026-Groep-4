@@ -3,6 +3,7 @@
 # Sub-configs are loaded from the relative directories.
 
 defaults:
+  - brittle_star_config
   - experiment: base
   - logging: default
   - ppo: default
