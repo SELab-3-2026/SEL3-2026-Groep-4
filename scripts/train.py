@@ -22,8 +22,10 @@ def make_env(cfg: BrittleStarConfig) -> BrittleStarJaxEnvWrapper:
 
 @hydra.main(config_path="../configs", config_name="main_config", version_base="1.3")
 def main(dict_cfg: DictConfig):
-    # 1. Convert DictConfig to structured dataclass
-    config: BrittleStarConfig = OmegaConf.to_object(dict_cfg)
+    # 1. Convert DictConfig to structured dataclass, ensuring the root schema is applied correctly.
+    config: BrittleStarConfig = OmegaConf.to_object(
+        OmegaConf.merge(OmegaConf.structured(BrittleStarConfig), dict_cfg)
+    )
 
     # 2. Setup run metadata
     # Hydra changes CWD to the output directory by default.

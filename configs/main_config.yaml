@@ -11,6 +11,7 @@ defaults:
   - morphology: 5_arms_full
   - arena: default
   - environment: directed_locomotion
+  - simulation: default
   - _self_
 
 hydra:

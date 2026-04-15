@@ -29,19 +29,23 @@ MODEL_OPTIONS = sorted(MODEL_BY_NAME)
 
 @hydra.main(config_path="../configs", config_name="main_config", version_base="1.3")
 def main(dict_cfg: DictConfig) -> None:
-    cfg: BrittleStarConfig = OmegaConf.to_object(dict_cfg)
+    # 1. Convert DictConfig to structured dataclass, ensuring the root schema is applied correctly.
+    config: BrittleStarConfig = OmegaConf.to_object(
+        OmegaConf.merge(OmegaConf.structured(BrittleStarConfig), dict_cfg)
+    )
 
-    # Allow overriding these via Hydra CLI or a dedicated simulate config group
-    # For now, defaults matching the old argparse behavior
-    backend = Backend.MJX
-    model_type = "random"
-    model_path = None
-    seed = cfg.experiment.seed
+    # Use the configurable settings from the simulation group
+    backend = config.simulation.backend
+    model_type = config.simulation.model_type
+    model_path = config.simulation.model_path
+    seed = config.experiment.seed
 
     # ======= ENVIRONMENT SETUP =======
     factory = BrittleStarEnvFactory()
-    raw_env = factory.create_environment(backend, cfg.morphology, cfg.arena, cfg.environment)
-    env = BrittleStarEnv(raw_env, backend=backend, config=cfg.environment)
+    raw_env = factory.create_environment(
+        backend, config.morphology, config.arena, config.environment
+    )
+    env = BrittleStarEnv(raw_env, backend=backend, config=config.environment)
 
     state = env.reset(seed=seed)
 

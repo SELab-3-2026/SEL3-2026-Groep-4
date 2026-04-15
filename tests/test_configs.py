@@ -13,9 +13,10 @@ def test_config_composition_centralized():
         # We compose the config; it follows main_config.yaml
         cfg = compose(config_name="main_config", overrides=["architecture=centralized"])
 
-        # Merge with the dataclass class to get a structured DictConfig,
-        # then convert to a real dataclass instance to verify validation.
-        structured_cfg = OmegaConf.to_object(OmegaConf.merge(BrittleStarConfig, cfg))
+        # Merge with the structured schema and convert to a real dataclass instance to verify validation.
+        structured_cfg = OmegaConf.to_object(
+            OmegaConf.merge(OmegaConf.structured(BrittleStarConfig), cfg)
+        )
 
         # Basic assertions
         assert structured_cfg.architecture.name == "centralized"
@@ -30,7 +31,9 @@ def test_config_composition_decentralized():
         cfg = compose(config_name="main_config", overrides=["architecture=decentralized"])
 
         # Merge and convert to dataclass instance
-        structured_cfg = OmegaConf.to_object(OmegaConf.merge(BrittleStarConfig, cfg))
+        structured_cfg = OmegaConf.to_object(
+            OmegaConf.merge(OmegaConf.structured(BrittleStarConfig), cfg)
+        )
 
         # Basic assertions
         assert structured_cfg.architecture.name == "decentralized"

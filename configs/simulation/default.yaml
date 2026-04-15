@@ -1,0 +1,11 @@
+# Default Simulation Settings
+# These values are used by scripts/simulate.py
+
+# Path to the trained model (optional)
+model_path: null
+
+# Type of model to use if no path is provided (e.g., random)
+model_type: "random"
+
+# Execution backend (MJX or BRAX)
+backend: "MJX"
