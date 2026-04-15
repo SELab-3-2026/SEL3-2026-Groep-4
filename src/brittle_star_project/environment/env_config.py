@@ -60,16 +60,3 @@ class EnvConfig:
     # Light escape
     # Per docs in upstream env config: integer factors of 200.
     light_perlin_noise_scale: int = 0
-
-
-def from_file(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
-    """Load configurations from a YAML file."""
-    import yaml
-
-    with open(path, "r") as f:
-        config_dict = yaml.safe_load(f)
-
-        morphology = MorphologyConfig(**config_dict.get("morphology", {}))
-        arena = ArenaConfig(**config_dict.get("arena", {}))
-        env = EnvConfig(**config_dict.get("env", {}))
-        return morphology, arena, env

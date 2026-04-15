@@ -72,67 +72,6 @@ def dataclass_from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:
     return cls(**filtered_config)
 
 
-def merge_config_with_cli(config_class: Type[T], config_file: str | None = None) -> T:
-    """Merge YAML config with CLI arguments, with CLI taking precedence.
-
-    Args:
-        config_class: Dataclass type to create
-        config_file: Path to YAML config file (optional)
-
-    Returns:
-        Instance of config_class with merged configuration
-    """
-    # Parse CLI args first to get the default/CLI values
-    import tyro
-
-    # Check if --config is in sys.argv and extract it
-    extracted_config_file = config_file
-    if "--config" in sys.argv:
-        config_idx = sys.argv.index("--config")
-        if config_idx + 1 < len(sys.argv):
-            extracted_config_file = sys.argv[config_idx + 1]
-            # Remove from sys.argv so tyro doesn't see it
-            sys.argv.pop(config_idx)  # Remove --config
-            sys.argv.pop(config_idx)  # Remove config file path
-
-    # Load YAML config if available
-    yaml_config = {}
-    if extracted_config_file and os.path.exists(extracted_config_file):
-        yaml_config = load_yaml_config(extracted_config_file)
-        get_logger().info(f"Merging YAML config from {extracted_config_file} with CLI args")
-    elif extracted_config_file:
-        get_logger().warning(f"Config file not found: {extracted_config_file}, using CLI args only")
-
-    # Create default instance to know what the defaults are
-    default_instance = config_class()
-    default_dict = {f.name: getattr(default_instance, f.name) for f in fields(config_class)}  # type: ignore
-
-    # Parse CLI args
-    cli_instance = tyro.cli(config_class)
-    cli_dict = {f.name: getattr(cli_instance, f.name) for f in fields(config_class)}  # type: ignore
-
-    # Merge configs: YAML as base, CLI overrides non-default values
-    final_config = {}
-
-    for field in fields(config_class):  # type: ignore
-        field_name = field.name
-        default_value = default_dict[field_name]
-        yaml_value = yaml_config.get(field_name, default_value)
-        cli_value = cli_dict[field_name]
-
-        # Use CLI value if it's different from default, otherwise use YAML value
-        if cli_value != default_value:
-            final_config[field_name] = cli_value
-            if yaml_value != default_value and yaml_value != cli_value:
-                get_logger().info(f"CLI override: {field_name}={cli_value} (YAML had {yaml_value})")
-        else:
-            final_config[field_name] = yaml_value
-            if yaml_value != default_value:
-                get_logger().info(f"YAML config: {field_name}={yaml_value}")
-
-    return config_class(**final_config)
-
-
 def print_config(config: Any, title: str = "Configuration"):
     """Pretty print configuration."""
     get_logger().info(f"{title}:")

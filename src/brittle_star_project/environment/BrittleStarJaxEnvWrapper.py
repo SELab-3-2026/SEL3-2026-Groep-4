@@ -8,7 +8,6 @@ from brittle_star_project import (
     ArenaConfig,
     Backend,
 )
-from brittle_star_project.environment import from_file
 
 
 class BrittleStarJaxEnvWrapper:
@@ -84,15 +83,6 @@ class BrittleStarJaxEnvWrapper:
         env_config = EnvConfig()
         return BrittleStarJaxEnvWrapper(
             morphology, arena, env_config, num_envs=num_envs, backend=backend
-        )
-
-    @staticmethod
-    def from_config(
-        config_path: str, num_envs: int, backend: Backend = Backend.MJX
-    ) -> "BrittleStarJaxEnvWrapper":
-        morphology_cfg, arena_cfg, env_cfg = from_file(config_path)
-        return BrittleStarJaxEnvWrapper(
-            morphology_cfg, arena_cfg, env_cfg, num_envs=num_envs, backend=backend
         )
 
     def __str__(self):

@@ -31,8 +31,3 @@ class TestYamlConfig:
 
         with pytest.raises(FileNotFoundError):
             load_yaml_config("nonexistent.yaml")
-
-    def test_merge_config_with_cli_is_callable(self):
-        from experiment_logger.config_utils import merge_config_with_cli
-
-        assert callable(merge_config_with_cli)
