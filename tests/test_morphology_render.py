@@ -1,4 +1,5 @@
 import jax
+import pytest
 import os
 import mujoco
 from PIL import Image
@@ -6,6 +7,7 @@ from brittle_star_project.environment.env_config import EnvConfig, MorphologyCon
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 
 
+@pytest.mark.skipif(os.getenv("CI") == "true", reason="No OpenGL display in CI")
 def test_render_morphologies():
     base_dir = "runs/renders"
     os.makedirs(base_dir, exist_ok=True)
