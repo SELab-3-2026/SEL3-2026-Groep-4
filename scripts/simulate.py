@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import time
 from pathlib import Path
 from typing import Any
@@ -38,18 +39,18 @@ class CleanRLPPOPolicy:
     def __init__(
         self,
         *,
-        network_params: Any,
+        sensor_params: Any,
         actor_params: Any,
         action_dim: int,
     ) -> None:
-        from brittle_star_project.rl import Actor, Network
+        from brittle_star_project.MLPs.mlps import Actor, GenericDenseLayersWithActivation
 
-        self._network = Network()
+        self._sensor = GenericDenseLayersWithActivation()
         self._actor = Actor(action_dim=action_dim)
-        self._network_apply = jax.jit(self._network.apply)
+        self._sensor_apply = jax.jit(self._sensor.apply)
         self._actor_apply = jax.jit(self._actor.apply)
         self._params = {
-            "network_params": network_params,
+            "sensor_params": sensor_params,
             "actor_params": actor_params,
         }
 
@@ -73,14 +74,19 @@ class CleanRLPPOPolicy:
                 and all(str(k).isdigit() for k in container.keys())
             )
 
-        def _parse_checkpoint(restored_obj: Any) -> tuple[Any, Any, Any, Any]:
-            """Extract (args_dict, network_params, actor_params, critic_params).
+        def _parse_checkpoint(restored_obj: Any) -> tuple[Any, Any, Any, Any, Any]:
+            """Extract checkpoint parts.
 
-            `src/train.py` saves:
-              flax.serialization.to_bytes([vars(args), [net, actor, critic]])
+            Returns (args_dict, sensor_params, actor_params, critic_params,
+            feature_extractor_params).
 
-            `msgpack_restore()` occasionally restores lists as dicts keyed by
-            string indices ("0", "1", ...), so we accept both shapes.
+            `PPOTrainer` saves:
+              flax.serialization.to_bytes(
+                [vars(args), [sensor, actor, critic, feature_extractor]]
+              )
+
+            `msgpack_restore()` may restore lists as dicts keyed by string
+            indices ("0", "1", ...), so we accept both shapes.
             """
 
             args_part: Any | None = None
@@ -96,38 +102,55 @@ class CleanRLPPOPolicy:
                 params_part = restored_obj.get("1", restored_obj.get(1))
 
             if _looks_like_indexed_dict(params_part):
-                network_params = _get_index(params_part, 0)
+                sensor_params = _get_index(params_part, 0)
                 actor_params = _get_index(params_part, 1)
                 critic_params = _get_index(params_part, 2)
-                if network_params is None or actor_params is None:
+                feature_extractor_params = _get_index(params_part, 3)
+                if sensor_params is None or actor_params is None:
                     raise ValueError("Missing required params in checkpoint")
-                return args_part, network_params, actor_params, critic_params
+                return (
+                    args_part,
+                    sensor_params,
+                    actor_params,
+                    critic_params,
+                    feature_extractor_params,
+                )
 
             if isinstance(params_part, (list, tuple)) and len(params_part) >= 2:
-                network_params = params_part[0]
+                sensor_params = params_part[0]
                 actor_params = params_part[1]
                 critic_params = params_part[2] if len(params_part) >= 3 else None
-                return args_part, network_params, actor_params, critic_params
+                feature_extractor_params = params_part[3] if len(params_part) >= 4 else None
+                return (
+                    args_part,
+                    sensor_params,
+                    actor_params,
+                    critic_params,
+                    feature_extractor_params,
+                )
 
             raise ValueError(
-                f"Unexpected .cleanrl_model structure in {path}. "
-                "Expected [args_dict, [network_params, actor_params, critic_params]] "
+                f"Unexpected checkpoint structure in {path}. "
+                "Expected [args_dict, [sensor_params, actor_params, critic_params, "
+                "feature_extractor_params]] "
                 "or an equivalent dict-indexed variant."
             )
 
         payload = path.read_bytes()
         restored = flax.serialization.msgpack_restore(payload)
-        _args_dict, network_params, actor_params, _critic_params = _parse_checkpoint(restored)
+        _args_dict, sensor_params, actor_params, _critic_params, _feature_extractor_params = (
+            _parse_checkpoint(restored)
+        )
 
         return CleanRLPPOPolicy(
-            network_params=network_params,
+            sensor_params=sensor_params,
             actor_params=actor_params,
             action_dim=action_dim,
         )
 
     def act(self, *, observations: dict[str, Any]) -> np.ndarray:
         obs = _flatten_obs_dict(observations)
-        hidden = self._network_apply(self._params["network_params"], obs)
+        hidden = self._sensor_apply(self._params["sensor_params"], obs)
         mean, _log_std = self._actor_apply(self._params["actor_params"], hidden)
 
         # Always evaluate with the actor mean.
@@ -135,7 +158,7 @@ class CleanRLPPOPolicy:
         return np.asarray(mean, dtype=np.float32).ravel()
 
 
-def _get_observations(state: Any) -> dict[str, Any]:
+def _get_observations(state: Any) -> dict[str, Any] | None:
     return getattr(state, "observations", None)
 
 
@@ -202,7 +225,7 @@ def _run_one_episode_viewer(
     seed: int,
     state: Any,
     control_dt: float,
-    max_steps: int,
+    max_steps: int | None,
 ) -> None:
     import mujoco.viewer
 
@@ -215,23 +238,28 @@ def _run_one_episode_viewer(
     prev_dist = _get_xy_distance_to_target(observations)
     reached_target = _target_reached(state=state)
 
-    viewer = mujoco.viewer.launch_passive(model, data)
-    try:
-        steps = 0
-        for _step_idx in range(int(max_steps)):
+    steps = 0
+    # Use the viewer as a context manager to avoid GLX teardown races
+    # (e.g. GLXBadDrawable from X_GLXSwapBuffers after a window is destroyed).
+    with mujoco.viewer.launch_passive(model, data) as viewer:
+        step_iter = (
+            range(int(max_steps)) if max_steps is not None else itertools.count()
+        )
+        for _step_idx in step_iter:
             if not viewer.is_running():
                 break
             step_start = time.time()
 
-            # One control step. We do the env step under the viewer lock.
             action = policy.act(observations=observations)
             if model.nu > 0 and action.shape != (int(model.nu),):
                 raise ValueError(
                     f"Policy returned action shape {action.shape}, expected ({int(model.nu)},)"
                 )
+
             # The passive viewer runs a GUI thread; protect MuJoCo state mutation.
             with viewer.lock():
                 state = env.step(state=state, action=action)
+
             if not viewer.is_running():
                 break
             viewer.sync()
@@ -248,31 +276,17 @@ def _run_one_episode_viewer(
             if reached_target:
                 break
 
-            # Real-time pacing so the viewer doesn't run as fast as possible.
             remaining = control_dt - (time.time() - step_start)
             if remaining > 0:
                 time.sleep(remaining)
 
-        # Done: target reached, fixed horizon reached, or window closed.
-        if viewer.is_running():
-            dist = _get_xy_distance_to_target(observations)
-            dist_str = "n/a" if dist is None else f"{dist:.3f}"
-            print(
-                "episode done: "
-                f"return={episode_return:.6f}, len={steps}, "
-                f"target_reached={reached_target}, final_xy_dist={dist_str}"
-            )
-            viewer.close()
-    finally:
-        # Ensure the GUI thread stops before the env/model/data are torn down.
-        try:
-            viewer.close()
-        except Exception:
-            pass
-        for _ in range(200):
-            if not viewer.is_running():
-                break
-            time.sleep(0.01)
+    dist = _get_xy_distance_to_target(observations)
+    dist_str = "n/a" if dist is None else f"{dist:.3f}"
+    print(
+        "episode done: "
+        f"return={episode_return:.6f}, len={steps}, "
+        f"target_reached={reached_target}, final_xy_dist={dist_str}"
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -293,7 +307,9 @@ def parse_args() -> argparse.Namespace:
         "--model",
         type=str,
         required=True,
-        help=("Path to a CleanRL/Flax '.cleanrl_model' checkpoint (saved by src/train.py)."),
+        help=(
+            "Path to the Flax checkpoint saved by scripts/train.py (final_model.flax)."
+        ),
     )
     p.add_argument(
         "--headless",
@@ -303,17 +319,17 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--max-steps",
         type=int,
-        required=True,
+        default=None,
         help=(
-            "Number of control steps to run (fixed horizon). "
-            "This script stops when this many steps are reached, or earlier if "
-            "the target is reached (directed locomotion)."
+            "Number of control steps to run. "
+            "In --headless mode this is required and acts as a fixed horizon. "
+            "In viewer mode the default is infinite (run until window closed or target reached)."
         ),
     )
     p.add_argument(
         "--backend",
-        choices=[b for b in Backend],
-        default=Backend.MJC,
+        choices=[b.value for b in Backend],
+        default=Backend.MJC.value,
     )
     p.add_argument("--seed", type=int, default=0)
     return p.parse_args()
@@ -340,7 +356,7 @@ def main() -> None:
 
     # ======= ENVIRONMENT SETUP =======
 
-    backend = args.backend
+    backend = Backend(args.backend)
 
     factory = BrittleStarEnvFactory()
     raw_env = factory.create_environment(backend, morphology_cfg, arena_cfg, env_cfg)
@@ -361,8 +377,11 @@ def main() -> None:
     nu = int(state.mj_model.nu)
 
     model_path = Path(args.model)
-    if model_path.suffix != ".cleanrl_model":
-        raise ValueError(f"Expected a '.cleanrl_model' checkpoint, got '{model_path.name}'.")
+    if model_path.name != "final_model.flax" or model_path.suffix != ".flax":
+        raise ValueError(
+            "Expected the training artifact 'final_model.flax', "
+            f"got '{model_path.name}'."
+        )
 
     policy = CleanRLPPOPolicy.load(
         model_path,
@@ -374,6 +393,8 @@ def main() -> None:
     # ======= SIMULATION =======
 
     if args.headless:
+        if args.max_steps is None:
+            raise ValueError("--max-steps is required in --headless mode")
         max_steps = int(args.max_steps)
         if max_steps <= 0:
             raise ValueError("--max-steps must be > 0")
@@ -392,9 +413,13 @@ def main() -> None:
             f"target_reached={reached_target}, final_xy_dist={final_dist_str}"
         )
     else:
-        max_steps = int(args.max_steps)
-        if max_steps <= 0:
-            raise ValueError("--max-steps must be > 0")
+        max_steps: int | None
+        if args.max_steps is None:
+            max_steps = None
+        else:
+            max_steps = int(args.max_steps)
+            if max_steps <= 0:
+                raise ValueError("--max-steps must be > 0")
 
         model_dt = float(state.mj_model.opt.timestep)
         control_dt = model_dt * float(env_cfg.num_physics_steps_per_control_step)
