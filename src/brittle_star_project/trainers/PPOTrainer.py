@@ -11,7 +11,10 @@ import numpy as np
 import optax
 from flax.training.train_state import TrainState
 
-from brittle_star_project.dataclasses import EpisodeStatistics, PPOArgs
+from experiment_logger import get_logger
+
+from brittle_star_project.configs.main_config import BrittleStarConfig
+from brittle_star_project.dataclasses import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from brittle_star_project.MLPs.mlps import (
     Actor,
@@ -21,7 +24,6 @@ from brittle_star_project.MLPs.mlps import (
     Storage,
 )
 from brittle_star_project.ppo import PPO
-from experiment_logger import get_logger
 
 # TODO: move to config
 _ALLOWED_OBS_KEYS = {
@@ -268,14 +270,23 @@ class TrainingMeasurements:
 
 
 class PPOTrainer:
-    def __init__(self, args: PPOArgs, env: BrittleStarJaxEnvWrapper, run_dir: str, run_name: str):
-        self.args = args
+    def __init__(
+        self, cfg: BrittleStarConfig, env: BrittleStarJaxEnvWrapper, run_dir: str, run_name: str
+    ):
+        self.cfg = cfg
+        self.ppo = cfg.ppo
+        self.experiment = cfg.experiment
+        self.logging_cfg = cfg.logging
         self.env = env
         self.run_dir = run_dir
         self.run_name = run_name
         self.logger = get_logger()
 
-        self.key = jax.random.PRNGKey(args.seed)
+        # Derived runtime fields
+        self.batch_size = self.ppo.num_envs * self.ppo.num_steps
+        self.num_iterations = self.ppo.total_timesteps // self.batch_size
+
+        self.key = jax.random.PRNGKey(self.experiment.seed)
 
         self.sensor, self.feature_extractor, self.actor, self.critic = self._init_agent()
         self.sensor.apply = jax.jit(self.sensor.apply)
@@ -289,7 +300,7 @@ class PPOTrainer:
         self._rollout_jit = jax.jit(
             partial(
                 _rollout_jit,
-                max_steps=self.args.num_steps,
+                max_steps=self.ppo.num_steps,
                 step_env_fn=partial(_step_env_wrapped, env_step_fn=self.env.step),
                 sensor=self.sensor,
                 feature_extractor=self.feature_extractor,
@@ -302,15 +313,15 @@ class PPOTrainer:
         self._compute_gae_jit = jax.jit(
             partial(
                 _compute_gae_jit,
-                num_envs=self.args.num_envs,
-                gamma=self.args.gamma,
-                gae_lambda=self.args.gae_lambda,
+                num_envs=self.ppo.num_envs,
+                gamma=self.ppo.gamma,
+                gae_lambda=self.ppo.gae_lambda,
                 feature_extractor=self.feature_extractor,
                 critic=self.critic,
             )
         )
 
-        self._ppo = PPO(self.args, self.sensor, self.actor, self.critic, self.feature_extractor)
+        self._ppo = PPO(self.ppo, self.sensor, self.actor, self.critic, self.feature_extractor)
 
         self.agent_state = self._init_agent_state()
 
@@ -319,10 +330,10 @@ class PPOTrainer:
         self._init_random()
 
     def _init_random(self):
-        self.logger.info(f"[RANDOM]: Setting random seed to {self.args.seed}")
+        self.logger.info(f"[RANDOM]: Setting random seed to {self.experiment.seed}")
 
-        random.seed(self.args.seed)
-        np.random.seed(self.args.seed)
+        random.seed(self.experiment.seed)
+        np.random.seed(self.experiment.seed)
 
     def _init_agent(self):
         self.logger.info("[AGENT]: Initializing agent...")
@@ -358,17 +369,17 @@ class PPOTrainer:
                 AgentParams(sensor_params, actor_params, critic_params, feature_extractor_params)
             ),
             tx=optax.chain(
-                optax.clip_by_global_norm(self.args.max_grad_norm),
+                optax.clip_by_global_norm(self.ppo.max_grad_norm),
                 optax.inject_hyperparams(optax.adam)(
                     learning_rate=partial(
                         _linear_schedule,
-                        minibatch_count=self.args.num_minibatches,
-                        update_epochs=self.args.update_epochs,
-                        num_iterations=self.args.num_iterations,
-                        learning_rate=self.args.learning_rate,
+                        minibatch_count=self.ppo.num_minibatches,
+                        update_epochs=self.ppo.update_epochs,
+                        num_iterations=self.num_iterations,
+                        learning_rate=self.ppo.learning_rate,
                     )
-                    if self.args.anneal_lr
-                    else self.args.learning_rate,
+                    if self.ppo.anneal_lr
+                    else self.ppo.learning_rate,
                     eps=1e-5,
                 ),
             ),
@@ -378,10 +389,10 @@ class PPOTrainer:
         self.logger.info("[EPISODE STATS]: Initializing episode stats...")
 
         return EpisodeStatistics(
-            episode_returns=jnp.zeros(self.args.num_envs, dtype=jnp.float32),
-            episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
-            returned_episode_returns=jnp.zeros(self.args.num_envs, jnp.float32),
-            returned_episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
+            episode_returns=jnp.zeros(self.ppo.num_envs, dtype=jnp.float32),
+            episode_lengths=jnp.zeros(self.ppo.num_envs, dtype=jnp.int32),
+            returned_episode_returns=jnp.zeros(self.ppo.num_envs, jnp.float32),
+            returned_episode_lengths=jnp.zeros(self.ppo.num_envs, dtype=jnp.int32),
         )
 
     def _update_obs_stats(self, obs: jnp.ndarray):
@@ -481,7 +492,7 @@ class PPOTrainer:
             "losses/loss": training_measurements.loss[-1, -1].item(),
             "charts/SPS": int(global_step / (time.time() - start_time)),
             "charts/SPS_update": int(
-                self.args.num_envs * self.args.num_steps / (time.time() - iteration_time_start)
+                self.ppo.num_envs * self.ppo.num_steps / (time.time() - iteration_time_start)
             ),
             **storage_metrics,
         }
@@ -563,8 +574,14 @@ class PPOTrainer:
     def _save_model(self, model_path: str):
         self.logger.info("[SAVE]: Saving the final model...")
 
+        from dataclasses import asdict as _asdict
+
+        config_dict = {
+            "experiment": _asdict(self.experiment),
+            "ppo": _asdict(self.ppo),
+        }
         params = [
-            vars(self.args),
+            config_dict,
             [
                 self.agent_state.params["sensor_params"],
                 self.agent_state.params["actor_params"],
@@ -576,8 +593,7 @@ class PPOTrainer:
 
     def train(self):
         """
-        Train the PPO agent for a specified number of iterations
-        (passed through PPOArgs in constructor).
+        Train the PPO agent for a specified number of iterations.
         Closes the environment at the end of training.
         """
         self.logger.info(f"running name: {self.run_name}")
@@ -585,16 +601,16 @@ class PPOTrainer:
         self.logger.info("[TRAIN]: Resetting environment...")
         self.logger.log_non_interactive(f"Initial reset started: {time.ctime()}")
 
-        env_state = self.env.reset(seed=self.args.seed)
+        env_state = self.env.reset(seed=self.experiment.seed)
         next_obs = _convert_obs_dict_to_array(env_state.observations)
-        next_done = jnp.zeros(self.args.num_envs, dtype=jnp.bool_)
+        next_done = jnp.zeros(self.ppo.num_envs, dtype=jnp.bool_)
 
         self.logger.log_non_interactive(f"Initial reset completed: {time.ctime()}")
 
         global_step = 0
         start_time = time.time()
 
-        iter_bar = self.logger.progress_bar(range(1, self.args.num_iterations + 1))
+        iter_bar = self.logger.progress_bar(range(1, self.num_iterations + 1))
         for iteration in iter_bar:
             iteration_time_start = time.time()
 
@@ -606,7 +622,7 @@ class PPOTrainer:
 
             xy_distance = _get_xy_distance_to_target(env_state.observations)
 
-            global_step += self.args.num_steps * self.args.num_envs
+            global_step += self.ppo.num_steps * self.ppo.num_envs
             self._log(
                 global_step,
                 self.episode_stats,
@@ -619,20 +635,24 @@ class PPOTrainer:
             )
 
             sps = int(global_step / (time.time() - start_time))
-            remaining_steps = self.args.total_timesteps - global_step
+            remaining_steps = self.ppo.total_timesteps - global_step
             eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
             eta_str = str(datetime.timedelta(seconds=eta_seconds))
 
             self.logger.log_non_interactive(
-                f"Iteration {iteration}/{self.args.num_iterations} | "
-                f"Step {global_step}/{self.args.total_timesteps} | "
+                f"Iteration {iteration}/{self.num_iterations} | "
+                f"Step {global_step}/{self.ppo.total_timesteps} | "
                 f"SPS {sps} | "
                 f"Return {training_measurements.avg_episodic_return:.4f} | "
                 f"ETA {eta_str}"
             )
 
-        if self.args.save_model:
-            model_path = f"{self.run_dir}/{self.args.exp_name}.cleanrl_model"
+            if getattr(self.cfg.experiment, "debug_sanity", False):
+                self.logger.info("\n[SANITY CHECK] Successfully completed 1 epoch")
+                break
+
+        if self.logging_cfg.save_model:
+            model_path = f"{self.run_dir}/{self.experiment.exp_name}.cleanrl_model"
             self._save_model(model_path=model_path)
 
         self._close()

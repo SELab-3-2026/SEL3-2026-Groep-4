@@ -1,0 +1,21 @@
+# Brittle Star Project - Main Configuration
+# This file defines the default composition of the hierarchical configuration.
+# Sub-configs are loaded from the relative directories.
+
+defaults:
+  - brittle_star_config
+  - experiment: base
+  - logging: default
+  - ppo: default
+  - architecture: centralized
+  - morphology: 5_arms_full
+  - arena: default
+  - environment: directed_locomotion
+  - simulation: default
+  - _self_
+
+hydra:
+  job:
+    chdir: True
+  run:
+    dir: ${experiment.base_run_dir}/${experiment.exp_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}

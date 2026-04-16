@@ -5,24 +5,37 @@ from dataclasses import dataclass, field
 from .env_types import Task
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class MorphologyConfig:
-    num_arms: int = 5
-    num_segments_per_arm: int = 4
+    """Brittle star morphology configuration.
+
+    segments_per_arm defines the number of segments for each arm. The length of
+    this list implicitly sets the number of arms. Use 0 segments to represent
+    a fully amputated arm (e.g., [4, 0, 4, 2, 4] for a 5-arm morphology with
+    arm 1 removed and arm 3 shortened).
+
+    The upstream biorobot library natively supports per-arm segment counts.
+    """
+
+    segments_per_arm: list[int] = field(default_factory=lambda: [4, 4, 4, 4, 4])
     use_p_control: bool = True
     use_torque_control: bool = False
 
+    @property
+    def num_arms(self) -> int:
+        return len(self.segments_per_arm)
 
-@dataclass(frozen=True, slots=True)
+
+@dataclass
 class ArenaConfig:
-    size: tuple[float, float] = (10.0, 5.0)
+    size: list[float] = field(default_factory=lambda: [10.0, 5.0])
     sand_ground_color: bool = True
     attach_target: bool = True
     wall_height: float = 1.5
     wall_thickness: float = 0.1
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class EnvConfig:
     """Shared environment settings.
 
@@ -37,7 +50,7 @@ class EnvConfig:
 
     camera_ids: list[int] = field(default_factory=lambda: [0, 1])
     # (height, width)
-    render_size: tuple[int, int] = (480, 640)
+    render_size: list[int] = field(default_factory=lambda: [480, 640])
 
     joint_randomization_noise_scale: float = 0.0
 
@@ -47,16 +60,3 @@ class EnvConfig:
     # Light escape
     # Per docs in upstream env config: integer factors of 200.
     light_perlin_noise_scale: int = 0
-
-
-def from_file(path: str) -> tuple[MorphologyConfig, ArenaConfig, EnvConfig]:
-    """Load configurations from a YAML file."""
-    import yaml
-
-    with open(path, "r") as f:
-        config_dict = yaml.safe_load(f)
-
-        morphology = MorphologyConfig(**config_dict.get("morphology", {}))
-        arena = ArenaConfig(**config_dict.get("arena", {}))
-        env = EnvConfig(**config_dict.get("env", {}))
-        return morphology, arena, env

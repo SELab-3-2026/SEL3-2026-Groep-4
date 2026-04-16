@@ -63,11 +63,11 @@ elif [ -f "$PBS_O_WORKDIR/.env" ]; then
     export $(grep -v '^#' "$PBS_O_WORKDIR/.env" | xargs)
 fi
 
-# TODO Once experiments get serious, change the config
+# Run training using Hydra overrides
 python scripts/train.py \
-    --env-config-path configs/hpc/debug.yaml \
-    --hyperparameter-config-path configs/hpc/debug.yaml \
-    --run-dir "$SCRATCH_RUNDIR"
+    hydra.run.dir="$SCRATCH_RUNDIR" \
+    ppo=stable \
+    logging=wandb_enabled
 
 echo ">>> Staging out results to $DATA_RUNDIR..."
 cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"

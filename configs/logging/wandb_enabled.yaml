@@ -1,0 +1,11 @@
+# WandB Enabled Logging Configuration
+# For production/cloud experiments with weights synced.
+
+track: true
+wandb_project_name: "PPO-Modularity"
+wandb_entity: "SEL3-2026-Groep-4"
+capture_video: false
+save_model: true
+checkpoint_frequency: 100
+upload_model: false
+hf_entity: ""

@@ -1,14 +1,11 @@
 """Configuration utilities for loading YAML configs and merging with CLI args."""
 
 import os
-import sys
 from typing import Dict, Any, Type, TypeVar
 import yaml
 from dataclasses import fields, is_dataclass
 
 from experiment_logger.unified_logger import get_logger
-
-log = get_logger()
 
 T = TypeVar("T")
 
@@ -24,7 +21,7 @@ def load_yaml_config(config_path: str) -> Dict[str, Any]:
     if config is None:
         return {}
 
-    log.info(f"Loaded configuration from: {config_path}")
+    get_logger().info(f"Loaded configuration from: {config_path}")
     return config
 
 
@@ -35,7 +32,7 @@ def save_yaml_config(config: Dict[str, Any], config_path: str):
     with open(config_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False, indent=2, sort_keys=False)
 
-    log.info(f"Saved configuration to: {config_path}")
+    get_logger().info(f"Saved configuration to: {config_path}")
 
 
 def dataclass_from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:
@@ -66,82 +63,21 @@ def dataclass_from_dict(cls: Type[T], config_dict: Dict[str, Any]) -> T:
                     else:
                         filtered_config[key] = field.type(value) if value is not None else None  # type: ignore
             except (ValueError, TypeError) as e:
-                log.warning(f"Could not convert {key}={value} to {field.type}: {e}")
+                get_logger().warning(f"Could not convert {key}={value} to {field.type}: {e}")
                 filtered_config[key] = value
         else:
-            log.warning(f"Unknown configuration parameter: {key}")
+            get_logger().warning(f"Unknown configuration parameter: {key}")
 
     return cls(**filtered_config)
 
 
-def merge_config_with_cli(config_class: Type[T], config_file: str | None = None) -> T:
-    """Merge YAML config with CLI arguments, with CLI taking precedence.
-
-    Args:
-        config_class: Dataclass type to create
-        config_file: Path to YAML config file (optional)
-
-    Returns:
-        Instance of config_class with merged configuration
-    """
-    # Parse CLI args first to get the default/CLI values
-    import tyro
-
-    # Check if --config is in sys.argv and extract it
-    extracted_config_file = config_file
-    if "--config" in sys.argv:
-        config_idx = sys.argv.index("--config")
-        if config_idx + 1 < len(sys.argv):
-            extracted_config_file = sys.argv[config_idx + 1]
-            # Remove from sys.argv so tyro doesn't see it
-            sys.argv.pop(config_idx)  # Remove --config
-            sys.argv.pop(config_idx)  # Remove config file path
-
-    # Load YAML config if available
-    yaml_config = {}
-    if extracted_config_file and os.path.exists(extracted_config_file):
-        yaml_config = load_yaml_config(extracted_config_file)
-        log.info(f"Merging YAML config from {extracted_config_file} with CLI args")
-    elif extracted_config_file:
-        log.warning(f"Config file not found: {extracted_config_file}, using CLI args only")
-
-    # Create default instance to know what the defaults are
-    default_instance = config_class()
-    default_dict = {f.name: getattr(default_instance, f.name) for f in fields(config_class)}  # type: ignore
-
-    # Parse CLI args
-    cli_instance = tyro.cli(config_class)
-    cli_dict = {f.name: getattr(cli_instance, f.name) for f in fields(config_class)}  # type: ignore
-
-    # Merge configs: YAML as base, CLI overrides non-default values
-    final_config = {}
-
-    for field in fields(config_class):  # type: ignore
-        field_name = field.name
-        default_value = default_dict[field_name]
-        yaml_value = yaml_config.get(field_name, default_value)
-        cli_value = cli_dict[field_name]
-
-        # Use CLI value if it's different from default, otherwise use YAML value
-        if cli_value != default_value:
-            final_config[field_name] = cli_value
-            if yaml_value != default_value and yaml_value != cli_value:
-                log.info(f"CLI override: {field_name}={cli_value} (YAML had {yaml_value})")
-        else:
-            final_config[field_name] = yaml_value
-            if yaml_value != default_value:
-                log.info(f"YAML config: {field_name}={yaml_value}")
-
-    return config_class(**final_config)
-
-
 def print_config(config: Any, title: str = "Configuration"):
     """Pretty print configuration."""
-    log.info(f"{title}:")
+    get_logger().info(f"{title}:")
     if is_dataclass(config):
         for field in fields(config):
             value = getattr(config, field.name)
-            log.info(f"  {field.name}: {value}")
+            get_logger().info(f"  {field.name}: {value}")
     else:
         for key, value in vars(config).items():
-            log.info(f"  {key}: {value}")
+            get_logger().info(f"  {key}: {value}")
