@@ -27,10 +27,10 @@ from experiment_logger import get_logger
 _ALLOWED_OBS_KEYS = {
     "joint_position",
     "joint_velocity",
-    "joint_actuator_force",
-    "actuator_force",
+    # "joint_actuator_force",
+    # "actuator_force",
     "disk_position",
-    "disk_rotation",
+    # "disk_rotation",
     "disk_linear_velocity",
     "disk_angular_velocity",
     "unit_xy_direction_to_target",
@@ -153,7 +153,10 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     next_env_state = env_step_fn(env_state, action)
 
     reward = next_env_state.reward
-    reward *= 20000
+    reward *= 100
+    xy_dist = _get_xy_distance_to_target(next_env_state.observations)   # shape: (num_envs,)
+    distance_scale = 1
+    reward = reward - distance_scale * xy_dist
     reward = jnp.clip(reward, -10, 10)
     terminated = next_env_state.terminated
     truncated = next_env_state.truncated
@@ -434,7 +437,7 @@ class PPOTrainer:
     ):
         data = jax.device_get(
             {
-                "rewards": storage.rewards[0],
+                "rewards": storage.rewards,
                 "values": storage.values[0],
                 "returns": storage.returns[0],
                 "advantages": storage.advantages[0],
@@ -458,8 +461,12 @@ class PPOTrainer:
             "rollout/env0/raw_action_mean": float(np.mean(data["raw_actions"])),
         }
 
+        rewards_per_env = np.mean(data["rewards"], axis=0)   # mean reward per env over the rollout steps
         for i in range(len(xy_distance)):
-            storage_metrics[f"env_data/env{i}_xy_dist_target"] = float(xy_distance[i])
+            env_prefix = f"env_data{i}"
+            storage_metrics[f"{env_prefix}/reward_mean"] = float(rewards_per_env[i])
+            storage_metrics[f"{env_prefix}/xy_dist_target"] = float(xy_distance[i])
+            storage_metrics[f"{env_prefix}/last_reward"] = float(data["rewards"][-1, i])
 
         metrics = {
             "charts/avg_episodic_return": training_measurements.avg_episodic_return,
