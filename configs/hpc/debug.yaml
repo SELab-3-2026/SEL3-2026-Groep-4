@@ -2,7 +2,7 @@
 exp_name: "debug-experiment"
 seed: 42
 track: true
-wandb_project_name: "Let's-find-that-bug"
+wandb_project_name: "Lvl2-Bug-Hunter"
 wandb_entity: "SEL3-2026-Groep-4"
 run_dir: "/data/gent/465/vsc46589"
 num_envs: 32
