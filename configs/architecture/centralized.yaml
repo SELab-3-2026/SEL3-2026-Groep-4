@@ -1,0 +1,22 @@
+# Centralized Actor-Critic Architecture
+# Baseline configuration with a single global sensor and motor.
+
+# Default values are defined in CentralizedConfig dataclass.
+# Use this configuration for standard PPO experiments.
+
+name: "centralized"
+sensor:
+  hidden_dims: [300, 300, 300]
+  activation: "tanh"
+
+motor:
+  hidden_dims: []
+  activation: "tanh"
+
+feature_extractor:
+  hidden_dims: [300, 300, 300]
+  activation: "tanh"
+
+critic:
+  hidden_dims: []
+  activation: "tanh"

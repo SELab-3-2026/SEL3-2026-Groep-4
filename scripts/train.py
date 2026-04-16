@@ -1,75 +1,60 @@
-import subprocess
-import time
-
-import torch
 import os
+import torch
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
-from brittle_star_project.dataclasses import PPOArgs
+from brittle_star_project.configs.main_config import BrittleStarConfig
+from brittle_star_project.configs.register_configs import register_configs
 from brittle_star_project.trainers.PPOTrainer import PPOTrainer
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
-
-from experiment_logger import UnifiedLogger
-from experiment_logger.config_utils import merge_config_with_cli, print_config
+from experiment_logger import init_logger, get_logger
 
 
-def make_env(config_path: str | None, num_envs: int) -> BrittleStarJaxEnvWrapper:
-    if config_path is None:
-        return BrittleStarJaxEnvWrapper.default(num_envs=num_envs)
-    return BrittleStarJaxEnvWrapper.from_config(config_path, num_envs=num_envs)
+def make_env(cfg: BrittleStarConfig) -> BrittleStarJaxEnvWrapper:
+    """Create the environment using the structured configuration."""
+    return BrittleStarJaxEnvWrapper(
+        morphology=cfg.morphology,
+        arena=cfg.arena,
+        env_config=cfg.environment,
+        num_envs=cfg.ppo.num_envs,
+    )
 
 
-def parse_args() -> PPOArgs:
-    import argparse
+@hydra.main(config_path="../configs", config_name="main_config", version_base="1.3")
+def main(dict_cfg: DictConfig):
+    # 1. Convert DictConfig to structured dataclass, ensuring the root schema is applied correctly.
+    config: BrittleStarConfig = OmegaConf.to_object(
+        OmegaConf.merge(OmegaConf.structured(BrittleStarConfig), dict_cfg)
+    )
 
-    # Use argparse to reliably extract just the config path without swallowing --help
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--hyperparameter-config-path", type=str, default=None)
-    known_args, _ = parser.parse_known_args()
+    # 2. Setup run metadata
+    # Hydra changes CWD to the output directory by default.
+    run_dir = os.getcwd()
+    run_name = os.path.basename(run_dir)
 
-    args = merge_config_with_cli(PPOArgs, config_file=known_args.hyperparameter_config_path)
-    return args
+    # 3. Initialize Logger
+    cfg_dict = OmegaConf.to_container(dict_cfg, resolve=True, throw_on_missing=True)
+    init_logger(
+        run_name=run_name,
+        config=cfg_dict,
+        project_name=config.logging.wandb_project_name,
+        entity=config.logging.wandb_entity,
+        base_dir=os.path.dirname(run_dir),
+        use_wandb=config.logging.track,
+    )
+    logger = get_logger()
+    logger.info(f"Hydra-initialized run: {run_name}")
+    logger.info(f"Output directory: {run_dir}")
 
+    # 4. Setup Environment and Torch
+    env = make_env(config)
+    torch.backends.cudnn.deterministic = config.experiment.torch_deterministic
 
-def get_git_hash() -> str:
-    try:
-        return (
-            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
-        )
-    except (subprocess.CalledProcessError, UnicodeDecodeError):
-        return "none"
+    # 5. Train - pass structured config directly
+    ppo_trainer = PPOTrainer(config, env, run_dir, run_name)
+    ppo_trainer.train()
 
 
 if __name__ == "__main__":
-    args = parse_args()
-
-    args.batch_size = args.num_envs * args.num_steps
-    args.minibatch_size = args.batch_size // args.num_minibatches
-    args.num_iterations = args.total_timesteps // args.batch_size
-
-    git_hash = get_git_hash()
-    run_name = f"{args.exp_name}__seed_{args.seed}__{git_hash}__{int(time.time())}"
-
-    if args.run_dir is None:
-        run_dir = f"runs/{run_name}"
-    else:
-        run_dir = args.run_dir
-
-    os.makedirs(run_dir, exist_ok=True)
-
-    # Initialize Global Logger
-    logger = UnifiedLogger(
-        config=vars(args),
-        project_name=args.wandb_project_name,  # or default PPO-Modularity if missing
-        run_name=run_name,
-        base_dir=os.path.dirname(run_dir),
-        use_wandb=args.track,
-    )
-
-    print_config(args, title="PPO Training Configuration")
-
-    env = make_env(args.env_config_path, args.num_envs)
-
-    torch.backends.cudnn.deterministic = args.torch_deterministic
-
-    ppo_trainer = PPOTrainer(args, env, run_dir, run_name)
-    ppo_trainer.train()
+    register_configs()
+    main()

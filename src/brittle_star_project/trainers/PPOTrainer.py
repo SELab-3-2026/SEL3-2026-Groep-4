@@ -13,7 +13,8 @@ from flax.training.train_state import TrainState
 
 from experiment_logger import get_logger
 
-from brittle_star_project.dataclasses import EpisodeStatistics, PPOArgs
+from brittle_star_project.configs.main_config import BrittleStarConfig
+from brittle_star_project.dataclasses import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from brittle_star_project.MLPs.mlps import (
     Actor,
@@ -23,6 +24,33 @@ from brittle_star_project.MLPs.mlps import (
     Storage,
 )
 from brittle_star_project.ppo import PPO
+
+# TODO: move to config
+_ALLOWED_OBS_KEYS = {
+    "joint_position",
+    "joint_velocity",
+    "joint_actuator_force",
+    "actuator_force",
+    "disk_position",
+    "disk_rotation",
+    "disk_linear_velocity",
+    "disk_angular_velocity",
+    "unit_xy_direction_to_target",
+    "xy_distance_to_target",
+}
+# TODO: clip scaled reward?
+
+
+@jax.jit
+def _get_xy_distance_to_target(obs_dict: dict) -> jnp.ndarray:
+    """Extract xy_distance_to_target for all environments."""
+    # obs_dict is a dict of arrays with leading batch dimension (num_envs, ...)
+    return obs_dict["xy_distance_to_target"].squeeze(-1)  # shape: (num_envs,)
+
+
+@jax.jit
+def _clip_action(action: jnp.ndarray, low: jnp.ndarray, high: jnp.ndarray) -> jnp.ndarray:
+    return jnp.clip(action, low, high)
 
 
 def _compute_explained_variance(values: jnp.ndarray, returns: jnp.ndarray) -> float:
@@ -38,10 +66,24 @@ def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, lear
 
 
 @jax.jit
+def _normalize_obs(obs, mean, var, eps=1e-8):
+    return jnp.clip((obs - mean) / jnp.sqrt(var + eps), -10.0, 10.0)
+
+
+@jax.jit
 def _convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
-    return jax.vmap(lambda o: jnp.concatenate([v.flatten() for v in o.values() if v.size > 0]))(
-        obs_dict
-    )
+    """Convert the raw observation dict → flat array, filtering unwanted keys."""
+
+    def _filter_and_flatten(o: dict) -> jnp.ndarray:
+        values = []
+        for key in sorted(o.keys()):
+            if key in _ALLOWED_OBS_KEYS:  # TODO: NORMALIZATION or .. of observations??
+                v = o[key]
+                if v.size > 0:
+                    values.append(jnp.asarray(v).flatten())
+        return jnp.concatenate(values)
+
+    return jax.vmap(_filter_and_flatten)(obs_dict)
 
 
 def _get_action_and_value_noise(
@@ -52,6 +94,8 @@ def _get_action_and_value_noise(
     agent_state: TrainState,
     next_obs: jnp.ndarray,
     key: jax.random.PRNGKey,
+    action_low,
+    action_high,
 ):
     hidden = sensor.apply(agent_state.params["sensor_params"], next_obs)
     hidden_critic = feature_extractor.apply(
@@ -59,13 +103,16 @@ def _get_action_and_value_noise(
     )
 
     mean, log_std = actor.apply(agent_state.params["actor_params"], hidden)
+    log_std = jnp.clip(log_std, -5, 2)
     key, subkey = jax.random.split(key)
     noise = jax.random.normal(subkey, shape=mean.shape)
     std = jnp.exp(log_std)
-    action = mean + noise * std
-    logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
+    raw_action = mean + noise * std
+    clipped_action = _clip_action(raw_action, action_low, action_high)
+    logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
     value = critic.apply(agent_state.params["critic_params"], hidden_critic)
-    return action, logprob, value.squeeze(-1), key
+
+    return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
 
 
 def _step_once(
@@ -76,23 +123,28 @@ def _step_once(
     feature_extractor: GenericDenseLayersWithActivation,
     actor: Actor,
     critic: OneDenseLayerMLP,
+    action_low,
+    action_high,
 ):
     agent_state, episode_stats, obs, done, key, env_state = carry
-    action, logprob, value, key = _get_action_and_value_noise(
-        sensor, feature_extractor, actor, critic, agent_state, obs, key
+    clipped_action, raw_action, logprob, value, mean, std, key = _get_action_and_value_noise(
+        sensor, feature_extractor, actor, critic, agent_state, obs, key, action_low, action_high
     )
 
     episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
-        episode_stats, env_state, action
+        episode_stats, env_state, clipped_action
     )
 
     storage = Storage(
         obs=obs,
-        actions=action,
+        actions=raw_action,
+        raw_actions=raw_action,
         logprobs=logprob,
         dones=done,
         values=value,
         rewards=reward,
+        means=mean,
+        stds=std,
         returns=jnp.zeros_like(reward),
         advantages=jnp.zeros_like(reward),
     )
@@ -103,6 +155,8 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     next_env_state = env_step_fn(env_state, action)
 
     reward = next_env_state.reward
+    reward *= 20000
+    reward = jnp.clip(reward, -10, 10)
     terminated = next_env_state.terminated
     truncated = next_env_state.truncated
     done = terminated | truncated
@@ -140,6 +194,8 @@ def _rollout_jit(
     feature_extractor: GenericDenseLayersWithActivation,
     actor: Actor,
     critic: OneDenseLayerMLP,
+    action_low,
+    action_high,
 ):
     (agent_state, episode_stats, next_obs, next_done, key, env_state), storage = jax.lax.scan(
         partial(
@@ -149,6 +205,8 @@ def _rollout_jit(
             actor=actor,
             critic=critic,
             env_step_fn=step_env_fn,
+            action_low=action_low,
+            action_high=action_high,
         ),
         (agent_state, episode_stats, next_obs, next_done, key, env_state),
         (),
@@ -191,7 +249,9 @@ def _compute_gae_jit(
         (dones[1:], values[1:], values[:-1], storage.rewards),
         reverse=True,
     )
-    return storage.replace(advantages=advantages, returns=advantages + storage.values)
+    returns = advantages + storage.values
+    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+    return storage.replace(advantages=advantages, returns=returns)
 
 
 @dataclass
@@ -210,14 +270,23 @@ class TrainingMeasurements:
 
 
 class PPOTrainer:
-    def __init__(self, args: PPOArgs, env: BrittleStarJaxEnvWrapper, run_dir: str, run_name: str):
-        self.args = args
+    def __init__(
+        self, cfg: BrittleStarConfig, env: BrittleStarJaxEnvWrapper, run_dir: str, run_name: str
+    ):
+        self.cfg = cfg
+        self.ppo = cfg.ppo
+        self.experiment = cfg.experiment
+        self.logging_cfg = cfg.logging
         self.env = env
         self.run_dir = run_dir
         self.run_name = run_name
         self.logger = get_logger()
 
-        self.key = jax.random.PRNGKey(args.seed)
+        # Derived runtime fields
+        self.batch_size = self.ppo.num_envs * self.ppo.num_steps
+        self.num_iterations = self.ppo.total_timesteps // self.batch_size
+
+        self.key = jax.random.PRNGKey(self.experiment.seed)
 
         self.sensor, self.feature_extractor, self.actor, self.critic = self._init_agent()
         self.sensor.apply = jax.jit(self.sensor.apply)
@@ -225,29 +294,34 @@ class PPOTrainer:
         self.actor.apply = jax.jit(self.actor.apply)
         self.critic.apply = jax.jit(self.critic.apply)
 
+        action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
+        action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
+
         self._rollout_jit = jax.jit(
             partial(
                 _rollout_jit,
-                max_steps=self.args.num_steps,
+                max_steps=self.ppo.num_steps,
                 step_env_fn=partial(_step_env_wrapped, env_step_fn=self.env.step),
                 sensor=self.sensor,
                 feature_extractor=self.feature_extractor,
                 actor=self.actor,
                 critic=self.critic,
+                action_low=action_low,
+                action_high=action_high,
             )
         )
         self._compute_gae_jit = jax.jit(
             partial(
                 _compute_gae_jit,
-                num_envs=self.args.num_envs,
-                gamma=self.args.gamma,
-                gae_lambda=self.args.gae_lambda,
+                num_envs=self.ppo.num_envs,
+                gamma=self.ppo.gamma,
+                gae_lambda=self.ppo.gae_lambda,
                 feature_extractor=self.feature_extractor,
                 critic=self.critic,
             )
         )
 
-        self._ppo = PPO(self.args, self.sensor, self.actor, self.critic, self.feature_extractor)
+        self._ppo = PPO(self.ppo, self.sensor, self.actor, self.critic, self.feature_extractor)
 
         self.agent_state = self._init_agent_state()
 
@@ -256,16 +330,16 @@ class PPOTrainer:
         self._init_random()
 
     def _init_random(self):
-        self.logger.info(f"[RANDOM]: Setting random seed to {self.args.seed}")
+        self.logger.info(f"[RANDOM]: Setting random seed to {self.experiment.seed}")
 
-        random.seed(self.args.seed)
-        np.random.seed(self.args.seed)
+        random.seed(self.experiment.seed)
+        np.random.seed(self.experiment.seed)
 
     def _init_agent(self):
         self.logger.info("[AGENT]: Initializing agent...")
 
-        sensor = GenericDenseLayersWithActivation()
-        feature_extractor = GenericDenseLayersWithActivation()
+        sensor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
+        feature_extractor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
         actor = Actor(action_dim=self.env.single_action_space.shape[0])
         critic = OneDenseLayerMLP()
         return sensor, feature_extractor, actor, critic
@@ -277,15 +351,11 @@ class PPOTrainer:
             self.key, 5
         )
 
-        sample_obs = jnp.concatenate(
-            [
-                v.flatten()
-                for v in self.env.single_observation_space.sample(
-                    rng=jax.random.PRNGKey(0)
-                ).values()
-                if v.size > 0
-            ]
-        )
+        dummy_reset = self.env.reset(seed=0)
+        sample_obs = _convert_obs_dict_to_array(dummy_reset.observations)[0]  # take first env
+        self.obs_mean = jnp.zeros((len(sample_obs),))
+        self.obs_var = jnp.ones((len(sample_obs),))
+        self.obs_count = 1e-4
         sensor_params = self.sensor.init(sensor_key, sample_obs)
         feature_extractor_params = self.feature_extractor.init(feature_extractor_key, sample_obs)
         actor_params = self.actor.init(actor_key, self.sensor.apply(sensor_params, sample_obs))
@@ -299,17 +369,17 @@ class PPOTrainer:
                 AgentParams(sensor_params, actor_params, critic_params, feature_extractor_params)
             ),
             tx=optax.chain(
-                optax.clip_by_global_norm(self.args.max_grad_norm),
+                optax.clip_by_global_norm(self.ppo.max_grad_norm),
                 optax.inject_hyperparams(optax.adam)(
                     learning_rate=partial(
                         _linear_schedule,
-                        minibatch_count=self.args.num_minibatches,
-                        update_epochs=self.args.update_epochs,
-                        num_iterations=self.args.num_iterations,
-                        learning_rate=self.args.learning_rate,
+                        minibatch_count=self.ppo.num_minibatches,
+                        update_epochs=self.ppo.update_epochs,
+                        num_iterations=self.num_iterations,
+                        learning_rate=self.ppo.learning_rate,
                     )
-                    if self.args.anneal_lr
-                    else self.args.learning_rate,
+                    if self.ppo.anneal_lr
+                    else self.ppo.learning_rate,
                     eps=1e-5,
                 ),
             ),
@@ -319,11 +389,30 @@ class PPOTrainer:
         self.logger.info("[EPISODE STATS]: Initializing episode stats...")
 
         return EpisodeStatistics(
-            episode_returns=jnp.zeros(self.args.num_envs, dtype=jnp.float32),
-            episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
-            returned_episode_returns=jnp.zeros(self.args.num_envs, jnp.float32),
-            returned_episode_lengths=jnp.zeros(self.args.num_envs, dtype=jnp.int32),
+            episode_returns=jnp.zeros(self.ppo.num_envs, dtype=jnp.float32),
+            episode_lengths=jnp.zeros(self.ppo.num_envs, dtype=jnp.int32),
+            returned_episode_returns=jnp.zeros(self.ppo.num_envs, jnp.float32),
+            returned_episode_lengths=jnp.zeros(self.ppo.num_envs, dtype=jnp.int32),
         )
+
+    def _update_obs_stats(self, obs: jnp.ndarray):
+        batch_mean = jnp.mean(obs, axis=0)
+        batch_var = jnp.var(obs, axis=0)
+        batch_count = obs.shape[0]
+
+        delta = batch_mean - self.obs_mean
+        total_count = self.obs_count + batch_count
+
+        new_mean = self.obs_mean + delta * batch_count / total_count
+
+        m_a = self.obs_var * self.obs_count
+        m_b = batch_var * batch_count
+        M2 = m_a + m_b + delta**2 * self.obs_count * batch_count / total_count
+        new_var = M2 / total_count
+
+        self.obs_mean = new_mean
+        self.obs_var = new_var
+        self.obs_count = total_count
 
     def _rollout(self, env_state, next_obs, next_done) -> tuple[Any, ...]:
         return self._rollout_jit(
@@ -350,7 +439,39 @@ class PPOTrainer:
         start_time,
         iteration_time_start,
         training_measurements,
+        storage,
+        next_obs,
+        xy_distance,
     ):
+        data = jax.device_get(
+            {
+                "rewards": storage.rewards[0],
+                "values": storage.values[0],
+                "returns": storage.returns[0],
+                "advantages": storage.advantages[0],
+                "actions": storage.actions[0],
+                "raw_actions": storage.raw_actions[0],
+                "means": storage.means[0],
+                "stds": storage.stds[0],
+                "logprobs": storage.logprobs[0],
+            }
+        )
+
+        storage_metrics = {
+            "rollout/env0/return_mean": float(np.mean(data["returns"])),
+            "rollout/env0/advantage_mean": float(np.mean(data["advantages"])),
+            "rollout/env0/value_mean": float(np.mean(data["values"])),
+            "rollout/env0/value_vs_return_diff": float(np.mean(data["values"] - data["returns"])),
+            "rollout/env0/reward_mean": float(np.mean(data["rewards"])),
+            "rollout/env0/mean_mean": float(np.mean(data["means"])),
+            "rollout/env0/logprob_mean": float(np.mean(data["logprobs"])),
+            "rollout/env0/action_mean": float(np.mean(data["actions"])),
+            "rollout/env0/raw_action_mean": float(np.mean(data["raw_actions"])),
+        }
+
+        for i in range(len(xy_distance)):
+            storage_metrics[f"env_data/env{i}_xy_dist_target"] = float(xy_distance[i])
+
         metrics = {
             "charts/avg_episodic_return": training_measurements.avg_episodic_return,
             "charts/avg_episodic_length": np.mean(
@@ -371,8 +492,9 @@ class PPOTrainer:
             "losses/loss": training_measurements.loss[-1, -1].item(),
             "charts/SPS": int(global_step / (time.time() - start_time)),
             "charts/SPS_update": int(
-                self.args.num_envs * self.args.num_steps / (time.time() - iteration_time_start)
+                self.ppo.num_envs * self.ppo.num_steps / (time.time() - iteration_time_start)
             ),
+            **storage_metrics,
         }
         self.logger.log(metrics, step=global_step)
 
@@ -443,6 +565,7 @@ class PPOTrainer:
                 avg_terminated_length=avg_terminated_length,
                 avg_truncated_length=avg_truncated_length,
             ),
+            storage,
         )
 
     def _close(self):
@@ -451,8 +574,14 @@ class PPOTrainer:
     def _save_model(self, model_path: str):
         self.logger.info("[SAVE]: Saving the final model...")
 
+        from dataclasses import asdict as _asdict
+
+        config_dict = {
+            "experiment": _asdict(self.experiment),
+            "ppo": _asdict(self.ppo),
+        }
         params = [
-            vars(self.args),
+            config_dict,
             [
                 self.agent_state.params["sensor_params"],
                 self.agent_state.params["actor_params"],
@@ -464,8 +593,7 @@ class PPOTrainer:
 
     def train(self):
         """
-        Train the PPO agent for a specified number of iterations
-        (passed through PPOArgs in constructor).
+        Train the PPO agent for a specified number of iterations.
         Closes the environment at the end of training.
         """
         self.logger.info(f"running name: {self.run_name}")
@@ -473,47 +601,58 @@ class PPOTrainer:
         self.logger.info("[TRAIN]: Resetting environment...")
         self.logger.log_non_interactive(f"Initial reset started: {time.ctime()}")
 
-        env_state = self.env.reset(seed=self.args.seed)
+        env_state = self.env.reset(seed=self.experiment.seed)
         next_obs = _convert_obs_dict_to_array(env_state.observations)
-        next_done = jnp.zeros(self.args.num_envs, dtype=jnp.bool_)
+        next_done = jnp.zeros(self.ppo.num_envs, dtype=jnp.bool_)
 
         self.logger.log_non_interactive(f"Initial reset completed: {time.ctime()}")
 
         global_step = 0
         start_time = time.time()
 
-        iter_bar = self.logger.progress_bar(range(1, self.args.num_iterations + 1))
+        iter_bar = self.logger.progress_bar(range(1, self.num_iterations + 1))
         for iteration in iter_bar:
             iteration_time_start = time.time()
 
-            env_state, next_obs, next_done, training_measurements = self._step(
+            env_state, next_obs, next_done, training_measurements, storage = self._step(
                 env_state, next_obs, next_done, iteration=iteration
             )
+            self._update_obs_stats(next_obs)
+            next_obs = _normalize_obs(next_obs, self.obs_mean, self.obs_var)
 
-            global_step += self.args.num_steps * self.args.num_envs
+            xy_distance = _get_xy_distance_to_target(env_state.observations)
+
+            global_step += self.ppo.num_steps * self.ppo.num_envs
             self._log(
                 global_step,
                 self.episode_stats,
                 start_time,
                 iteration_time_start,
                 training_measurements,
+                storage,
+                next_obs,
+                xy_distance,
             )
 
             sps = int(global_step / (time.time() - start_time))
-            remaining_steps = self.args.total_timesteps - global_step
+            remaining_steps = self.ppo.total_timesteps - global_step
             eta_seconds = int(remaining_steps / sps) if sps > 0 else 0
             eta_str = str(datetime.timedelta(seconds=eta_seconds))
 
             self.logger.log_non_interactive(
-                f"Iteration {iteration}/{self.args.num_iterations} | "
-                f"Step {global_step}/{self.args.total_timesteps} | "
+                f"Iteration {iteration}/{self.num_iterations} | "
+                f"Step {global_step}/{self.ppo.total_timesteps} | "
                 f"SPS {sps} | "
                 f"Return {training_measurements.avg_episodic_return:.4f} | "
                 f"ETA {eta_str}"
             )
 
-        if self.args.save_model:
-            model_path = f"{self.run_dir}/{self.args.exp_name}.cleanrl_model"
+            if getattr(self.cfg.experiment, "debug_sanity", False):
+                self.logger.info("\n[SANITY CHECK] Successfully completed 1 epoch")
+                break
+
+        if self.logging_cfg.save_model:
+            model_path = f"{self.run_dir}/{self.experiment.exp_name}.cleanrl_model"
             self._save_model(model_path=model_path)
 
         self._close()

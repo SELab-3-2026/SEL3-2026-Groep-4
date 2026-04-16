@@ -22,7 +22,7 @@ class BrittleStarEnvFactory:
 
         spec = default_brittle_star_morphology_specification(
             num_arms=config.num_arms,
-            num_segments_per_arm=config.num_segments_per_arm,
+            num_segments_per_arm=list(config.segments_per_arm),
             use_p_control=config.use_p_control,
             use_torque_control=config.use_torque_control,
         )

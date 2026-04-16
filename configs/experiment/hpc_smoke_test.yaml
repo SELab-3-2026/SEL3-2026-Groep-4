@@ -1,0 +1,7 @@
+# HPC Smoke Test Configuration
+# Uses minimal settings but simulates HPC environment.
+
+exp_name: "hpc_smoke_test"
+seed: 123
+torch_deterministic: true
+cuda: true

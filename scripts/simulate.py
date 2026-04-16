@@ -1,30 +1,54 @@
+"""Simulate a trained policy in the MuJoCo viewer.
+
+Uses Hydra to load the same BrittleStarConfig that was used during training.
+Override settings via CLI, e.g.:
+    python scripts/simulate.py morphology=3_arms
+"""
+
 from __future__ import annotations
 
-import argparse
 import itertools
 import time
 from pathlib import Path
 from typing import Any
+
 import flax
+import hydra
 import jax
 import jax.numpy as jnp
 import numpy as np
+from omegaconf import DictConfig, OmegaConf
 
-from brittle_star_project import (
-    Backend,
-)
-from brittle_star_project.environment import ArenaConfig, EnvConfig, MorphologyConfig, from_file
+from brittle_star_project import BrittleStarEnv, BrittleStarEnvFactory
+from brittle_star_project.configs.main_config import BrittleStarConfig
+from brittle_star_project.configs.register_configs import register_configs
 
+_ALLOWED_OBS_KEYS = {
+    "joint_position",
+    "joint_velocity",
+    "joint_actuator_force",
+    "actuator_force",
+    "disk_position",
+    "disk_rotation",
+    "disk_linear_velocity",
+    "disk_angular_velocity",
+    "unit_xy_direction_to_target",
+    "xy_distance_to_target",
+}
 
-def _flatten_obs_dict(obs_dict: dict[str, Any]) -> jnp.ndarray:
+def _transform_obs_dict(obs_dict: dict[str, Any]) -> jnp.ndarray:
     """Flatten the env's observation dict into a 1D vector.
 
-    concatenates values in the dict's iteration order and skips empty arrays.
+    Matches training behavior:
+    - only includes keys in _ALLOWED_OBS_KEYS
+    - iterates keys in sorted order for stable layout
+    - skips empty arrays
     """
-
     parts: list[jnp.ndarray] = []
-    for v in obs_dict.values():
-        arr = jnp.asarray(v)
+    for key in sorted(obs_dict.keys()):
+        if key not in _ALLOWED_OBS_KEYS:
+            continue
+        arr = jnp.asarray(obs_dict[key])
         if arr.size == 0:
             continue
         parts.append(arr.reshape((-1,)))
@@ -45,7 +69,9 @@ class CleanRLPPOPolicy:
     ) -> None:
         from brittle_star_project.MLPs.mlps import Actor, GenericDenseLayersWithActivation
 
-        self._sensor = GenericDenseLayersWithActivation()
+        hidden_dim = int(sensor_params["params"]["Dense_0"]["kernel"].shape[1])
+
+        self._sensor = GenericDenseLayersWithActivation(layer_sizes=[hidden_dim, hidden_dim])
         self._actor = Actor(action_dim=action_dim)
         self._sensor_apply = jax.jit(self._sensor.apply)
         self._actor_apply = jax.jit(self._actor.apply)
@@ -77,28 +103,29 @@ class CleanRLPPOPolicy:
         def _parse_checkpoint(restored_obj: Any) -> tuple[Any, Any, Any, Any, Any]:
             """Extract checkpoint parts.
 
-            Returns (args_dict, sensor_params, actor_params, critic_params,
+            Returns (config_dict, sensor_params, actor_params, critic_params,
             feature_extractor_params).
 
-            `PPOTrainer` saves:
-              flax.serialization.to_bytes(
-                [vars(args), [sensor, actor, critic, feature_extractor]]
-              )
+            PPOTrainer saves:
+              flax.serialization.to_bytes([
+                config_dict,
+                [sensor_params, actor_params, critic_params, feature_extractor_params],
+              ])
 
-            `msgpack_restore()` may restore lists as dicts keyed by string
-            indices ("0", "1", ...), so we accept both shapes.
+            msgpack_restore() may restore lists as dicts keyed by string indices
+            ("0", "1", ...), so we accept both shapes.
             """
 
-            args_part: Any | None = None
+            cfg_part: Any | None = None
             params_part: Any = restored_obj
 
             if isinstance(restored_obj, (list, tuple)) and len(restored_obj) >= 2:
-                args_part = restored_obj[0]
+                cfg_part = restored_obj[0]
                 params_part = restored_obj[1]
             elif _looks_like_indexed_dict(restored_obj) and (
                 "0" in restored_obj or "1" in restored_obj
             ):
-                args_part = restored_obj.get("0", restored_obj.get(0))
+                cfg_part = restored_obj.get("0", restored_obj.get(0))
                 params_part = restored_obj.get("1", restored_obj.get(1))
 
             if _looks_like_indexed_dict(params_part):
@@ -109,7 +136,7 @@ class CleanRLPPOPolicy:
                 if sensor_params is None or actor_params is None:
                     raise ValueError("Missing required params in checkpoint")
                 return (
-                    args_part,
+                    cfg_part,
                     sensor_params,
                     actor_params,
                     critic_params,
@@ -122,7 +149,7 @@ class CleanRLPPOPolicy:
                 critic_params = params_part[2] if len(params_part) >= 3 else None
                 feature_extractor_params = params_part[3] if len(params_part) >= 4 else None
                 return (
-                    args_part,
+                    cfg_part,
                     sensor_params,
                     actor_params,
                     critic_params,
@@ -131,14 +158,13 @@ class CleanRLPPOPolicy:
 
             raise ValueError(
                 f"Unexpected checkpoint structure in {path}. "
-                "Expected [args_dict, [sensor_params, actor_params, critic_params, "
-                "feature_extractor_params]] "
-                "or an equivalent dict-indexed variant."
+                "Expected [config_dict, [sensor_params, actor_params, critic_params, "
+                "feature_extractor_params]] or an equivalent dict-indexed variant."
             )
 
         payload = path.read_bytes()
         restored = flax.serialization.msgpack_restore(payload)
-        _args_dict, sensor_params, actor_params, _critic_params, _feature_extractor_params = (
+        _cfg_dict, sensor_params, actor_params, _critic_params, _feature_extractor_params = (
             _parse_checkpoint(restored)
         )
 
@@ -149,7 +175,7 @@ class CleanRLPPOPolicy:
         )
 
     def act(self, *, observations: dict[str, Any]) -> np.ndarray:
-        obs = _flatten_obs_dict(observations)
+        obs = _transform_obs_dict(observations)
         hidden = self._sensor_apply(self._params["sensor_params"], obs)
         mean, _log_std = self._actor_apply(self._params["actor_params"], hidden)
 
@@ -172,27 +198,26 @@ def _target_reached(*, state: Any) -> bool:
 
 def _rollout_one_episode_headless(
     *,
-    env: Any,
+    env: BrittleStarEnv,
     policy: CleanRLPPOPolicy,
     seed: int,
     max_steps: int,
 ) -> tuple[float, int, bool, float | None]:
-    """Run one rollout up to `max_steps`.
+    """Run one rollout up to max_steps.
 
     Returns (return, length, reached_target, final_xy_dist).
+
+    Note: In the MJC backend, the raw env reward can be 0.0; we compute a simple
+    progress reward based on xy_distance_to_target.
     """
+
     state = env.reset(seed=seed)
 
     ep_return = 0.0
-
     observations = _get_observations(state)
     prev_dist = _get_xy_distance_to_target(observations)
     reached_target = _target_reached(state=state)
 
-    # NOTE: In the MJC backend, `state.reward` is always 0.0.
-    # To get a meaningful return, we compute a simple progress reward:
-    #   r_t = d_{t-1} - d_t
-    # where d is `xy_distance_to_target`.
     steps = 0
     for _ in range(int(max_steps)):
         action = policy.act(observations=observations)
@@ -220,7 +245,7 @@ def _rollout_one_episode_headless(
 
 def _run_one_episode_viewer(
     *,
-    env: Any,
+    env: BrittleStarEnv,
     policy: CleanRLPPOPolicy,
     seed: int,
     state: Any,
@@ -232,15 +257,14 @@ def _run_one_episode_viewer(
     model = state.mj_model
     data = state.mj_data
 
-    seed = int(seed)
+    _ = int(seed)
     episode_return = 0.0
     observations = _get_observations(state)
     prev_dist = _get_xy_distance_to_target(observations)
     reached_target = _target_reached(state=state)
 
     steps = 0
-    # Use the viewer as a context manager to avoid GLX teardown races
-    # (e.g. GLXBadDrawable from X_GLXSwapBuffers after a window is destroyed).
+    # Use the viewer as a context manager to avoid GLX teardown races.
     with mujoco.viewer.launch_passive(model, data) as viewer:
         step_iter = range(int(max_steps)) if max_steps is not None else itertools.count()
         for _step_idx in step_iter:
@@ -248,7 +272,7 @@ def _run_one_episode_viewer(
                 break
             step_start = time.time()
 
-            action = policy.act(observations=observations)
+            action = policy.act(observations=observations or {})
             if model.nu > 0 and action.shape != (int(model.nu),):
                 raise ValueError(
                     f"Policy returned action shape {action.shape}, expected ({int(model.nu)},)"
@@ -287,119 +311,86 @@ def _run_one_episode_viewer(
     )
 
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Run a trained policy for exactly one episode (viewer or headless)."
-    )
-    p.add_argument(
-        "--config-path",
-        type=str,
-        default=None,
-        help=(
-            "Path to an environment YAML config (morphology/arena/env). "
-            "If omitted, uses the environment defaults. "
-            "Relative paths are resolved from the repository root."
-        ),
-    )
-    p.add_argument(
-        "--model",
-        type=str,
-        required=True,
-        help=("Path to the Flax checkpoint saved by scripts/train.py (final_model.flax)."),
-    )
-    p.add_argument(
-        "--headless",
-        action="store_true",
-        help="Run without the MuJoCo viewer (still exactly one episode).",
-    )
-    p.add_argument(
-        "--max-steps",
-        type=int,
-        default=None,
-        help=(
-            "Number of control steps to run. "
-            "In --headless mode this is required and acts as a fixed horizon. "
-            "In viewer mode the default is infinite (run until window closed or target reached)."
-        ),
-    )
-    p.add_argument(
-        "--backend",
-        choices=[b.value for b in Backend],
-        default=Backend.MJC.value,
-    )
-    p.add_argument("--seed", type=int, default=0)
-    return p.parse_args()
+def _infer_checkpoint_obs_dim(policy: CleanRLPPOPolicy) -> int | None:
+    """Best-effort read of the first Dense kernel input dim (obs dim)."""
+
+    try:
+        kernel = policy._params["sensor_params"]["params"]["Dense_0"]["kernel"]
+        return int(getattr(kernel, "shape")[0])
+    except Exception:
+        return None
 
 
-def main() -> None:
-    from brittle_star_project.environment import (
-        BrittleStarEnv,
-        BrittleStarEnvFactory,
+@hydra.main(config_path="../configs", config_name="main_config", version_base="1.3")
+def main(dict_cfg: DictConfig) -> None:
+    # Convert DictConfig to structured dataclass, ensuring the root schema is applied.
+    config: BrittleStarConfig = OmegaConf.to_object(
+        OmegaConf.merge(OmegaConf.structured(BrittleStarConfig), dict_cfg)
     )
 
-    args = parse_args()
+    backend = config.simulation.backend
+    seed = int(config.experiment.seed)
 
-    if args.config_path is None:
-        morphology_cfg = MorphologyConfig()
-        arena_cfg = ArenaConfig()
-        env_cfg = EnvConfig()
-    else:
-        repo_root = Path(__file__).resolve().parents[1]
-        config_path = Path(args.config_path)
-        if not config_path.is_absolute():
-            config_path = repo_root / config_path
-        morphology_cfg, arena_cfg, env_cfg = from_file(str(config_path))
+    model_path_str = config.simulation.model_path
+    if model_path_str is None:
+        raise ValueError(
+            "simulation.model_path must be set to a .flax checkpoint (e.g. final_model.flax)"
+        )
+
+    # Hydra chdir changes CWD; resolve relative paths relative to the invocation.
+    model_path = Path(hydra.utils.to_absolute_path(model_path_str))
+    if model_path.suffix != ".flax":
+        raise ValueError(f"Expected a '.flax' checkpoint, got '{model_path.name}'.")
 
     # ======= ENVIRONMENT SETUP =======
-
-    backend = Backend(args.backend)
-
     factory = BrittleStarEnvFactory()
-    raw_env = factory.create_environment(backend, morphology_cfg, arena_cfg, env_cfg)
+    raw_env = factory.create_environment(
+        backend,
+        config.morphology,
+        config.arena,
+        config.environment,
+    )
     env = BrittleStarEnv(
         raw_env,
         backend=backend,
-        config=env_cfg,
-        morphology_config=morphology_cfg,
+        config=config.environment,
+        morphology_config=config.morphology,
     )
 
-    seed_for_env = int(args.seed) if args.seed is not None else 0
-    state = env.reset(seed=seed_for_env)
+    state0 = env.reset(seed=seed)
 
     # ======= MODEL SETUP =======
+    nu = int(state0.mj_model.nu)
+    policy = CleanRLPPOPolicy.load(model_path, action_dim=nu)
 
-    # Extract the number of actuators (nu) from the environment's model, so we can pass it to the
-    # policy/model.
-    nu = int(state.mj_model.nu)
-
-    model_path = Path(args.model)
-    if model_path.suffix != ".flax":
+    # Helpful early failure when configs don't match the checkpoint.
+    observations0 = _get_observations(state0)
+    env_obs_dim = int(_transform_obs_dict(observations0 or {}).shape[0])
+    ckpt_obs_dim = _infer_checkpoint_obs_dim(policy)
+    if ckpt_obs_dim is not None and ckpt_obs_dim != env_obs_dim:
         raise ValueError(
-            f"Expected the training artifact '.flax', got '{model_path.name}'."
+            "Checkpoint/env mismatch: "
+            f"checkpoint expects obs_dim={ckpt_obs_dim}, env provides obs_dim={env_obs_dim}. "
+            "Use the same Hydra config (morphology/arena/environment) "
+            "that was used during training."
         )
 
-    policy = CleanRLPPOPolicy.load(
-        model_path,
-        action_dim=nu,
-    )
-
-    default_seed = seed_for_env
-
     # ======= SIMULATION =======
+    headless = bool(config.simulation.headless)
+    max_steps = config.simulation.max_steps
 
-    if args.headless:
-        if args.max_steps is None:
-            raise ValueError("--max-steps is required in --headless mode")
-        max_steps = int(args.max_steps)
-        if max_steps <= 0:
-            raise ValueError("--max-steps must be > 0")
+    if headless:
+        if max_steps is None:
+            raise ValueError("simulation.max_steps is required when simulation.headless=true")
+        max_steps_i = int(max_steps)
+        if max_steps_i <= 0:
+            raise ValueError("simulation.max_steps must be > 0")
 
-        ep_seed = int(args.seed) if args.seed is not None else default_seed
         ep_return, ep_len, reached_target, final_dist = _rollout_one_episode_headless(
             env=env,
             policy=policy,
-            seed=ep_seed,
-            max_steps=max_steps,
+            seed=seed,
+            max_steps=max_steps_i,
         )
         final_dist_str = "n/a" if final_dist is None else f"{final_dist:.3f}"
         print(
@@ -408,27 +399,29 @@ def main() -> None:
             f"target_reached={reached_target}, final_xy_dist={final_dist_str}"
         )
     else:
-        max_steps: int | None
-        if args.max_steps is None:
-            max_steps = None
+        if max_steps is not None:
+            max_steps_i = int(max_steps)
+            if max_steps_i <= 0:
+                raise ValueError("simulation.max_steps must be > 0")
+            max_steps_val: int | None = max_steps_i
         else:
-            max_steps = int(args.max_steps)
-            if max_steps <= 0:
-                raise ValueError("--max-steps must be > 0")
+            max_steps_val = None
 
-        model_dt = float(state.mj_model.opt.timestep)
-        control_dt = model_dt * float(env_cfg.num_physics_steps_per_control_step)
+        model_dt = float(state0.mj_model.opt.timestep)
+        control_dt = model_dt * float(config.environment.num_physics_steps_per_control_step)
+
         _run_one_episode_viewer(
             env=env,
             policy=policy,
-            seed=int(args.seed) if args.seed is not None else default_seed,
-            state=state,
+            seed=seed,
+            state=state0,
             control_dt=control_dt,
-            max_steps=max_steps,
+            max_steps=max_steps_val,
         )
 
     env.close()
 
 
 if __name__ == "__main__":
+    register_configs()
     main()
