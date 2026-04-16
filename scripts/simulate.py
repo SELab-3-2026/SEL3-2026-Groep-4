@@ -59,7 +59,7 @@ def main(dict_cfg: DictConfig) -> None:
     if model_path is not None:
         # TODO: Refactoring Notice - The .flax checkpoint payload no longer encapsulates the config
         # and no longer wraps parameters into a hardcoded list.
-        # The file now natively contains solely the pure raw Jax 'agent_state.params' FrozenDict mapping.
+        # Now natively contains solely the pure raw Jax 'agent_state.params' FrozenDict mapping.
         # The entire BrittleStarConfig is safely exported alongside it down at '..._metadata.yaml'.
         #
         # Example parsed layout from flax.serialization.from_bytes():
@@ -69,7 +69,7 @@ def main(dict_cfg: DictConfig) -> None:
         #    'critic_params': FrozenDict({...}),
         #    ...
         # }
-        # Update the RLModel.load function or subsequent destructuring to support this raw dictionary natively.
+        # Update to support this raw dictionary natively.
         policy = RLModel.load(Path(model_path))
         if hasattr(policy, "nu"):
             policy.nu = nu
