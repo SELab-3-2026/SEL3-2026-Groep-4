@@ -30,6 +30,51 @@ export PIP_CACHE_DIR="$VSC_SCRATCH/.cache/pip"
 export UV_CACHE_DIR="$VSC_SCRATCH/.cache/uv"
 mkdir -p "$PIP_CACHE_DIR" "$UV_CACHE_DIR"
 
+function notify_discord {
+    local exit_code=$?
+    local state="Finished Successfully"
+    local color=65280 # Green for success
+
+    # If the exit code is not 0, the script crashed
+    if [ $exit_code -ne 0 ]; then
+        state="Crashed/Failed (Exit Code: $exit_code)"
+        color=16711680 # Red for failure
+    fi
+
+    echo ">>> Sending Discord notification (State: $state)..."
+
+    # Construct JSON payload using a bash heredoc for variable interpolation
+    local payload=$(cat <<EOF
+{
+  "thread_name": "Run $RUN_ID has $state",
+  "embeds": [
+    {
+      "title": "HPC Run Update: $RUN_ID",
+      "description": "A run has concluded in the **$PROJ_NAME** project.",
+      "color": $color,
+      "fields": [
+        {
+          "name": "State",
+          "value": "\`$state\`",
+          "inline": true
+        },
+        {
+          "name": "User",
+          "value": "$USER",
+          "inline": true
+        }
+      ]
+    }
+  ]
+}
+EOF
+)
+    local DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/1488463677131587604/C8ciXT5SIVqHEH-zctQ9mfaxVgyDY528QbU_2E-JOj4dHRKDwB1Q5UdgfyQqzVW6sibq?thread_id=1488463461586309140'
+    curl -s -H "Content-Type: application/json" -d "$payload" "${DISCORD_WEBHOOK_URL}" > /dev/null
+}
+
+trap notify_discord EXIT
+
 module load vsc-venv
 
 echo ">>> Synchronizing and activating environment (vsc-venv)..."
