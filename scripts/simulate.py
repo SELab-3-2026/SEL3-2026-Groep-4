@@ -373,9 +373,9 @@ def main() -> None:
     nu = int(state.mj_model.nu)
 
     model_path = Path(args.model)
-    if model_path.name != "final_model.flax" or model_path.suffix != ".flax":
+    if model_path.suffix != ".flax":
         raise ValueError(
-            f"Expected the training artifact 'final_model.flax', got '{model_path.name}'."
+            f"Expected the training artifact '.flax', got '{model_path.name}'."
         )
 
     policy = CleanRLPPOPolicy.load(
