@@ -99,6 +99,7 @@ def get_action_and_value(
     hidden_critic = feature_extractor_apply(params["feature_extractor_params"], x)
     hidden_sensor = message_passer(hidden_sensor)
     mean, log_std = actor_apply(params["actor_params"], hidden_sensor)
+    log_std = jnp.clip(log_std, -5, 2)
     std = jnp.exp(log_std)
 
     logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
@@ -142,6 +143,7 @@ def ppo_loss(
     pg_loss1 = -mb_advantages * ratio
     pg_loss2 = -mb_advantages * jnp.clip(ratio, 1 - args.clip_coef, 1 + args.clip_coef)
     pg_loss = jnp.maximum(pg_loss1, pg_loss2).mean()
+
     v_loss = 0.5 * ((newvalue - mb_returns) ** 2).mean()
     entropy_loss = entropy.mean()
     loss = pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef

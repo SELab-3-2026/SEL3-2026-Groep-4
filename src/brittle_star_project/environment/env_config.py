@@ -44,7 +44,7 @@ class EnvConfig:
 
     task: Task = Task.DIRECTED_LOCOMOTION
 
-    simulation_time: float = 5.0
+    simulation_time: float = 10000.0
     num_physics_steps_per_control_step: int = 10
     time_scale: int = 2
 

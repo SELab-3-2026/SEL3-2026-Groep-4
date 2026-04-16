@@ -6,7 +6,7 @@
 
 name: "centralized"
 sensor:
-  hidden_dims: [64, 64]
+  hidden_dims: [300, 300, 300]
   activation: "tanh"
 
 motor:
@@ -14,7 +14,7 @@ motor:
   activation: "tanh"
 
 feature_extractor:
-  hidden_dims: [64, 64]
+  hidden_dims: [300, 300, 300]
   activation: "tanh"
 
 critic:
