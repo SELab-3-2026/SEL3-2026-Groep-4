@@ -41,6 +41,8 @@ def main(dict_cfg: DictConfig):
         entity=config.logging.wandb_entity,
         base_dir=os.path.dirname(run_dir),
         use_wandb=config.logging.track,
+        upload_final_model=config.logging.upload_final_model,
+        upload_checkpoints=config.logging.upload_checkpoints,
     )
     logger = get_logger()
     logger.info(f"Hydra-initialized run: {run_name}")

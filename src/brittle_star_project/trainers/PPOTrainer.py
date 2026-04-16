@@ -24,7 +24,6 @@ from brittle_star_project.MLPs.mlps import (
     Storage,
 )
 from brittle_star_project.ppo import PPO
-from brittle_star_project.trainers.utils import serialize_training_state
 
 # TODO: move to config
 _ALLOWED_OBS_KEYS = {
@@ -574,13 +573,13 @@ class PPOTrainer:
 
     def _save_model(self, model_path: str):
         self.logger.info("[SAVE]: Saving the final model...")
-        config_dict, params = serialize_training_state(self.cfg, self.agent_state)
-        self.logger.save_final_model(params=params, metadata=config_dict)
+        self.logger.save_final_model(params=self.agent_state.params, metadata=asdict(self.cfg))
 
     def _save_checkpoint(self, iteration: int):
         self.logger.info(f"[SAVE]: Saving checkpoint at iteration {iteration}...")
-        config_dict, params = serialize_training_state(self.cfg, self.agent_state)
-        self.logger.save_checkpoint(params=params, step=iteration, metadata=config_dict)
+        self.logger.save_checkpoint(
+            params=self.agent_state.params, step=iteration, metadata=asdict(self.cfg)
+        )
 
     def train(self):
         """
@@ -638,7 +637,7 @@ class PPOTrainer:
                 f"ETA {eta_str}"
             )
 
-            if self.logging_cfg.save_model and self.logging_cfg.checkpoint_frequency > 0:
+            if self.logging_cfg.save_checkpoints and self.logging_cfg.checkpoint_frequency > 0:
                 if iteration % self.logging_cfg.checkpoint_frequency == 0:
                     self._save_checkpoint(iteration)
 

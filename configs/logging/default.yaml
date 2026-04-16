@@ -6,6 +6,8 @@ wandb_project_name: "PPO-Modularity"
 wandb_entity: "SEL3-2026-Groep-4"
 capture_video: false
 save_model: true
+save_checkpoints: true
 checkpoint_frequency: 100
-upload_model: false
+upload_final_model: false
+upload_checkpoints: false
 hf_entity: ""

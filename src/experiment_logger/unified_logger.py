@@ -93,6 +93,8 @@ class UnifiedLogger:
         entity: Optional[str] = None,
         base_dir: str = "runs",
         use_wandb: bool = True,
+        upload_final_model: bool = False,
+        upload_checkpoints: bool = False,
         save_code: bool = True,
         log_level: int = logging.INFO,
     ):
@@ -110,6 +112,8 @@ class UnifiedLogger:
         self.run_name = run_name
         self.config = config
         self.use_wandb = use_wandb
+        self.upload_final_model = upload_final_model
+        self.upload_checkpoints = upload_checkpoints
         self.wandb_available = False
         self.wandb_run = None
         self.is_interactive = sys.stdout.isatty()
@@ -327,7 +331,7 @@ class UnifiedLogger:
             self.info(f"Checkpoint saved: {checkpoint_path}")
 
             # Log to WandB as artifact
-            if self.wandb_run is not None:
+            if self.wandb_run is not None and self.upload_checkpoints:
                 try:
                     import wandb
 
@@ -363,7 +367,7 @@ class UnifiedLogger:
             self.info(f"Final model saved: {final_model_path}")
 
             # Log to WandB
-            if self.wandb_run is not None:
+            if self.wandb_run is not None and self.upload_final_model:
                 try:
                     import wandb
 
