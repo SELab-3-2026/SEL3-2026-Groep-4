@@ -2,7 +2,6 @@ from dataclasses import dataclass, fields, field
 
 import flax
 import flax.linen as nn
-import jax.numpy as jnp
 import jax.tree_util
 from typing import Sequence, Callable
 from flax.linen.initializers import constant, orthogonal
@@ -13,18 +12,26 @@ class GenericDenseLayersWithActivation(nn.Module):
     layer_sizes: Sequence[int] = field(default_factory=lambda: [64, 64])
     activation: Callable = nn.tanh
 
+    def setup(self):
+        self.dense_layers = [nn.Dense(size) for size in self.layer_sizes]
+
     @nn.compact
     def __call__(self, x):
-        for size in self.layer_sizes:
-            x = nn.Dense(size, kernel_init=orthogonal(jnp.sqrt(2)))(x)
+        for layer in self.dense_layers:
+            x = layer(x)
             x = self.activation(x)
         return x
 
 
 class OneDenseLayerMLP(nn.Module):
+    feature_dim: int = field(default=1)
+
+    def setup(self):
+        self.dense_layer = nn.Dense(self.feature_dim)
+
     @nn.compact
     def __call__(self, x):
-        return nn.Dense(1, kernel_init=orthogonal(1), bias_init=constant(0.0))(x)
+        return self.dense_layer(x)
 
 
 class Actor(nn.Module):

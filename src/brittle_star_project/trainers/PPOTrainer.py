@@ -1,4 +1,5 @@
 import datetime
+import logging
 import random
 import time
 from dataclasses import asdict, dataclass
@@ -215,6 +216,9 @@ class PPOTrainer:
         self.run_name = run_name
         self.logger = get_logger()
 
+        # TODO: remove
+        self.logger.set_level(logging.DEBUG)
+
         self.key = jax.random.PRNGKey(args.seed)
 
         self.sensor, self.feature_extractor, self.actor, self.critic = self._init_agent()
@@ -262,8 +266,10 @@ class PPOTrainer:
     def _init_agent(self):
         self.logger.info("[AGENT]: Initializing agent...")
 
-        sensor = GenericDenseLayersWithActivation()
-        feature_extractor = GenericDenseLayersWithActivation()
+        sizes = [195 // 2, 195 // 4, 195 // 4]
+
+        sensor = GenericDenseLayersWithActivation(layer_sizes=sizes)
+        feature_extractor = GenericDenseLayersWithActivation(layer_sizes=sizes)
         actor = Actor(
             action_dim=self.env.single_action_space.shape[0]
         )  # continuous actions for MJX
