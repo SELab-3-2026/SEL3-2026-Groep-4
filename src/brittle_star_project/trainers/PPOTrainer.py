@@ -612,8 +612,6 @@ class PPOTrainer:
             self._update_obs_stats(next_obs)
             next_obs = _normalize_obs(next_obs, self.obs_mean, self.obs_var)
 
-            xy_distance = _get_xy_distance_to_target(env_state.observations)
-
             global_step += self.ppo.num_steps * self.ppo.num_envs
             self._log(
                 global_step,
