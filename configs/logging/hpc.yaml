@@ -1,0 +1,9 @@
+track: true
+wandb_project_name: "hpc-default"
+wandb_entity: "SEL3-2026-Groep-4"
+save_model: true
+save_checkpoints: true
+upload_final_model: true
+upload_checkpoints: true
+checkpoint_frequency: 100
+hf_entity: ""

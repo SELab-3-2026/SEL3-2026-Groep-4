@@ -18,6 +18,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from experiment_logger.wandb_utils import finish_wandb, init_wandb
+from experiment_logger.config_logger import LoggingConfig
 
 # Global storage for the active logger and the proxy singleton
 _active_logger: Optional[Any] = None
@@ -88,11 +89,9 @@ class UnifiedLogger:
     def __init__(
         self,
         run_name: str,
-        config: Dict[str, Any],
-        project_name: str = "PPO-Modularity",
-        entity: Optional[str] = None,
+        full_config: Dict[str, Any],
+        logging_cfg: LoggingConfig,
         base_dir: str = "runs",
-        use_wandb: bool = True,
         save_code: bool = True,
         log_level: int = logging.INFO,
     ):
@@ -100,16 +99,16 @@ class UnifiedLogger:
 
         Args:
             run_name: Unique name for this run
-            config: Configuration dictionary with hyperparameters
-            project_name: WandB project name
-            entity: WandB entity (team/user name)
+            full_config: Full configuration dictionary with hyperparameters to be saved
+            logging_cfg: Structured logging configuration dataclass
             base_dir: Base directory for local storage
-            use_wandb: Whether to use WandB logging
             save_code: Whether to save code to WandB
         """
         self.run_name = run_name
-        self.config = config
-        self.use_wandb = use_wandb
+        self.full_config = full_config
+        self.use_wandb = logging_cfg.track
+        self.upload_final_model = logging_cfg.upload_final_model
+        self.upload_checkpoints = logging_cfg.upload_checkpoints
         self.wandb_available = False
         self.wandb_run = None
         self.is_interactive = sys.stdout.isatty()
@@ -159,7 +158,7 @@ class UnifiedLogger:
 
         # Initialize WandB if requested
         if self.use_wandb:
-            self._init_wandb(project_name, entity, save_code)
+            self._init_wandb(logging_cfg.wandb_project_name, logging_cfg.wandb_entity, save_code)
 
         # Initialize metrics storage
         self.metrics_buffer: List[Dict[str, Any]] = []
@@ -207,7 +206,7 @@ class UnifiedLogger:
             project=project_name,
             entity=entity,
             name=self.run_name,
-            config=self.config,
+            config=self.full_config,
             save_code=save_code,
             resume="allow",
         )
@@ -217,7 +216,7 @@ class UnifiedLogger:
         """Save configuration to disk."""
         try:
             with open(self.config_file, "w") as f:
-                yaml.dump(self.config, f, default_flow_style=False, indent=2, sort_keys=False)
+                yaml.dump(self.full_config, f, default_flow_style=False, indent=2, sort_keys=False)
             self.info(f"Config saved to {self.config_file}")
         except Exception as e:
             self.error(f"Error saving config: {e}")
@@ -327,7 +326,7 @@ class UnifiedLogger:
             self.info(f"Checkpoint saved: {checkpoint_path}")
 
             # Log to WandB as artifact
-            if self.wandb_run is not None:
+            if self.wandb_run is not None and self.upload_checkpoints:
                 try:
                     import wandb
 
@@ -363,7 +362,7 @@ class UnifiedLogger:
             self.info(f"Final model saved: {final_model_path}")
 
             # Log to WandB
-            if self.wandb_run is not None:
+            if self.wandb_run is not None and self.upload_final_model:
                 try:
                     import wandb
 
