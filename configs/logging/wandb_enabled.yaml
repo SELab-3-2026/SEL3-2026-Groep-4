@@ -2,7 +2,7 @@
 # For production/cloud experiments with weights synced.
 
 track: true
-wandb_project_name: "PPO-Modularity"
+wandb_project_name: "PPO-Modularity - reward engineering"
 wandb_entity: "SEL3-2026-Groep-4"
 capture_video: false
 save_model: true

@@ -3,7 +3,7 @@
 
 learning_rate: 0.0005
 total_timesteps: 500000
-num_envs: 8
+num_envs: 32
 num_steps: 128
 anneal_lr: true
 gamma: 0.99
