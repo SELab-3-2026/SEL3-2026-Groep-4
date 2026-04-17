@@ -8,6 +8,8 @@ inputs must be distributed fairly to guarantee an objective comparison between d
 - The reward function is centered around minimizing the distance to the goal or maximizing the movement towards the goal
   within a finite number of timesteps $T$.
 - To motivate efficient movement, the amount of timesteps taken to reach the goal will be used as penalty.
+- An extra penalty based on movement relative to the current step and
+the previous is used to penalize a movement away from the target.
 
 ## From reward to PPO
 
