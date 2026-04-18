@@ -8,7 +8,7 @@ flattened observation maintains the correct physical mapping to the neural netwo
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Sequence
 import jax.numpy as jnp
 
 # Observation keys whose size scales with the number of joints (2 per segment).
@@ -30,8 +30,8 @@ _SEGMENT_SCALED_KEYS = frozenset(
 
 
 def compute_padding_masks(
-    segments_per_arm: tuple[int, ...],
-    reference_segments_per_arm: tuple[int, ...] = (4, 4, 4, 4, 4),
+    segments_per_arm: Sequence[int],
+    reference_segments_per_arm: Sequence[int] = (4, 4, 4, 4, 4),
 ) -> dict[str, Any]:
     """Pre-compute boolean masks for spatial insertion of observations.
 
