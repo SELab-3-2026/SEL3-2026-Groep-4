@@ -27,7 +27,7 @@ class BrittleStarJaxEnvWrapper:
         )
 
         # Pre-compute masks for observation padding
-        self._padding_masks = compute_padding_masks(self._morphology.segments_per_arm, (4, 4))
+        self._padding_masks = compute_padding_masks(self._morphology.segments_per_arm)
 
         self._vectorized_reset = jax.jit(jax.vmap(self._env.reset))
         self._vectorized_step = jax.jit(jax.vmap(self._env.step))
