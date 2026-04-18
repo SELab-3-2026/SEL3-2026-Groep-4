@@ -14,18 +14,16 @@ class SimpleLogger:
     def __init__(
         self,
         run_name: str = "simple_run",
-        config: Optional[Dict[str, Any]] = None,
-        project_name: str = "none",
-        entity: Optional[str] = None,
+        full_config: Optional[Dict[str, Any]] = None,
+        logging_cfg: Optional[Any] = None,
         base_dir: str = "runs",
-        use_wandb: bool = False,
         save_code: bool = False,
         log_level: int = logging.INFO,
         _set_as_global: bool = False,
     ):
         self.is_interactive = True
         self.run_name = run_name
-        self.config = config or {}
+        self.full_config = full_config or {}
         print(f"[INIT] SimpleLogger initialized for run: {run_name}")
 
     def set_level(self, level: int):

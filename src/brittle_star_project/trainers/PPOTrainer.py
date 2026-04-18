@@ -575,23 +575,13 @@ class PPOTrainer:
 
     def _save_model(self, model_path: str):
         self.logger.info("[SAVE]: Saving the final model...")
+        self.logger.save_final_model(params=self.agent_state.params, metadata=asdict(self.cfg))
 
-        from dataclasses import asdict as _asdict
-
-        config_dict = {
-            "experiment": _asdict(self.experiment),
-            "ppo": _asdict(self.ppo),
-        }
-        params = [
-            config_dict,
-            [
-                self.agent_state.params["sensor_params"],
-                self.agent_state.params["actor_params"],
-                self.agent_state.params["critic_params"],
-                self.agent_state.params["feature_extractor_params"],
-            ],
-        ]
-        self.logger.save_final_model(params=params)
+    def _save_checkpoint(self, iteration: int):
+        self.logger.info(f"[SAVE]: Saving checkpoint at iteration {iteration}...")
+        self.logger.save_checkpoint(
+            params=self.agent_state.params, step=iteration, metadata=asdict(self.cfg)
+        )
 
     def train(self):
         """
@@ -622,8 +612,6 @@ class PPOTrainer:
             self._update_obs_stats(next_obs)
             next_obs = _normalize_obs(next_obs, self.obs_mean, self.obs_var)
 
-            xy_distance = _get_xy_distance_to_target(env_state.observations)
-
             global_step += self.ppo.num_steps * self.ppo.num_envs
             self._log(
                 global_step,
@@ -646,6 +634,10 @@ class PPOTrainer:
                 f"Return {training_measurements.avg_episodic_return:.4f} | "
                 f"ETA {eta_str}"
             )
+
+            if self.logging_cfg.save_checkpoints and self.logging_cfg.checkpoint_frequency > 0:
+                if iteration % self.logging_cfg.checkpoint_frequency == 0:
+                    self._save_checkpoint(iteration)
 
             if getattr(self.cfg.experiment, "debug_sanity", False):
                 self.logger.info("\n[SANITY CHECK] Successfully completed 1 epoch")

@@ -36,11 +36,9 @@ def main(dict_cfg: DictConfig):
     cfg_dict = OmegaConf.to_container(dict_cfg, resolve=True, throw_on_missing=True)
     init_logger(
         run_name=run_name,
-        config=cfg_dict,
-        project_name=config.logging.wandb_project_name,
-        entity=config.logging.wandb_entity,
+        full_config=cfg_dict,
+        logging_cfg=config.logging,
         base_dir=os.path.dirname(run_dir),
-        use_wandb=config.logging.track,
     )
     logger = get_logger()
     logger.info(f"Hydra-initialized run: {run_name}")

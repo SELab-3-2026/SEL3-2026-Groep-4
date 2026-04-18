@@ -67,7 +67,7 @@ fi
 python scripts/train.py \
     hydra.run.dir="$SCRATCH_RUNDIR" \
     ppo=stable \
-    logging=wandb_enabled
+    logging=hpc
 
 echo ">>> Staging out results to $DATA_RUNDIR..."
 cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"
