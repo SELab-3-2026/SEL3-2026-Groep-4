@@ -151,12 +151,27 @@ def _step_once(
     return (agent_state, episode_stats, next_obs, next_done, key, env_state), storage
 
 
+def _reward_fn(env_state, next_env_state):
+    # if delta distance positive ==> brittle star walking away from target
+    delta_distance = (
+        next_env_state.observations["xy_distance_to_target"]
+        - env_state.observations["xy_distance_to_target"]
+    ).squeeze(-1)
+
+    env_reward = next_env_state.reward
+    clipped_env_reward = jnp.clip(100 * env_reward, -10, 10)
+
+    time_penalty = 0.1
+    distance_penalty = jnp.clip(0.5 * delta_distance, -0.5, 0.5)
+    penalty = time_penalty + distance_penalty
+
+    return jnp.where(next_env_state.terminated, 50.0, clipped_env_reward - penalty)
+
+
 def _step_env_wrapped(episode_stats, env_state, action, env_step_fn):
     next_env_state = env_step_fn(env_state, action)
 
-    reward = next_env_state.reward
-    reward *= 20000
-    reward = jnp.clip(reward, -10, 10)
+    reward = _reward_fn(env_state, next_env_state)
     terminated = next_env_state.terminated
     truncated = next_env_state.truncated
     done = terminated | truncated
@@ -440,62 +455,49 @@ class PPOTrainer:
         iteration_time_start,
         training_measurements,
         storage,
-        next_obs,
-        xy_distance,
     ):
         data = jax.device_get(
             {
-                "rewards": storage.rewards[0],
-                "values": storage.values[0],
-                "returns": storage.returns[0],
-                "advantages": storage.advantages[0],
-                "actions": storage.actions[0],
-                "raw_actions": storage.raw_actions[0],
-                "means": storage.means[0],
-                "stds": storage.stds[0],
-                "logprobs": storage.logprobs[0],
+                "rewards": storage.rewards,
+                "values": storage.values,
+                "returns": storage.returns,
+                "advantages": storage.advantages,
             }
         )
 
-        storage_metrics = {
-            "rollout/env0/return_mean": float(np.mean(data["returns"])),
-            "rollout/env0/advantage_mean": float(np.mean(data["advantages"])),
-            "rollout/env0/value_mean": float(np.mean(data["values"])),
-            "rollout/env0/value_vs_return_diff": float(np.mean(data["values"] - data["returns"])),
-            "rollout/env0/reward_mean": float(np.mean(data["rewards"])),
-            "rollout/env0/mean_mean": float(np.mean(data["means"])),
-            "rollout/env0/logprob_mean": float(np.mean(data["logprobs"])),
-            "rollout/env0/action_mean": float(np.mean(data["actions"])),
-            "rollout/env0/raw_action_mean": float(np.mean(data["raw_actions"])),
+        rollout_metrics = {
+            "rollout/reward_mean": float(np.mean(data["rewards"])),
+            "rollout/return_mean": float(np.mean(data["returns"])),
+            "rollout/value_mean": float(np.mean(data["values"])),
+            "rollout/advantage_mean": float(np.mean(data["advantages"])),
+            "rollout/advantage_std": float(np.std(data["advantages"])),
+            "rollout/value_vs_return_mse": float(np.mean((data["values"] - data["returns"]) ** 2)),
         }
 
-        for i in range(len(xy_distance)):
-            storage_metrics[f"env_data/env{i}_xy_dist_target"] = float(xy_distance[i])
-
         metrics = {
-            "charts/avg_episodic_return": training_measurements.avg_episodic_return,
-            "charts/avg_episodic_length": np.mean(
-                jax.device_get(episode_stats.returned_episode_lengths)
+            "charts/episodic_return": training_measurements.avg_episodic_return,
+            "charts/episodic_length": float(
+                np.mean(jax.device_get(episode_stats.returned_episode_lengths))
             ),
-            "charts/learning_rate": self.agent_state.opt_state[1]
-            .hyperparams["learning_rate"]
-            .item(),
             "charts/explained_variance": training_measurements.explained_variance,
-            "charts/num_terminated": training_measurements.num_terminated,
-            "charts/num_truncated": training_measurements.num_truncated,
-            "charts/avg_terminated_ep_length": training_measurements.avg_terminated_length,
-            "charts/avg_truncated_ep_length": training_measurements.avg_truncated_length,
             "losses/value_loss": training_measurements.v_loss[-1, -1].item(),
             "losses/policy_loss": training_measurements.pg_loss[-1, -1].item(),
             "losses/entropy": training_measurements.entropy_loss[-1, -1].item(),
             "losses/approx_kl": training_measurements.approx_kl[-1, -1].item(),
-            "losses/loss": training_measurements.loss[-1, -1].item(),
+            "charts/learning_rate": self.agent_state.opt_state[1]
+            .hyperparams["learning_rate"]
+            .item(),
             "charts/SPS": int(global_step / (time.time() - start_time)),
             "charts/SPS_update": int(
                 self.ppo.num_envs * self.ppo.num_steps / (time.time() - iteration_time_start)
             ),
-            **storage_metrics,
+            "termi_trunci/num_terminated": training_measurements.num_terminated,
+            "termi_trunci/num_truncated": training_measurements.num_truncated,
+            "termi_trunci/avg_terminated_ep_length": training_measurements.avg_terminated_length,
+            "termi_trunci/avg_truncated_ep_length": training_measurements.avg_truncated_length,
+            **rollout_metrics,
         }
+
         self.logger.log(metrics, step=global_step)
 
     def _step(self, env_state, next_obs, next_done, iteration: int) -> tuple:
@@ -573,23 +575,13 @@ class PPOTrainer:
 
     def _save_model(self, model_path: str):
         self.logger.info("[SAVE]: Saving the final model...")
+        self.logger.save_final_model(params=self.agent_state.params, metadata=asdict(self.cfg))
 
-        from dataclasses import asdict as _asdict
-
-        config_dict = {
-            "experiment": _asdict(self.experiment),
-            "ppo": _asdict(self.ppo),
-        }
-        params = [
-            config_dict,
-            [
-                self.agent_state.params["sensor_params"],
-                self.agent_state.params["actor_params"],
-                self.agent_state.params["critic_params"],
-                self.agent_state.params["feature_extractor_params"],
-            ],
-        ]
-        self.logger.save_final_model(params=params)
+    def _save_checkpoint(self, iteration: int):
+        self.logger.info(f"[SAVE]: Saving checkpoint at iteration {iteration}...")
+        self.logger.save_checkpoint(
+            params=self.agent_state.params, step=iteration, metadata=asdict(self.cfg)
+        )
 
     def train(self):
         """
@@ -620,8 +612,6 @@ class PPOTrainer:
             self._update_obs_stats(next_obs)
             next_obs = _normalize_obs(next_obs, self.obs_mean, self.obs_var)
 
-            xy_distance = _get_xy_distance_to_target(env_state.observations)
-
             global_step += self.ppo.num_steps * self.ppo.num_envs
             self._log(
                 global_step,
@@ -630,8 +620,6 @@ class PPOTrainer:
                 iteration_time_start,
                 training_measurements,
                 storage,
-                next_obs,
-                xy_distance,
             )
 
             sps = int(global_step / (time.time() - start_time))
@@ -646,6 +634,10 @@ class PPOTrainer:
                 f"Return {training_measurements.avg_episodic_return:.4f} | "
                 f"ETA {eta_str}"
             )
+
+            if self.logging_cfg.save_checkpoints and self.logging_cfg.checkpoint_frequency > 0:
+                if iteration % self.logging_cfg.checkpoint_frequency == 0:
+                    self._save_checkpoint(iteration)
 
             if getattr(self.cfg.experiment, "debug_sanity", False):
                 self.logger.info("\n[SANITY CHECK] Successfully completed 1 epoch")

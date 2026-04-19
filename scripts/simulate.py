@@ -367,6 +367,7 @@ def main(dict_cfg: DictConfig) -> None:
     observations0 = _get_observations(state0)
     env_obs_dim = int(_transform_obs_dict(observations0 or {}).shape[0])
     ckpt_obs_dim = _infer_checkpoint_obs_dim(policy)
+    
     if ckpt_obs_dim is not None and ckpt_obs_dim != env_obs_dim:
         raise ValueError(
             "Checkpoint/env mismatch: "
@@ -374,7 +375,7 @@ def main(dict_cfg: DictConfig) -> None:
             "Use the same Hydra config (morphology/arena/environment) "
             "that was used during training."
         )
-
+    
     # ======= SIMULATION =======
     headless = bool(config.simulation.headless)
     max_steps = config.simulation.max_steps

@@ -2,10 +2,12 @@
 # For production/cloud experiments with weights synced.
 
 track: true
-wandb_project_name: "PPO-Modularity"
+wandb_project_name: "default-project"
 wandb_entity: "SEL3-2026-Groep-4"
 capture_video: false
 save_model: true
+save_checkpoints: true
 checkpoint_frequency: 100
-upload_model: false
+upload_final_model: true
+upload_checkpoints: false
 hf_entity: ""

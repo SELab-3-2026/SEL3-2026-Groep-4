@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,9 +31,13 @@ jobs:
       - name: Regenerate env/hpc/requirements.txt
         run: uv run scripts/hpc/export_requirements.py
 
-      - name: Commit updated requirements if changed
-        uses: stefanzweifel/git-auto-commit-action@v5
+      - name: Create Pull Request with updated requirements
+        uses: peter-evans/create-pull-request@v6
         with:
-          commit_message: "chore(hpc): update env/hpc/requirements.txt from pyproject.toml [skip ci]"
-          file_pattern: env/hpc/requirements.txt
-          commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(hpc): update env/hpc/requirements.txt from pyproject.toml"
+          title: "chore(hpc): update HPC requirements"
+          body: "Automatically generated pull request to update `env/hpc/requirements.txt` based on recent changes to `pyproject.toml`."
+          branch: chore/auto-update-hpc-requirements
+          base: ${{ github.ref_name }}
+          author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
