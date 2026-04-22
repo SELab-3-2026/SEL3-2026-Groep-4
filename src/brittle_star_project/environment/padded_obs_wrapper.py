@@ -9,6 +9,8 @@ flattened observation maintains the correct physical mapping to the neural netwo
 from __future__ import annotations
 
 from typing import Any, Sequence
+
+import jax
 import jax.numpy as jnp
 
 # Observation keys whose size scales with the number of joints (2 per segment).
@@ -78,11 +80,12 @@ def pad_observation(
     """Pad an observation dict using spatial insertion."""
     padded = {}
     for key, value in obs.items():
+        padded_dtype = _padding_dtype(value)
         if key in _JOINT_SCALED_KEYS:
-            out = jnp.zeros(masks["target_size_2x"], dtype=value.dtype)
+            out = jnp.zeros(masks["target_size_2x"], dtype=padded_dtype)
             padded[key] = out.at[masks["mask_2x"]].set(value)
         elif key in _SEGMENT_SCALED_KEYS:
-            out = jnp.zeros(masks["target_size_1x"], dtype=value.dtype)
+            out = jnp.zeros(masks["target_size_1x"], dtype=padded_dtype)
             padded[key] = out.at[masks["mask_1x"]].set(value)
         else:
             padded[key] = value
@@ -97,12 +100,31 @@ def pad_observations_batched(
     padded = {}
     for key, value in obs.items():
         batch_size = value.shape[0]
+        padded_dtype = _padding_dtype(value)
         if key in _JOINT_SCALED_KEYS:
-            out = jnp.zeros((batch_size, masks["target_size_2x"]), dtype=value.dtype)
+            out = jnp.zeros((batch_size, masks["target_size_2x"]), dtype=padded_dtype)
             padded[key] = out.at[:, masks["mask_2x"]].set(value)
         elif key in _SEGMENT_SCALED_KEYS:
-            out = jnp.zeros((batch_size, masks["target_size_1x"]), dtype=value.dtype)
+            out = jnp.zeros((batch_size, masks["target_size_1x"]), dtype=padded_dtype)
             padded[key] = out.at[:, masks["mask_1x"]].set(value)
         else:
             padded[key] = value
     return padded
+
+
+def _padding_dtype(value: Any) -> jnp.dtype:
+    """Choose a JAX-safe dtype for padding arrays.
+
+    When JAX x64 is disabled, allocating float64 zeros emits a warning. We
+    preserve the original dtype whenever it is supported, and otherwise fall
+    back to float32 for padding buffers.
+    """
+
+    dtype = getattr(value, "dtype", None)
+    if dtype is None:
+        dtype = jnp.asarray(value).dtype
+    else:
+        dtype = jnp.dtype(dtype)
+    if dtype == jnp.float64 and not jax.config.read("jax_enable_x64"):
+        return jnp.float32
+    return dtype
