@@ -6,7 +6,7 @@ from typing import Any
 
 import numpy as np
 
-from .env_config import EnvConfig
+from .env_config import EnvConfig, MorphologyConfig
 from .env_types import Backend
 
 
@@ -25,10 +25,18 @@ class BrittleStarEnv:
     Goal: hide backend-specific RNG setup and provide a stable place to plug in RL.
     """
 
-    def __init__(self, env: Any, *, backend: Backend, config: EnvConfig) -> None:
+    def __init__(
+        self,
+        env: Any,
+        *,
+        backend: Backend,
+        config: EnvConfig,
+        morphology_config: MorphologyConfig | None = None,
+    ) -> None:
         self._env = env
         self._backend = backend
         self._config = config
+        self._morphology_config = morphology_config
 
     @property
     def raw(self) -> Any:
@@ -41,6 +49,10 @@ class BrittleStarEnv:
     @property
     def config(self) -> EnvConfig:
         return self._config
+
+    @property
+    def morphology_config(self) -> MorphologyConfig | None:
+        return self._morphology_config
 
     def make_rng(self, seed: int):
         if self._backend == Backend.MJC:

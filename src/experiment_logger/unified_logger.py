@@ -6,6 +6,7 @@ This logger ensures all experimental data is preserved by writing to:
 3. stdout (for real-time monitoring)
 """
 
+from enum import Enum
 import logging
 import yaml
 import sys
@@ -23,6 +24,33 @@ from experiment_logger.config_logger import LoggingConfig
 # Global storage for the active logger and the proxy singleton
 _active_logger: Optional[Any] = None
 _proxy_instance: Optional["LoggerProxy"] = None
+
+
+def _sanitize_for_yaml(obj: Any) -> Any:
+    """Convert non-primitive values into YAML-safe structures.
+
+    In particular, avoids PyYAML serializing Enums as
+    ``!!python/object/apply:...`` which OmegaConf will not load.
+    """
+
+    if isinstance(obj, Enum):
+        return obj.name
+    if isinstance(obj, Path):
+        return str(obj)
+    if isinstance(obj, (np.generic, jnp.ndarray)):
+        try:
+            return obj.item()
+        except Exception:
+            pass
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {str(k): _sanitize_for_yaml(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_for_yaml(v) for v in obj]
+    if isinstance(obj, tuple):
+        return [_sanitize_for_yaml(v) for v in obj]
+    return obj
 
 
 def get_logger() -> "LoggerProxy":
@@ -216,7 +244,13 @@ class UnifiedLogger:
         """Save configuration to disk."""
         try:
             with open(self.config_file, "w") as f:
-                yaml.dump(self.full_config, f, default_flow_style=False, indent=2, sort_keys=False)
+                yaml.safe_dump(
+                    _sanitize_for_yaml(self.full_config),
+                    f,
+                    default_flow_style=False,
+                    indent=2,
+                    sort_keys=False,
+                )
             self.info(f"Config saved to {self.config_file}")
         except Exception as e:
             self.error(f"Error saving config: {e}")
@@ -296,7 +330,12 @@ class UnifiedLogger:
                         else:
                             serializable_metric[k] = v
                     f.write("---\n")
-                    yaml.dump(serializable_metric, f, default_flow_style=False)
+                    yaml.safe_dump(
+                        _sanitize_for_yaml(serializable_metric),
+                        f,
+                        default_flow_style=False,
+                        sort_keys=False,
+                    )
             self.metrics_buffer.clear()
         except Exception as e:
             self.error(f"Error flushing metrics: {e}")
@@ -321,7 +360,13 @@ class UnifiedLogger:
             if metadata:
                 metadata_path = self.checkpoints_dir / f"{prefix}_step_{step}_metadata.yaml"
                 with open(metadata_path, "w") as f:
-                    yaml.dump(metadata, f, default_flow_style=False)
+                    yaml.safe_dump(
+                        _sanitize_for_yaml(metadata),
+                        f,
+                        default_flow_style=False,
+                        indent=2,
+                        sort_keys=False,
+                    )
 
             self.info(f"Checkpoint saved: {checkpoint_path}")
 
@@ -357,7 +402,13 @@ class UnifiedLogger:
             if metadata:
                 metadata_path = self.run_dir / "final_model_metadata.yaml"
                 with open(metadata_path, "w") as f:
-                    yaml.dump(metadata, f, default_flow_style=False)
+                    yaml.safe_dump(
+                        _sanitize_for_yaml(metadata),
+                        f,
+                        default_flow_style=False,
+                        indent=2,
+                        sort_keys=False,
+                    )
 
             self.info(f"Final model saved: {final_model_path}")
 

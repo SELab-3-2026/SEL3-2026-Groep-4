@@ -4,8 +4,12 @@
 # Path to the trained model (optional)
 model_path: null
 
-# Type of model to use if no path is provided (e.g., random)
-model_type: "random"
+# Script behavior
+headless: false
+# In headless mode this is required; in viewer mode null means "infinite".
+max_steps: null
 
-# Execution backend (MJX or BRAX)
-backend: "MJX"
+# Optional: path to the Hydra config.yaml used during training.
+# When set, scripts/simulate.py will use it to default morphology/arena/environment/architecture
+# to match training (unless you explicitly override those keys via CLI).
+trained_config_path: null
