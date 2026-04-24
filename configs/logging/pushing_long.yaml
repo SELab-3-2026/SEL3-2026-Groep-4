@@ -1,0 +1,10 @@
+capture_video: false
+checkpoint_frequency: 100
+hf_entity: ''
+save_checkpoints: true
+save_model: true
+track: true
+upload_checkpoints: false
+upload_final_model: true
+wandb_entity: "SEL3-2026-Groep-4"
+wandb_project_name: "Pushing our best found config"

@@ -66,8 +66,11 @@ fi
 # Run training using Hydra overrides
 python scripts/train.py \
     hydra.run.dir="$SCRATCH_RUNDIR" \
-    ppo=stable \
-    logging=hpc
+    environment = dir_loc_further \
+    experiment = long_2arm \
+    ppo=chickendinnerwinner \
+    logging=pushing_long
+
 
 echo ">>> Staging out results to $DATA_RUNDIR..."
 cp -r "$SCRATCH_RUNDIR/." "$DATA_RUNDIR/"
