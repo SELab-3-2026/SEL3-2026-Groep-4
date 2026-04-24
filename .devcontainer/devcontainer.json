@@ -34,7 +34,9 @@
     },
     "remoteUser": "vscode",
     "runArgs": [
-        "--device", "nvidia.com/gpu=all"
+        "--device", "nvidia.com/gpu=all",
+        "--env=DISPLAY=${localEnv:DISPLAY}",
+        "--volume=/tmp/.X11-unix:/tmp/.X11-unix"
     ],
     // Ensure the .venv persists using a named volume for performance and parity
     "mounts": [
