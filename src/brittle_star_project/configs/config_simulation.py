@@ -19,3 +19,8 @@ class SimulationSettings:
     # Observations are padded from the override morphology UP TO the training
     # morphology's shape via compute_padding_masks(override, reference=training).
     morphology_override: Optional[str] = None
+
+    # Video recording (requires [evaluation] extra)
+    record_video: bool = False
+    # When None, video is saved in a per-model evaluation folder alongside the model.
+    video_output_path: Optional[str] = None

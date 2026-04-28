@@ -13,3 +13,8 @@ max_steps: null
 # Points to a morphology config YAML file (e.g. configs/morphology/3_arms.yaml).
 # If null, the training morphology from the model's metadata is used.
 morphology_override: null
+
+# Video recording (requires [evaluation] extra)
+record_video: false
+# When null, video is saved in a per-model evaluation folder alongside the model.
+video_output_path: null

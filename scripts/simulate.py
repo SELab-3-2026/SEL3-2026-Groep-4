@@ -27,6 +27,11 @@ from brittle_star_project.environment.env_config import MorphologyConfig
 from brittle_star_project.evaluation.checkpoint import load_metadata, metadata_to_configs
 from brittle_star_project.evaluation.policy import PolicyAgent
 from brittle_star_project.evaluation.rollout import rollout_headless, rollout_viewer
+from brittle_star_project.evaluation.video import (
+    record_episode,
+    create_evaluation_dir,
+    save_evaluation_metadata,
+)
 
 
 @hydra.main(config_path="../configs", config_name="main_config", version_base="1.3")
@@ -118,7 +123,48 @@ def main(dict_cfg: DictConfig) -> None:
     headless = bool(sim_cfg.headless)
     max_steps = sim_cfg.max_steps
 
-    if headless:
+    if sim_cfg.record_video:
+        if max_steps is None:
+            raise ValueError("simulation.max_steps is required when simulation.record_video=true")
+
+        max_steps_i = int(max_steps)
+        if max_steps_i <= 0:
+            raise ValueError("simulation.max_steps must be > 0")
+
+        if sim_cfg.video_output_path is None:
+            eval_dir = create_evaluation_dir(model_path)
+            output_path = eval_dir / "simulation.mp4"
+        else:
+            output_path = Path(hydra.utils.to_absolute_path(sim_cfg.video_output_path))
+            eval_dir = output_path.parent
+            eval_dir.mkdir(parents=True, exist_ok=True)
+
+        result = record_episode(
+            env=env,
+            policy=policy,
+            seed=seed,
+            max_steps=max_steps_i,
+            action_low=action_low,
+            action_high=action_high,
+            action_mask=action_mask,
+            output_path=output_path,
+        )
+
+        save_evaluation_metadata(
+            eval_dir=eval_dir,
+            morphology_override_path=sim_cfg.morphology_override,
+            seed=seed,
+            max_steps=max_steps_i,
+            result=result,
+        )
+        final_dist_str = "n/a" if result.final_xy_dist is None else f"{result.final_xy_dist:.3f}"
+        print(f"Video saved to {output_path}")
+        print(
+            "episode done: "
+            f"return={result.return_:.6f}, len={result.length}, "
+            f"target_reached={result.reached_target}, final_xy_dist={final_dist_str}"
+        )
+    elif headless:
         if max_steps is None:
             raise ValueError("simulation.max_steps is required when simulation.headless=true")
 

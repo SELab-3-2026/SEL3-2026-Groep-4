@@ -38,6 +38,10 @@ cuda = [
 analysis = [
     "tensorboard",
 ]
+evaluation = [
+    "imageio>=2.35.0",
+    "imageio-ffmpeg>=0.5.1",
+]
 
 [dependency-groups]
 dev = [
