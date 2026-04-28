@@ -16,8 +16,7 @@ Global inputs, always broadcasted to all nodes:
   $$
   tilt = sqrt(roll^2 + pitch^2)
   $$
-- Goal vector: Instead of just a scalar distance, the goal is represented asa a vector (distance and ange/direction) to
-  the target.
+- Goal vector: Instead of just a scalar distance, the goal is represented as an angle/direction to the target.
 
 Local inputs, routed directly to specific nodes:
 
@@ -70,6 +69,10 @@ When designing the state space, we must ask: *Could a human operator perform thi
   as a normalized unit vector bounds the values to the $[-1, 1]$ range, which stabilizes neural network training.
   Providing only a scalar "distance to the goal" would force the agent to learning localized searching behaviors (e.g.
   random walks or spiraling) to deduce the direction, drastically increasing the difficulty of the learning task.
+
+  **NOTE:** We later dropped the "distance to vector", switching to only a direction as the input. Our reasoning is
+  the agent should always move towards the goal (it should not learn to stop at the goal), which allows for this
+  simplification that decreases the model input size.
 - Contact sensors: Segment contact detects external ground interaction and is biologically vital for timing gait
   transitions.
 - **Zero-Centered Rescaling ($[-1, 1]$):** Using a zero-centered range is standard best practice for continuous control

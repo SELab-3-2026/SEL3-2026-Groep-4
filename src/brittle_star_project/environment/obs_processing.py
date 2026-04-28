@@ -63,7 +63,6 @@ def create_obs_processor(
             "joint_velocity",
             "segment_contact",
             "unit_xy_direction_to_target",
-            "xy_distance_to_target",
         ]
         values = []
         for key in ordered_keys:
