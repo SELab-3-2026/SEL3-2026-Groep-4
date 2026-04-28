@@ -148,6 +148,7 @@ def main(dict_cfg: DictConfig) -> None:
             action_high=action_high,
             action_mask=action_mask,
             output_path=output_path,
+            camera_id=sim_cfg.camera_id,
         )
 
         save_evaluation_metadata(

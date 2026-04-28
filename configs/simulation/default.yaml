@@ -18,3 +18,5 @@ morphology_override: null
 record_video: false
 # When null, video is saved in a per-model evaluation folder alongside the model.
 video_output_path: null
+# Camera ID to use for video recording (1 is usually the close-up camera)
+camera_id: 1

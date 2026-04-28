@@ -62,6 +62,7 @@ def record_episode(
     action_high: np.ndarray | None,
     action_mask: np.ndarray | None = None,
     output_path: Path,
+    camera_id: int = 1,
     fps: int = 60,
     width: int = 640,
     height: int = 480,
@@ -77,6 +78,7 @@ def record_episode(
         action_high: Maximum action values.
         action_mask: Boolean mask for the actions.
         output_path: Where to save the .mp4 file.
+        camera_id: Camera index to use for rendering (1 is usually close-up).
         fps: Frames per second for the video.
         width: Video width.
         height: Video height.
@@ -94,8 +96,6 @@ def record_episode(
     model = state.mj_model
     data = state.mj_data
 
-    # Use the first camera defined in the environment config, or default to 0
-    camera_id = env._config.camera_ids[0] if env._config.camera_ids else 0
     renderer = mujoco.Renderer(model, width=width, height=height)
 
     ep_return = 0.0

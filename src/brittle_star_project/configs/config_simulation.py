@@ -24,3 +24,5 @@ class SimulationSettings:
     record_video: bool = False
     # When None, video is saved in a per-model evaluation folder alongside the model.
     video_output_path: Optional[str] = None
+    # Camera ID to use for video recording (1 is usually the close-up camera)
+    camera_id: int = 1
