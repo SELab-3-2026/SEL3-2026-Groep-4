@@ -27,23 +27,9 @@ from omegaconf import DictConfig, OmegaConf, open_dict
 from brittle_star_project import Backend, BrittleStarEnv, BrittleStarEnvFactory
 from brittle_star_project.configs.main_config import BrittleStarConfig
 from brittle_star_project.configs.register_configs import register_configs
-from brittle_star_project.environment.padded_obs_wrapper import (
-    compute_padding_masks,
-    pad_observation,
-)
-
-_ALLOWED_OBS_KEYS = {
-    "joint_position",
-    "joint_velocity",
-    "joint_actuator_force",
-    "actuator_force",
-    "disk_position",
-    "disk_rotation",
-    "disk_linear_velocity",
-    "disk_angular_velocity",
-    "unit_xy_direction_to_target",
-    "xy_distance_to_target",
-}
+from brittle_star_project.environment.padded_obs_wrapper import compute_padding_masks
+from brittle_star_project.environment.obs_processing import create_obs_processor
+from brittle_star_project.environment.env_config import ObservationBoundsConfig
 
 
 def _dense_layer_sizes_from_params(params: Any) -> list[int]:
@@ -113,28 +99,6 @@ def _maybe_clip_action(
     return np.clip(action, low, high)
 
 
-def _transform_obs_dict(obs_dict: dict[str, Any]) -> jnp.ndarray:
-    """Flatten the env's observation dict into a 1D vector.
-
-    Matches training behavior:
-    - only includes keys in _ALLOWED_OBS_KEYS
-    - iterates keys in sorted order for stable layout
-    - skips empty arrays
-    """
-    parts: list[jnp.ndarray] = []
-    for key in sorted(obs_dict.keys()):
-        if key not in _ALLOWED_OBS_KEYS:
-            continue
-        arr = jnp.asarray(obs_dict[key])
-        if arr.size == 0:
-            continue
-        parts.append(arr.reshape((-1,)))
-
-    if not parts:
-        return jnp.zeros((0,), dtype=jnp.float32)
-    return jnp.concatenate(parts, axis=0)
-
-
 # A minimal policy class to load a CleanRL/Flax checkpoint and run inference.
 class CleanRLPPOPolicy:
     def __init__(
@@ -143,6 +107,7 @@ class CleanRLPPOPolicy:
         sensor_params: Any,
         actor_params: Any,
         action_dim: int,
+        obs_processor: Any,
     ) -> None:
         from brittle_star_project.MLPs.mlps import Actor, GenericDenseLayersWithActivation
 
@@ -155,12 +120,14 @@ class CleanRLPPOPolicy:
             "sensor_params": sensor_params,
             "actor_params": actor_params,
         }
+        self._obs_processor = obs_processor
 
     @staticmethod
     def load(
         path: Path,
         *,
         action_dim: int,
+        obs_processor: Any,
     ) -> "CleanRLPPOPolicy":
         def _get_index(container: Any, idx: int) -> Any:
             if isinstance(container, (list, tuple)):
@@ -280,10 +247,12 @@ class CleanRLPPOPolicy:
             sensor_params=sensor_params,
             actor_params=actor_params,
             action_dim=action_dim,
+            obs_processor=obs_processor,
         )
 
     def act(self, *, observations: dict[str, Any]) -> np.ndarray:
-        obs = _transform_obs_dict(observations)
+        batched_obs = jax.tree.map(lambda x: jnp.asarray(x)[None, ...], observations)
+        obs = self._obs_processor(batched_obs)[0]
         hidden = self._sensor_apply(self._params["sensor_params"], obs)
         mean, _log_std = self._actor_apply(self._params["actor_params"], hidden)
 
@@ -312,7 +281,6 @@ def _rollout_one_episode_headless(
     max_steps: int,
     action_low: np.ndarray | None,
     action_high: np.ndarray | None,
-    padding_masks: dict[str, Any] | None,
 ) -> tuple[float, int, bool, float | None]:
     """Run one rollout up to max_steps.
 
@@ -332,8 +300,6 @@ def _rollout_one_episode_headless(
     steps = 0
     for _ in range(int(max_steps)):
         obs_dict = observations or {}
-        if padding_masks is not None:
-            obs_dict = pad_observation(obs_dict, padding_masks)
 
         action = policy.act(observations=obs_dict)
         action = _maybe_clip_action(action, action_low, action_high)
@@ -369,7 +335,6 @@ def _run_one_episode_viewer(
     max_steps: int | None,
     action_low: np.ndarray | None,
     action_high: np.ndarray | None,
-    padding_masks: dict[str, Any] | None,
 ) -> None:
     import mujoco.viewer
 
@@ -392,8 +357,6 @@ def _run_one_episode_viewer(
             step_start = time.time()
 
             obs_dict = observations or {}
-            if padding_masks is not None:
-                obs_dict = pad_observation(obs_dict, padding_masks)
 
             action = policy.act(observations=obs_dict)
             action = _maybe_clip_action(action, action_low, action_high)
@@ -596,23 +559,29 @@ def main(dict_cfg: DictConfig) -> None:
     # Match training's padded observation layout for amputated morphologies.
     padding_masks = compute_padding_masks(config.morphology.segments_per_arm)
 
-    # Match training's action clipping behavior.
-    action_space = getattr(raw_env, "action_space", None)
-    action_low = (
-        None if action_space is None else np.asarray(action_space.low, dtype=np.float32).ravel()
-    )
-    action_high = (
-        None if action_space is None else np.asarray(action_space.high, dtype=np.float32).ravel()
+    training_bounds = ObservationBoundsConfig().to_bounds_dict()
+    if trained_cfg_path and "obs_bounds" in trained_cfg:
+        try:
+            training_bounds = OmegaConf.to_object(trained_cfg.obs_bounds).to_bounds_dict()
+        except Exception:
+            pass
+    else:
+        training_bounds = config.obs_bounds.to_bounds_dict()
+
+    obs_processor = create_obs_processor(
+        bounds_dict=training_bounds,
+        padding_masks=padding_masks,
     )
 
     # ======= MODEL SETUP =======
     nu = int(state0.mj_model.nu)
-    policy = CleanRLPPOPolicy.load(model_path, action_dim=nu)
+    policy = CleanRLPPOPolicy.load(model_path, action_dim=nu, obs_processor=obs_processor)
 
     # Helpful early failure when configs don't match the checkpoint.
     observations0 = _get_observations(state0)
-    obs0_dict = pad_observation(observations0 or {}, padding_masks)
-    env_obs_dim = int(_transform_obs_dict(obs0_dict).shape[0])
+    obs0_dict = observations0 or {}
+    batched_obs0 = jax.tree.map(lambda x: jnp.asarray(x)[None, ...], obs0_dict)
+    env_obs_dim = int(obs_processor(batched_obs0).shape[1])
     ckpt_obs_dim = _infer_checkpoint_obs_dim(policy)
 
     if ckpt_obs_dim is not None and ckpt_obs_dim != env_obs_dim:
@@ -622,6 +591,15 @@ def main(dict_cfg: DictConfig) -> None:
             "Use the same Hydra config (morphology/arena/environment) "
             "that was used during training."
         )
+
+    # Match training's action clipping behavior.
+    action_space = getattr(raw_env, "action_space", None)
+    action_low = (
+        None if action_space is None else np.asarray(action_space.low, dtype=np.float32).ravel()
+    )
+    action_high = (
+        None if action_space is None else np.asarray(action_space.high, dtype=np.float32).ravel()
+    )
 
     # ======= SIMULATION =======
     headless = bool(config.simulation.headless)
@@ -641,7 +619,6 @@ def main(dict_cfg: DictConfig) -> None:
             max_steps=max_steps_i,
             action_low=action_low,
             action_high=action_high,
-            padding_masks=padding_masks,
         )
         final_dist_str = "n/a" if final_dist is None else f"{final_dist:.3f}"
         print(
@@ -670,7 +647,6 @@ def main(dict_cfg: DictConfig) -> None:
             max_steps=max_steps_val,
             action_low=action_low,
             action_high=action_high,
-            padding_masks=padding_masks,
         )
 
     env.close()
