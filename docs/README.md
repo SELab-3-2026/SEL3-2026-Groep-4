@@ -2,6 +2,8 @@
 
 ## Design & architecture ([`/design`](./design/))
 
+If you are interested in the "why did you do it like this?"
+
 - [Actor/critic architecture](./design/actor-critic.md): Description of the actor-critic pipeline.
 - [Communication](./design/communication.md): Message propagation, Nerve-Net style.
 - [Controllers](./design/controllers.md): Macroscopig brain toplogy, centralized, arm-level, segment-level.
@@ -11,5 +13,9 @@
 
 ## API reference ([`/api`](./api/))
 
-- [Environment](./api/environment.md): MuJoCo environment interaction, state retrieval, and configuration.
-- [Simulate](./api/simulate.md): Simulation rendering.
+If you are interested in the "how do I use it?"
+
+- [Training](./api/training.md): How to configure and run experiments.
+- [Tracking & Monitoring](./api/tracking.md): Setting up WandB and TensorBoard to monitor runs.
+- [Simulation](./api/simulation.md): Visualizing and evaluating models.
+- [Environment](./api/environment.md): MuJoCo environment interaction and configuration.
