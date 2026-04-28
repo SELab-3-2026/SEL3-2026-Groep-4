@@ -60,3 +60,28 @@ class EnvConfig:
     # Light escape
     # Per docs in upstream env config: integer factors of 200.
     light_perlin_noise_scale: int = 0
+
+
+@dataclass
+class ObservationBoundsConfig:
+    """Physical observation bounds for deterministic min-max normalization."""
+
+    # TODO Inspect empirically observed ranges and update these bounds as needed.
+    joint_position: list[float] = field(default_factory=lambda: [-3.14, 3.14])
+    joint_velocity: list[float] = field(default_factory=lambda: [-20.0, 20.0])
+    joint_actuator_force: list[float] = field(default_factory=lambda: [-5.0, 5.0])
+    segment_contact: list[float] = field(default_factory=lambda: [0.0, 1.0])
+    unit_xy_direction_to_target: list[float] = field(default_factory=lambda: [-1.0, 1.0])
+    xy_distance_to_target: list[float] = field(default_factory=lambda: [0.0, 20.0])
+    disk_z_tilt: list[float] = field(default_factory=lambda: [0.0, 3.141592653589793])
+
+    def to_bounds_dict(self) -> dict[str, tuple[float, float]]:
+        return {
+            "joint_position": tuple(self.joint_position),
+            "joint_velocity": tuple(self.joint_velocity),
+            "joint_actuator_force": tuple(self.joint_actuator_force),
+            "segment_contact": tuple(self.segment_contact),
+            "unit_xy_direction_to_target": tuple(self.unit_xy_direction_to_target),
+            "xy_distance_to_target": tuple(self.xy_distance_to_target),
+            "disk_z_tilt": tuple(self.disk_z_tilt),
+        }
