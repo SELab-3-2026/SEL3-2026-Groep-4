@@ -9,7 +9,7 @@ headless: false
 # In headless mode this is required; in viewer mode null means "infinite".
 max_steps: null
 
-# Optional: path to the Hydra config.yaml used during training.
-# When set, scripts/simulate.py will use it to default morphology/arena/environment/architecture
-# to match training (unless you explicitly override those keys via CLI).
-trained_config_path: null
+# Optional: override morphology for amputation experiments.
+# Points to a morphology config YAML file (e.g. configs/morphology/3_arms.yaml).
+# If null, the training morphology from the model's metadata is used.
+morphology_override: null
