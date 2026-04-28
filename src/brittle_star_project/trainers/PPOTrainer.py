@@ -27,10 +27,11 @@ from brittle_star_project.ppo import PPO
 from enum import Enum
 
 
-class ObsMode(Enum):
-    CENTRALIZED = "centralized"
-    ARM = "arm"
-    SEGMENT = "segment"
+class MorphMode(Enum):
+    CENTRALIZED = 0
+    FULLY_CONNECTED = 1
+    RING = 2
+    SEGMENT = 3
 
 
 # TODO: move to config
@@ -47,6 +48,71 @@ _ALLOWED_OBS_KEYS = {
     "xy_distance_to_target",
 }
 # TODO: clip scaled reward?
+
+
+def build_adjacency(segments_per_arm, mode: MorphMode):
+    num_arms = len(segments_per_arm)
+    num_segments = sum(segments_per_arm)
+
+    # FOR NOW SEMI HARDCODE:
+    # CENTRALIZED: 1 agent, no stress, adja = 1,1 = [[1]]
+    # FULLY CONNECTED: 5 agents: adj = alle 1
+    # CENTRAL DISK:#arms= 5 agents, only neighbor as adjacent so diagonal kinda..
+    # ARM = #segments agents: diago kinda, but extra, center ring too, put center mlps first or..
+
+    if mode == MorphMode.CENTRALIZED:
+        return jnp.ones((1, 1))
+
+    if mode == MorphMode.FULLY_CONNECTED:
+        adj = jnp.ones((num_arms, num_arms))  # everybody adjacent everybody
+        return adj
+
+    if mode == MorphMode.RING:  # ring
+        adj = jnp.zeros((num_arms, num_arms))
+        for i in range(num_arms):
+            adj = adj.at[i, i].set(1)  # self
+            adj = adj.at[i, (i - 1) % num_arms].set(1)
+            adj = adj.at[i, (i + 1) % num_arms].set(1)  # left and right..
+        return adj
+
+    if mode == MorphMode.SEGMENT:
+        num_nodes = num_arms + num_segments
+        adj = jnp.zeros((num_nodes, num_nodes))
+
+        # first ring
+        for i in range(num_arms):
+            # self
+            adj = adj.at[i, i].set(1)
+
+            # ring neighbors
+            adj = adj.at[i, (i - 1) % num_arms].set(1)
+            adj = adj.at[i, (i + 1) % num_arms].set(1)
+
+        # then segment chains
+        idx = 0
+        for arm_idx, seg_count in enumerate(segments_per_arm):
+            for i in range(seg_count):
+                seg_node = num_arms + idx + i
+
+                adj = adj.at[seg_node, seg_node].set(1)
+                if i > 0:
+                    adj = adj.at[seg_node, seg_node - 1].set(1)
+                if i < seg_count - 1:
+                    adj = adj.at[seg_node, seg_node + 1].set(1)
+
+            idx += seg_count
+
+        idx = 0
+        for arm_idx, seg_count in enumerate(segments_per_arm):
+            first_seg = num_arms + idx  # first segment of this arm
+
+            # connect ring node first segment
+            adj = adj.at[arm_idx, first_seg].set(1)
+            adj = adj.at[first_seg, arm_idx].set(1)
+
+            idx += seg_count
+
+        return adj
 
 
 @jax.jit
@@ -69,15 +135,6 @@ def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, lear
 @jax.jit
 def _normalize_obs(obs, mean, var, eps=1e-8):
     return jnp.clip((obs - mean) / jnp.sqrt(var + eps), -10.0, 10.0)
-
-
-from enum import Enum
-
-
-class ObsMode(Enum):
-    CENTRALIZED = 0
-    ARM = 1
-    SEGMENT = 2
 
 
 @jax.jit
