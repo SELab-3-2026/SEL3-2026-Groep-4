@@ -10,9 +10,12 @@ decentralized control architecture in mind, we divide these inputs into global a
 
 Global inputs, always broadcasted to all nodes:
 
-- Vertical orientation/tilt: A single, simplified metric representing the tilt or vertical alignment of the agent's
-  central body/disk, derived from the environment's raw disk rotation 3D vector $[roll, pitch, yaw]$:
-  $$tilt = sqrt(roll^2 + pitch^2)$$. This represents the deviation from the global Z-axis.
+- Vertical orientation/tilt: A single, simplified metric representing the tilt/vertical alignment of the agent's
+  central body/disk, a.k.a. the deviation from the global Z-axis. Its value is derived from the environment's raw disk
+  rotation 3D vector $[roll, pitch, yaw]$:
+  $$
+  tilt = sqrt(roll^2 + pitch^2)
+  $$
 - Goal vector: Instead of just a scalar distance, the goal is represented asa a vector (distance and ange/direction) to
   the target.
 
@@ -28,6 +31,16 @@ Local inputs, routed directly to specific nodes:
 The action space defines how the agent interacts with the environment.
 
 - Joint offsets: *absolute* target positions (offsets) for the joints, i.e. the exact angle the joint should move to.
+
+## Normalization and Scaling
+
+Both the input (observation) and output (action) spaces are rescaled to the range **$[-1, 1]$**. 
+
+For the input space, all raw physical values (angles, velocities, forces, distances) are normalized based on their
+defined physical bounds. If a value exceeds these bounds during simulation, it is clipped to the $[-1, 1]$ range.
+
+For the output space, the neural network's tanh-activated outputs (which naturally fall in $[-1, 1]$) are linearly
+mapped to the physical joint limits defined in the robot's morphology.
 
 ## Rationale
 
@@ -59,6 +72,17 @@ When designing the state space, we must ask: *Could a human operator perform thi
   random walks or spiraling) to deduce the direction, drastically increasing the difficulty of the learning task.
 - Contact sensors: Segment contact detects external ground interaction and is biologically vital for timing gait
   transitions.
+- **Zero-Centered Rescaling ($[-1, 1]$):** Using a zero-centered range is standard best practice for continuous control
+  tasks. It provides several mathematical and physical advantages:
+  - **Improved Gradient Flow:** Neural networks optimize faster when inputs are zero-centered. If all inputs were
+    positive (e.g., $[0, 1]$), the gradients during backpropagation would be forced to the same sign, causing
+    inefficient "zig-zag" weight updates.
+  - **Meaningful "Neutral" State:** In robotics, $0.0$ naturally represents a resting state (zero velocity, centered
+    position, no force). In a $[-1, 1]$ system, this physical rest maps to a neutral $0.0$ signal in the network.
+  - **Robustness to Amputation:** In this project, amputated limbs are padded with $0.0$. In a $[-1, 1]$ system, this
+    correctly communicates a "neutral/dead" signal. In a $[0, 1]$ system, $0.0$ would represent the absolute minimum
+    physical limit, causing the network to misinterpret missing limbs as being at their extreme limits.
+
 
 
 Specifically, we do not include some available inputs:
@@ -80,6 +104,10 @@ Alternative state and action formulations include:
 - Scalar Goal Distance: Giving the agent only the scalar distance to the target would force it to learn a localized
   searching behavior (e.g., spiraling or random walks) to determine the correct direction. While biologically plausible
   for simpler organisms following chemical gradients, it drastically increases the difficulty of the learning task.
+- **$[0, 1]$ Rescaling:** While some domains (like computer vision) use $[0, 1]$ scaling, it is generally avoided in
+  robotics. Scaling to $[0, 1]$ would mean that a resting joint (velocity = 0) maps to an input of $0.5$. This
+  constant positive bias forces the network to waste capacity learning to ignore or subtract this baseline signal just
+  to stand still. Furthermore, it breaks the "dead signal" interpretation of zero-padding used for amputations.
 
 ## MuJoCo
 
