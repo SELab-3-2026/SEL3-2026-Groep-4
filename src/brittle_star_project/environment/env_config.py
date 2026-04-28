@@ -1,8 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 
 from .env_types import Task
+
+
+class MorphMode(Enum):
+    CENTRALIZED = 0
+    FULLY_CONNECTED = 1
+    RING = 2
+    SEGMENT = 3
 
 
 @dataclass
@@ -20,6 +28,7 @@ class MorphologyConfig:
     segments_per_arm: list[int] = field(default_factory=lambda: [4, 4, 4, 4, 4])
     use_p_control: bool = True
     use_torque_control: bool = False
+    morph_mode: MorphMode = MorphMode.CENTRALIZED
 
     @property
     def num_arms(self) -> int:
@@ -60,3 +69,5 @@ class EnvConfig:
     # Light escape
     # Per docs in upstream env config: integer factors of 200.
     light_perlin_noise_scale: int = 0
+
+    obs_mode: int = 0  # TODO: ????
