@@ -66,10 +66,15 @@ class EnvConfig:
 class ObservationBoundsConfig:
     """Physical observation bounds for deterministic min-max normalization."""
 
-    # TODO Inspect empirically observed ranges and update these bounds as needed.
-    joint_position: list[float] = field(default_factory=lambda: [-3.14, 3.14])
-    joint_velocity: list[float] = field(default_factory=lambda: [-20.0, 20.0])
-    joint_actuator_force: list[float] = field(default_factory=lambda: [-5.0, 5.0])
+    # Empirical testing based on the extract_observation_bounds.py script run for 1.000.000 steps
+
+    # Based on max. ctrlrange (0.78539816339744828) in XML, but empirical testing went slightly over
+    joint_position: list[float] = field(default_factory=lambda: [-0.8, 0.8])
+    # Empirical testing showed max. 3.22, adding buffer to be safe
+    joint_velocity: list[float] = field(default_factory=lambda: [-5.0, 5.0])
+    # Based on max. forceRange in XML, verified with empirical testing
+    joint_actuator_force: list[float] = field(default_factory=lambda: [-3.75, 3.75])
+    # Based on intuition and reasoning
     segment_contact: list[float] = field(default_factory=lambda: [0.0, 1.0])
     unit_xy_direction_to_target: list[float] = field(default_factory=lambda: [-1.0, 1.0])
     disk_z_tilt: list[float] = field(default_factory=lambda: [0.0, 3.141592653589793])
