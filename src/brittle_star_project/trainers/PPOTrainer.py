@@ -24,6 +24,14 @@ from brittle_star_project.MLPs.mlps import (
     Storage,
 )
 from brittle_star_project.ppo import PPO
+from enum import Enum
+
+
+class ObsMode(Enum):
+    CENTRALIZED = "centralized"
+    ARM = "arm"
+    SEGMENT = "segment"
+
 
 # TODO: move to config
 _ALLOWED_OBS_KEYS = {
@@ -39,13 +47,6 @@ _ALLOWED_OBS_KEYS = {
     "xy_distance_to_target",
 }
 # TODO: clip scaled reward?
-
-
-@jax.jit
-def _get_xy_distance_to_target(obs_dict: dict) -> jnp.ndarray:
-    """Extract xy_distance_to_target for all environments."""
-    # obs_dict is a dict of arrays with leading batch dimension (num_envs, ...)
-    return obs_dict["xy_distance_to_target"].squeeze(-1)  # shape: (num_envs,)
 
 
 @jax.jit
@@ -70,18 +71,154 @@ def _normalize_obs(obs, mean, var, eps=1e-8):
     return jnp.clip((obs - mean) / jnp.sqrt(var + eps), -10.0, 10.0)
 
 
-@jax.jit
-def _convert_obs_dict_to_array(obs_dict: dict) -> jnp.ndarray:
-    """Convert the raw observation dict → flat array, filtering unwanted keys."""
+from enum import Enum
 
-    def _filter_and_flatten(o: dict) -> jnp.ndarray:
+
+class ObsMode(Enum):
+    CENTRALIZED = 0
+    ARM = 1
+    SEGMENT = 2
+
+
+@jax.jit
+def _convert_obs_dict_to_array(obs_dict, obs_mode, segments_per_arm):
+
+    num_segments = sum(segments_per_arm)
+    num_arms = len(segments_per_arm)
+
+    def _filter_and_flatten(o):
         values = []
+
         for key in sorted(o.keys()):
-            if key in _ALLOWED_OBS_KEYS:  # TODO: NORMALIZATION or .. of observations??
-                v = o[key]
-                if v.size > 0:
-                    values.append(jnp.asarray(v).flatten())
-        return jnp.concatenate(values)
+            if key not in _ALLOWED_OBS_KEYS:
+                continue
+
+            v = o[key]
+            if v.size == 0:
+                continue
+
+            # -------- CENTRALIZED --------
+            if obs_mode == 0:
+                values.append(v.reshape(v.shape[0], -1))
+                continue
+
+            # -------- SPLIT TO SEGMENTS --------
+            if key in _JOINT_SCALED_KEYS:
+                v = v.reshape(v.shape[0], num_segments, 2)
+
+            elif key in _SEGMENT_SCALED_KEYS:
+                v = v[..., None]  # (env, segments, 1)
+
+            else:
+                # global → broadcast
+                if obs_mode == 2:
+                    v = jnp.repeat(v[:, None, :], num_segments, axis=1)
+                else:
+                    v = jnp.repeat(v[:, None, :], num_arms, axis=1)
+                values.append(v)
+                continue
+
+            # -------- SEGMENT MODE --------
+            if obs_mode == 2:
+                values.append(v)
+                continue
+
+            # -------- ARM MODE --------
+            # reshape (segments → arms, seg_per_arm)
+            v = v.reshape(v.shape[0], num_arms, -1)
+
+            values.append(v)
+
+        # -------- CONCAT --------
+        if obs_mode == 0:
+            return jnp.concatenate(values, axis=-1)
+        else:
+            return jnp.concatenate(values, axis=-1)
+
+    return jax.vmap(_filter_and_flatten)(obs_dict)
+
+
+from enum import Enum
+
+
+class ObsMode(Enum):
+    CENTRALIZED = 0  # dirty dirty code, todo, mooove outta here
+    ARM = 1
+    SEGMENT = 2
+
+
+# Observation keys whose size scales with the number of joints (2 per segment).
+_JOINT_SCALED_KEYS = frozenset(
+    {
+        "joint_position",
+        "joint_velocity",
+        "joint_actuator_force",
+        "actuator_force",
+    }
+)
+
+# Observation keys whose size scales with the number of segments (1 per segment).
+_SEGMENT_SCALED_KEYS = frozenset(
+    {
+        "segment_contact",
+    }
+)
+
+
+@jax.jit
+def _convert_obs_dict_to_array(obs_dict, obs_mode, segments_per_arm):
+
+    num_segments = sum(segments_per_arm)
+    num_arms = len(segments_per_arm)
+
+    def _filter_and_flatten(o):
+        values = []
+
+        for key in sorted(o.keys()):
+            if key not in _ALLOWED_OBS_KEYS:
+                continue
+
+            v = o[key]
+            if v.size == 0:
+                continue
+
+            # -------- CENTRALIZED --------
+            if obs_mode == 0:
+                values.append(v.reshape(v.shape[0], -1))
+                continue
+
+            # -------- SPLIT TO SEGMENTS --------
+            if key in _JOINT_SCALED_KEYS:
+                v = v.reshape(v.shape[0], num_segments, 2)
+
+            elif key in _SEGMENT_SCALED_KEYS:
+                v = v[..., None]  # (env, segments, 1)
+
+            else:
+                # global → broadcast
+                if obs_mode == 2:
+                    v = jnp.repeat(v[:, None, :], num_segments, axis=1)
+                else:
+                    v = jnp.repeat(v[:, None, :], num_arms, axis=1)
+                values.append(v)
+                continue
+
+            # -------- SEGMENT MODE --------
+            if obs_mode == 2:
+                values.append(v)
+                continue
+
+            # -------- ARM MODE --------
+            # reshape (segments → arms, seg_per_arm)
+            v = v.reshape(v.shape[0], num_arms, -1)
+
+            values.append(v)
+
+        # -------- CONCAT --------
+        if obs_mode == 0:
+            return jnp.concatenate(values, axis=-1)
+        else:
+            return jnp.concatenate(values, axis=-1)
 
     return jax.vmap(_filter_and_flatten)(obs_dict)
 
@@ -367,6 +504,8 @@ class PPOTrainer:
         )
 
         dummy_reset = self.env.reset(seed=0)
+        for k, v in dummy_reset.observations.items():
+            print(k, v.shape)
         sample_obs = _convert_obs_dict_to_array(dummy_reset.observations)[0]  # take first env
         self.obs_mean = jnp.zeros((len(sample_obs),))
         self.obs_var = jnp.ones((len(sample_obs),))
