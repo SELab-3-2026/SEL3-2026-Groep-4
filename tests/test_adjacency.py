@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import pytest
+import numpy as np
 
 from brittle_star_project.trainers.PPOTrainer import build_adjacency, MorphMode
 
@@ -70,6 +71,20 @@ def test_segment_structure():
         first_seg = num_arms + arm * 4
         assert adj[arm, first_seg] == 1
         assert adj[first_seg, arm] == 1
+
+    save_adj(adj)
+
+
+def save_adj(adj, name="adjacency_debug.txt"):
+    a = np.array(adj)
+
+    with open(name, "w") as f:
+        f.write("\nAdjacency matrix:\n")
+        f.write("   " + " ".join([f"{i:2d}" for i in range(a.shape[0])]) + "\n")
+
+        for i, row in enumerate(a):
+            line = f"{i:2d}  " + "  ".join(["█" if x > 0 else "." for x in row])
+            f.write(line + "\n")
 
 
 def test_no_isolated_nodes():
