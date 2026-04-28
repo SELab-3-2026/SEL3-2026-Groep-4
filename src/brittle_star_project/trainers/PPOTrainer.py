@@ -138,7 +138,7 @@ def _normalize_obs(obs, mean, var, eps=1e-8):
 
 
 @jax.jit
-def _convert_obs_dict_to_array(obs_dict, obs_mode, segments_per_arm):
+def _convert_obs_dict_to_array(obs_dict, morph_mode, segments_per_arm):
 
     num_segments = sum(segments_per_arm)
     num_arms = len(segments_per_arm)
@@ -155,53 +155,52 @@ def _convert_obs_dict_to_array(obs_dict, obs_mode, segments_per_arm):
                 continue
 
             # -------- CENTRALIZED --------
-            if obs_mode == 0:
+            if morph_mode == 0:
                 values.append(v.reshape(v.shape[0], -1))
                 continue
 
             # -------- SPLIT TO SEGMENTS --------
             if key in _JOINT_SCALED_KEYS:
+                if morph_mode == 3:
+                    B = v.shape[0]
+
+                    center_size = num_arms * 3 * 2  # 3 slots per arm, each slot has 2 values
+
+                    v_center = v[:, :center_size]
+                    v_center = v_center.reshape(B, num_arms, 3, 2)
+
+                    v_segs = v[:, center_size:]
+                    v_segs = v_segs.reshape(B, -1, 2)
+
+                    v = jnp.concatenate([v_center.reshape(B, -1, 2), v_segs], axis=1)
+                    values.append(v)
+                    continue
                 v = v.reshape(v.shape[0], num_segments, 2)
 
             elif key in _SEGMENT_SCALED_KEYS:
                 v = v[..., None]  # (env, segments, 1)
 
             else:
-                # global → broadcast
-                if obs_mode == 2:
-                    v = jnp.repeat(v[:, None, :], num_segments, axis=1)
-                else:
+                if morph_mode == 3:  # segment
+                    v = jnp.repeat(v[:, None, :], num_segments + num_arms, axis=1)
+
+                else:  # ring or fully connect
                     v = jnp.repeat(v[:, None, :], num_arms, axis=1)
                 values.append(v)
                 continue
 
             # -------- SEGMENT MODE --------
-            if obs_mode == 2:
+            if morph_mode == 3:
                 values.append(v)
                 continue
 
             # -------- ARM MODE --------
-            # reshape (segments → arms, seg_per_arm)
             v = v.reshape(v.shape[0], num_arms, -1)
-
             values.append(v)
 
-        # -------- CONCAT --------
-        if obs_mode == 0:
-            return jnp.concatenate(values, axis=-1)
-        else:
-            return jnp.concatenate(values, axis=-1)
+        return jnp.concatenate(values, axis=-1)
 
     return jax.vmap(_filter_and_flatten)(obs_dict)
-
-
-from enum import Enum
-
-
-class ObsMode(Enum):
-    CENTRALIZED = 0  # dirty dirty code, todo, mooove outta here
-    ARM = 1
-    SEGMENT = 2
 
 
 # Observation keys whose size scales with the number of joints (2 per segment).
@@ -480,7 +479,12 @@ class TrainingMeasurements:
 
 class PPOTrainer:
     def __init__(
-        self, cfg: BrittleStarConfig, env: BrittleStarJaxEnvWrapper, run_dir: str, run_name: str
+        self,
+        cfg: BrittleStarConfig,
+        env: BrittleStarJaxEnvWrapper,
+        run_dir: str,
+        run_name: str,
+        morph: MorphMode = MorphMode.CENTRALIZED,
     ):
         self.cfg = cfg
         self.ppo = cfg.ppo
@@ -496,6 +500,8 @@ class PPOTrainer:
         self.num_iterations = self.ppo.total_timesteps // self.batch_size
 
         self.key = jax.random.PRNGKey(self.experiment.seed)
+
+        self.adj = build_adjacency(cfg.morphology.segments_per_arm, morph)
 
         self.sensor, self.feature_extractor, self.actor, self.critic = self._init_agent()
         self.sensor.apply = jax.jit(self.sensor.apply)
