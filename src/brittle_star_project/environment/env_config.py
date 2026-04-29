@@ -70,4 +70,4 @@ class EnvConfig:
     # Per docs in upstream env config: integer factors of 200.
     light_perlin_noise_scale: int = 0
 
-    obs_mode: int = 0  # TODO: ????
+    morph_mode: MorphMode = MorphMode.CENTRALIZED
