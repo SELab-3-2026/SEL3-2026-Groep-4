@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import jax.tree_util
 from typing import Sequence, Callable
 from flax.linen.initializers import constant, orthogonal
+from flax.core import FrozenDict
 
 
 # semi generic so we can easily make a config for it in experiments
@@ -40,27 +41,28 @@ class Actor(nn.Module):
 @jax.tree_util.register_dataclass
 @dataclass
 class AgentParams:
-    sensor_params: flax.core.FrozenDict
-    actor_params: flax.core.FrozenDict
-    critic_params: flax.core.FrozenDict
-    feature_extractor_params: flax.core.FrozenDict
+    sensor_params: FrozenDict | dict
+    actor_params: FrozenDict | dict
+    critic_params: FrozenDict | dict
+    feature_extractor_params: FrozenDict | dict
+    message_passer_params: FrozenDict | dict
 
 
 @jax.tree_util.register_dataclass
 @dataclass
 class Storage:
-    obs: jnp.array
-    actions: jnp.array
-    logprobs: jnp.array
-    dones: jnp.array
-    values: jnp.array
-    advantages: jnp.array
-    returns: jnp.array
-    rewards: jnp.array
+    obs: jnp.ndarray
+    actions: jnp.ndarray
+    logprobs: jnp.ndarray
+    dones: jnp.ndarray
+    values: jnp.ndarray
+    advantages: jnp.ndarray
+    returns: jnp.ndarray
+    rewards: jnp.ndarray
 
-    raw_actions: jnp.ndarray = None  # before clipping
-    means: jnp.ndarray = None  # policy mean
-    stds: jnp.ndarray = None  # policy std
+    raw_actions: jnp.ndarray | None = None  # before clipping
+    means: jnp.ndarray | None = None  # policy mean
+    stds: jnp.ndarray | None = None  # policy std
 
     def replace(self, **kwargs) -> "Storage":
         fs = fields(self)
