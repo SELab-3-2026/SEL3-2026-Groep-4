@@ -136,66 +136,53 @@ def _convert_obs_dict_to_array_morphology(obs_dict, morph_mode, segments_per_arm
 
     @jax.jit
     def _filter_and_flatten(o) -> jnp.ndarray:
+        # vmap feeds one env at a time — v has NO batch dim here
+        # shapes are e.g. (n_features,) or (n_nodes, feat)
         values = []
 
         for key in sorted(o.keys()):
             if key not in _ALLOWED_OBS_KEYS:
                 continue
-
             v = o[key]
             if v.size == 0:
                 continue
 
             # -------- CENTRALIZED --------
             if morph_mode == MorphMode.CENTRALIZED:
-                values.append(v.reshape(v.shape[0], -1))
+                values.append(v.reshape(1, -1))  # (1, feat)
                 continue
 
             # -------- SPLIT TO SEGMENTS --------
             if key in _JOINT_SCALED_KEYS:
                 if morph_mode == MorphMode.SEGMENT:
-                    # special case: segment lvl and scale with joints,
-                    # needs to split logic for center mlps and arms
-                    # center:
-                    # 3 joints per arm, each joint has 2 values
-                    B = v.shape[0]
                     center_size = num_arms * 3 * 2
-                    v_center = v[:, :center_size]
-                    v_center = v_center.reshape(B, num_arms, 3, 2)
-
-                    v_segs = v[:, center_size:]
-                    v_segs = v_segs.reshape(B, -1, 2)
-
-                    v = jnp.concatenate([v_center.reshape(B, -1, 2), v_segs], axis=1)
-                    values.append(v)
+                    v_center = v[:center_size].reshape(num_arms, 3 * 2)  # (arms, 6)
+                    v_segs = v[center_size:].reshape(-1, 2)  # (segs, 2)
+                    values.append(jnp.concatenate([v_center, v_segs], axis=0))  # (arms+segs, ?)
                     continue
-                v = v.reshape(v.shape[0], num_segments, 2)
+                v = v.reshape(num_arms, -1)  # (n_arms, 2)
 
             elif key in _SEGMENT_SCALED_KEYS:
-                v = v[..., None]  # (env, segments, 1)
+                v = v[:, None]  # (segments, 1)
 
             else:
-                # global key, share with all
-                if morph_mode == 3:  # segment
-                    v = jnp.repeat(v[:, None, :], num_segments + num_arms, axis=1)
-
-                else:  # ring or fully connect
-                    v = jnp.repeat(v[:, None, :], num_arms, axis=1)
-                values.append(v)
-                continue
+                # global key, broadcast to all nodes
+                n_nodes = (num_segments + num_arms) if morph_mode == MorphMode.SEGMENT else num_arms
+                v = jnp.repeat(v[None, :], n_nodes, axis=0)  # (n_nodes, feat)
 
             # -------- SEGMENT MODE --------
             if morph_mode == MorphMode.SEGMENT:
-                values.append(v)
+                values.append(v)  # (n_nodes, feat)
                 continue
 
             # -------- ARM MODE --------
-            v = v.reshape(v.shape[0], num_arms, -1)
-            values.append(v)
+            v = v.reshape(num_arms, -1)
+            values.append(v)  # (n_arms, feat)
 
-        return jnp.concatenate(values, axis=0)
+        return jnp.concatenate(values, axis=-1)  # (n_nodes, total_feat)
 
     return jax.vmap(_filter_and_flatten)(obs_dict)
+    # output: (batch, n_nodes, total_feat)
 
 
 # Observation keys whose size scales with the number of joints (2 per segment).
@@ -541,12 +528,15 @@ class PPOTrainer:
     def _init_agent(self):
         self.logger.info("[AGENT]: Initializing agent...")
 
-        if (self.morph_mode == MorphMode.FULLY_CONNECTED) or (self.morph_mode == MorphMode.RING):
-            needed_copies = sum(1 for s in self.segments_per_arm if s > 0)
-        else:
-            needed_copies = sum(self.segments_per_arm) + sum(
-                1 for s in self.segments_per_arm if s > 0
-            )
+        match self.morph_mode:
+            case MorphMode.CENTRALIZED:
+                needed_copies = 1
+            case MorphMode.FULLY_CONNECTED | MorphMode.RING:
+                needed_copies = jnp.where(self.segments_per_arm > 0, 1, 0).sum()
+            case MorphMode.SEGMENT:
+                needed_copies = (
+                    self.segments_per_arm.sum() + jnp.where(self.segments_per_arm > 0, 1, 0).sum()
+                )
 
         actor = Actor(action_dim=self.env.single_action_space.shape[0])
         sensor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
@@ -580,6 +570,7 @@ class PPOTrainer:
         actor_keys = jax.random.split(actor_key, self.needed_copies)
         message_passer_keys = jax.random.split(message_passer_key, self.needed_copies)
 
+        # (needed_copies, 175)
         sensor_params = jax.vmap(lambda k: self.sensor.init(k, sample_obs))(sensor_keys)
 
         single_sensor_param = jax.tree.map(lambda x: x[0], sensor_params)
