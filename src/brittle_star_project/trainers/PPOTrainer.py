@@ -130,12 +130,12 @@ def _normalize_obs(obs, mean, var, eps=1e-8):
     return jnp.clip((obs - mean) / jnp.sqrt(var + eps), -10.0, 10.0)
 
 
-@jax.jit
-def _convert_obs_dict_to_array_morphology(obs_dict, morph_mode, segments_per_arm):
-    num_segments = sum(segments_per_arm)
-    num_arms = sum(1 for s in segments_per_arm if s > 0)
+def _convert_obs_dict_to_array_morphology(obs_dict, morph_mode, segments_per_arm: jnp.ndarray):
+    num_segments = segments_per_arm.sum()
+    num_arms = jnp.where(segments_per_arm > 0, 1, 0).sum()
 
-    def _filter_and_flatten(o):
+    @jax.jit
+    def _filter_and_flatten(o) -> jnp.ndarray:
         values = []
 
         for key in sorted(o.keys()):
@@ -147,13 +147,13 @@ def _convert_obs_dict_to_array_morphology(obs_dict, morph_mode, segments_per_arm
                 continue
 
             # -------- CENTRALIZED --------
-            if morph_mode == 0:
+            if morph_mode == MorphMode.CENTRALIZED:
                 values.append(v.reshape(v.shape[0], -1))
                 continue
 
             # -------- SPLIT TO SEGMENTS --------
             if key in _JOINT_SCALED_KEYS:
-                if morph_mode == 3:
+                if morph_mode == MorphMode.SEGMENT:
                     # special case: segment lvl and scale with joints,
                     # needs to split logic for center mlps and arms
                     # center:
@@ -185,7 +185,7 @@ def _convert_obs_dict_to_array_morphology(obs_dict, morph_mode, segments_per_arm
                 continue
 
             # -------- SEGMENT MODE --------
-            if morph_mode == 3:
+            if morph_mode == MorphMode.SEGMENT:
                 values.append(v)
                 continue
 
@@ -193,7 +193,7 @@ def _convert_obs_dict_to_array_morphology(obs_dict, morph_mode, segments_per_arm
             v = v.reshape(v.shape[0], num_arms, -1)
             values.append(v)
 
-        return jnp.concatenate(values, axis=-1)
+        return jnp.concatenate(values, axis=0)
 
     return jax.vmap(_filter_and_flatten)(obs_dict)
 
@@ -247,7 +247,7 @@ def _get_action_and_value_noise(
     return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
 
 
-# TODO: update to work with extra dimension + message passing
+# TODO: update to work vectorized (sensor, actor, message passer) + message passing
 def _step_once(
     carry,
     _,
@@ -349,7 +349,7 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn, morph_mode,
 
 def apply_per_node(net, params, x):
     # x: (batch, nodes, feat)
-    return jax.vmap(lambda node_x: net.apply(params, node_x), in_axes=1, out_axes=1)(x)
+    return jax.vmap(net.apply, in_axes=(0, 1), out_axes=1)(params, x)
 
 
 # TODO: update to work with extra dimension + message passing
@@ -359,7 +359,6 @@ def _rollout_jit(
     env_state,
     next_obs,
     next_done,
-    adj_matrix,
     key,
     max_steps,
     step_env_fn,
@@ -370,6 +369,7 @@ def _rollout_jit(
     message_passer: nn.Module,
     action_low,
     action_high,
+    adj_matrix,
 ):
     (agent_state, episode_stats, next_obs, next_done, key, env_state), storage = jax.lax.scan(
         partial(
@@ -470,6 +470,7 @@ class PPOTrainer:
         self.key = jax.random.PRNGKey(self.experiment.seed)
 
         self.morph_mode = self.cfg.morphology.morph_mode
+        self.segments_per_arm = jnp.asarray(self.cfg.morphology.segments_per_arm, dtype=jnp.int32)
 
         self.logger.info(f"[INIT]: Used morphology mode {self.morph_mode}")
         self.adj = build_adjacency(cfg.morphology.segments_per_arm, self.morph_mode)
@@ -487,7 +488,6 @@ class PPOTrainer:
         self.feature_extractor.apply = jax.jit(self.feature_extractor.apply)
         self.actor.apply = jax.jit(self.actor.apply)
         self.critic.apply = jax.jit(self.critic.apply)
-        self.segments_per_arm = jnp.asarray(self.cfg.morphology.segments_per_arm, dtype=jnp.int32)
 
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
         action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
