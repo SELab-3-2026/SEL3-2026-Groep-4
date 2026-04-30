@@ -26,3 +26,7 @@ class SimulationSettings:
     video_output_path: Optional[str] = None
     # Camera ID to use for video recording (1 is usually the close-up camera)
     camera_id: int = 1
+
+    # Optional override for the sidecar metadata YAML file.
+    # If None, it defaults to the model_path with a `_metadata.yaml` suffix.
+    metadata_path: Optional[str] = None

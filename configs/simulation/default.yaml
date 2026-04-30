@@ -20,3 +20,7 @@ record_video: false
 video_output_path: null
 # Camera ID to use for video recording (1 is usually the close-up camera)
 camera_id: 1
+
+# Optional override for the metadata YAML file path.
+# If null, the script looks for `<model_name>_metadata.yaml` alongside the model_path.
+metadata_path: null

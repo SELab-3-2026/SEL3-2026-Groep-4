@@ -56,13 +56,15 @@ def load_params(path: Path) -> dict:
     }
 
 
-def load_metadata(model_path: Path) -> dict:
+def load_metadata(model_path: Path, metadata_override_path: Path | None = None) -> dict:
     """Discover and load the sidecar metadata YAML file."""
-    metadata_path = model_path.with_name(model_path.stem + "_metadata.yaml")
+    if metadata_override_path is not None:
+        metadata_path = metadata_override_path
+    else:
+        metadata_path = model_path.with_name(model_path.stem + "_metadata.yaml")
+
     if not metadata_path.exists():
-        raise FileNotFoundError(
-            f"Could not find metadata YAML for {model_path.name}. Expected it at {metadata_path}"
-        )
+        raise FileNotFoundError(f"Could not find metadata YAML at {metadata_path}")
     with open(metadata_path, "r") as f:
         return yaml.safe_load(f)
 

@@ -51,7 +51,11 @@ def main(dict_cfg: DictConfig) -> None:
         raise ValueError(f"Expected a '.flax' checkpoint, got '{model_path.name}'.")
 
     # 2. Discover + load sidecar metadata YAML
-    metadata = load_metadata(model_path)
+    metadata_override = None
+    if sim_cfg.metadata_path is not None:
+        metadata_override = Path(hydra.utils.to_absolute_path(sim_cfg.metadata_path))
+
+    metadata = load_metadata(model_path, metadata_override)
 
     # 3. Reconstruct typed configs from metadata
     training = metadata_to_configs(metadata)

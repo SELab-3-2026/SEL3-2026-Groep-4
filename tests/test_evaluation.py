@@ -1,6 +1,13 @@
 import numpy as np
+import pytest
+import yaml
+from pathlib import Path
 
-from brittle_star_project.evaluation.checkpoint import metadata_to_configs, TrainingConfig
+from brittle_star_project.evaluation.checkpoint import (
+    metadata_to_configs,
+    TrainingConfig,
+    load_metadata,
+)
 from brittle_star_project.evaluation.rollout import _maybe_clip_action
 from brittle_star_project.environment.env_config import (
     MorphologyConfig,
@@ -75,3 +82,33 @@ def test_maybe_clip_action():
     wrong_low = np.array([-1.0, -1.0])  # Shape mismatch
     unclipped_3 = _maybe_clip_action(action, wrong_low, high)
     np.testing.assert_array_equal(unclipped_3, action)
+
+
+def test_load_metadata_with_override(tmp_path: Path):
+    """Test that metadata can be loaded from both default and override paths."""
+    # 1. Setup
+    model_path = tmp_path / "model.flax"
+    model_path.write_bytes(b"dummy")
+
+    default_metadata_path = tmp_path / "model_metadata.yaml"
+    default_content = {"version": "default", "seed": 42}
+    with open(default_metadata_path, "w") as f:
+        yaml.dump(default_content, f)
+
+    override_path = tmp_path / "custom_metadata.yaml"
+    override_content = {"version": "override", "seed": 1337}
+    with open(override_path, "w") as f:
+        yaml.dump(override_content, f)
+
+    # 2. Test default behavior
+    loaded_default = load_metadata(model_path)
+    assert loaded_default == default_content
+
+    # 3. Test override behavior
+    loaded_override = load_metadata(model_path, metadata_override_path=override_path)
+    assert loaded_override == override_content
+
+    # 4. Test Error Case
+    non_existent = tmp_path / "missing.yaml"
+    with pytest.raises(FileNotFoundError, match="Could not find metadata YAML at"):
+        load_metadata(model_path, metadata_override_path=non_existent)
