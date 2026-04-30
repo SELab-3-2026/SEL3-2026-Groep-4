@@ -70,21 +70,21 @@ class ObservationBoundsConfig:
 
     # Based on max. ctrlrange (0.78539816339744828) in XML, but empirical testing went slightly over
     joint_position: list[float] = field(default_factory=lambda: [-0.8, 0.8])
-    # Empirical testing showed max. 3.22, adding buffer to be safe
+    # Empirical testing showed max. 3.22, adding buffer to be safe. Consider higher values "fast".
     joint_velocity: list[float] = field(default_factory=lambda: [-5.0, 5.0])
     # Based on max. forceRange in XML, verified with empirical testing
     joint_actuator_force: list[float] = field(default_factory=lambda: [-3.75, 3.75])
     # Based on intuition and reasoning
     segment_contact: list[float] = field(default_factory=lambda: [0.0, 1.0])
-    unit_xy_direction_to_target: list[float] = field(default_factory=lambda: [-1.0, 1.0])
+    robot_direction_to_target: list[float] = field(default_factory=lambda: [-1.0, 1.0])
     disk_z_tilt: list[float] = field(default_factory=lambda: [0.0, 3.141592653589793])
 
     def to_bounds_dict(self) -> dict[str, tuple[float, float]]:
         return {
+            "disk_z_tilt": tuple(self.disk_z_tilt),
+            "joint_actuator_force": tuple(self.joint_actuator_force),
             "joint_position": tuple(self.joint_position),
             "joint_velocity": tuple(self.joint_velocity),
-            "joint_actuator_force": tuple(self.joint_actuator_force),
+            "robot_direction_to_target": tuple(self.robot_direction_to_target),
             "segment_contact": tuple(self.segment_contact),
-            "unit_xy_direction_to_target": tuple(self.unit_xy_direction_to_target),
-            "disk_z_tilt": tuple(self.disk_z_tilt),
         }

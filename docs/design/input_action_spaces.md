@@ -16,7 +16,8 @@ Global inputs, always broadcasted to all nodes:
   $$
   tilt = sqrt(roll^2 + pitch^2)
   $$
-- Goal vector: Instead of just a scalar distance, the goal is represented as an angle/direction to the target.
+- Goal vector: A 2D unit vector representing the *egocentric* direction to the target. A value of $[1.0, 0.0]$
+  indicates that the target is directly in front of the agent (angle 0).
 
 Local inputs, routed directly to specific nodes:
 
@@ -73,20 +74,21 @@ When designing the state space, we must ask: *Could a human operator perform thi
   **NOTE:** We later dropped the "distance to vector", switching to only a direction as the input. Our reasoning is
   the agent should always move towards the goal (it should not learn to stop at the goal), which allows for this
   simplification that decreases the model input size.
+  
+  The environment provides a raw `unit_xy_direction_to_target` (global), which we transform into a calculated
+  `robot_direction_to_target` (egocentric) before passing it to the MLPs. This vector consists of the X and Y
+  direction, where a value of $[1.0, 0.0]$ (mapping to an angle of $0$) means the robot is facing directly towards the
+  target.
 - Contact sensors: Segment contact detects external ground interaction and is biologically vital for timing gait
   transitions.
-- **Zero-Centered Rescaling ($[-1, 1]$):** Using a zero-centered range is standard best practice for continuous control
+- Zero-Centered Rescaling ($[-1, 1]$): Using a zero-centered range is standard best practice for continuous control
   tasks. It provides several mathematical and physical advantages:
-  - **Improved Gradient Flow:** Neural networks optimize faster when inputs are zero-centered. If all inputs were
-    positive (e.g., $[0, 1]$), the gradients during backpropagation would be forced to the same sign, causing
-    inefficient "zig-zag" weight updates.
-  - **Meaningful "Neutral" State:** In robotics, $0.0$ naturally represents a resting state (zero velocity, centered
+  - Improved Gradient Flow: Neural networks optimize faster when inputs are zero-centered. If all inputs were positive
+    (e.g., $[0, 1]$), the gradients during backpropagation would be forced to the same sign, causing inefficient
+    "zig-zag" weight updates.
+  - Meaningful Neutral State: In robotics, $0.0$ naturally represents a resting state (zero velocity, centered
     position, no force). In a $[-1, 1]$ system, this physical rest maps to a neutral $0.0$ signal in the network.
-  - **Robustness to Amputation:** In this project, amputated limbs are padded with $0.0$. In a $[-1, 1]$ system, this
-    correctly communicates a "neutral/dead" signal. In a $[0, 1]$ system, $0.0$ would represent the absolute minimum
-    physical limit, causing the network to misinterpret missing limbs as being at their extreme limits.
-
-
+    This also correctly communicaties a "neutral/dead" signal for amputated limbs that are padded with $0.0$ values.
 
 Specifically, we do not include some available inputs:
 
@@ -120,8 +122,7 @@ This is what the filtered input vectors look like in MuJoCo, with $J$ joints and
 - `joint_velocity`: shape=(J,), dtype=float64
 - `joint_actuator_force`: shape=(J,), dtype=float64
 - `segment_contact`: shape=(S,), dtype=float64
-- `unit_xy_direction_to_target`: shape=(2,), dtype=float64
-- `xy_distance_to_target`: shape=(1,), dtype=float64
+- `robot_direction_to_target`: shape=(2,), dtype=float64, egocentric
 - `disk_z_tilt`: shape=(1,), dtype=float64, derived from `disk_rotation`
 
 This brings the entire input space down to $3J + S + 4$ float64's, compared to $4J + S + 15$ float64's for the
@@ -159,6 +160,5 @@ disk_angular_velocity: shape=(3,), dtype=float64, size=3
 tendon_position: shape=(0,), dtype=float64, size=0
 tendon_velocity: shape=(0,), dtype=float64, size=0
 segment_contact: shape=(6,), dtype=float64, size=6
-unit_xy_direction_to_target: shape=(2,), dtype=float64, size=2
 xy_distance_to_target: shape=(1,), dtype=float64, size=1
 ```

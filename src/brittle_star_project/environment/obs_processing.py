@@ -26,6 +26,15 @@ def create_obs_processor(
         if "disk_rotation" in new_obs:
             rot = new_obs["disk_rotation"]
             new_obs["disk_z_tilt"] = jnp.sqrt(jnp.pow(rot[0], 2) + jnp.pow(rot[1], 2))
+
+            if "unit_xy_direction_to_target" in new_obs:
+                yaw = rot[2]
+                unit_x, unit_y = new_obs["unit_xy_direction_to_target"]
+                cos_yaw, sin_yaw = jnp.cos(yaw), jnp.sin(yaw)
+                new_x = unit_x * cos_yaw + unit_y * sin_yaw
+                new_y = -unit_x * sin_yaw + unit_y * cos_yaw
+                new_obs["robot_direction_to_target"] = jnp.stack([new_x, new_y])
+
         return new_obs
 
     def _normalize_features(obs: dict) -> dict:
@@ -61,8 +70,8 @@ def create_obs_processor(
             "joint_actuator_force",
             "joint_position",
             "joint_velocity",
+            "robot_direction_to_target",
             "segment_contact",
-            "unit_xy_direction_to_target",
         ]
         values = []
         for key in ordered_keys:
