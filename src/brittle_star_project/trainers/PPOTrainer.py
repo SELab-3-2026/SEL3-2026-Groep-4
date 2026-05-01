@@ -26,6 +26,7 @@ from brittle_star_project.MLPs.mlps import (
 )
 from brittle_star_project.ppo import PPO
 from brittle_star_project.environment import MorphMode
+from brittle_star_project.utils import logged_jit
 
 # TODO: move to config
 _ALLOWED_OBS_KEYS = {
@@ -108,7 +109,7 @@ def build_adjacency(segments_per_arm, mode: MorphMode):
         return adj
 
 
-@jax.jit
+@logged_jit
 def _clip_action(action: jnp.ndarray, low: jnp.ndarray, high: jnp.ndarray) -> jnp.ndarray:
     return jnp.clip(action, low, high)
 
@@ -119,13 +120,13 @@ def _compute_explained_variance(values: jnp.ndarray, returns: jnp.ndarray) -> fl
     return float(explained_var)
 
 
-@jax.jit
+@logged_jit
 def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, learning_rate):
     frac = 1.0 - (count // (minibatch_count * update_epochs)) / num_iterations
     return learning_rate * frac
 
 
-@jax.jit
+@logged_jit
 def _normalize_obs(obs, mean, var, eps=1e-8):
     return jnp.clip((obs - mean) / jnp.sqrt(var + eps), -10.0, 10.0)
 
@@ -134,7 +135,7 @@ def _convert_obs_dict_to_array_morphology(obs_dict, morph_mode, segments_per_arm
     num_segments = segments_per_arm.sum()
     num_arms = jnp.where(segments_per_arm > 0, 1, 0).sum()
 
-    @jax.jit
+    @logged_jit
     def _filter_and_flatten(o) -> jnp.ndarray:
         # vmap feeds one env at a time — v has NO batch dim here
         # shapes are e.g. (n_features,) or (n_nodes, feat)
@@ -230,11 +231,12 @@ def _get_action_and_value_noise(
     raw_action = mean + noise * std
     clipped_action = _clip_action(raw_action, action_low, action_high)
 
-
     logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
     value = apply_shared(critic, agent_state.params["critic_params"], hidden_critic)
-    
-    raw_action = raw_action.reshape(raw_action.shape[0], -1) # concat the per agent, keep the envs dim
+
+    raw_action = raw_action.reshape(
+        raw_action.shape[0], -1
+    )  # concat the per agent, keep the envs dim
     clipped_action = _clip_action(raw_action, action_low, action_high)
     return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
 
@@ -338,6 +340,7 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn, morph_mode,
         ),
     )
 
+
 def apply_per_node(net, params, x):
     # params: (nodes, ...)
     # x: (batch, nodes, feat)
@@ -348,12 +351,14 @@ def apply_per_node(net, params, x):
 
     return jax.vmap(apply_single_node, in_axes=(0, 1), out_axes=1)(params, x)
 
+
 def apply_shared(net, params, x):
     # x: (batch, nodes, feat)
     # If the critic expects a single vector per environment:
     batch_size = x.shape[0]
     x_flattened = x.reshape(batch_size, -1)
     return jax.vmap(lambda xi: net.apply(params, xi))(x_flattened)
+
 
 # TODO: update to work with extra dimension + message passing
 def _rollout_jit(
@@ -415,9 +420,10 @@ def _compute_gae_jit(
     critic,
     adj_matrix: jnp.ndarray,
 ):
-    next_value = apply_shared(critic,
+    next_value = apply_shared(
+        critic,
         agent_state.params["critic_params"],
-        apply_shared(feature_extractor,agent_state.params["feature_extractor_params"], next_obs),
+        apply_shared(feature_extractor, agent_state.params["feature_extractor_params"], next_obs),
     ).squeeze(-1)
 
     advantages = jnp.zeros((num_envs,))
@@ -487,15 +493,15 @@ class PPOTrainer:
             self.needed_copies,
         ) = self._init_agent()
 
-        self.sensor.apply = jax.jit(self.sensor.apply)
-        self.feature_extractor.apply = jax.jit(self.feature_extractor.apply)
-        self.actor.apply = jax.jit(self.actor.apply)
-        self.critic.apply = jax.jit(self.critic.apply)
+        self.sensor.apply = logged_jit(self.sensor.apply)
+        self.feature_extractor.apply = logged_jit(self.feature_extractor.apply)
+        self.actor.apply = logged_jit(self.actor.apply)
+        self.critic.apply = logged_jit(self.critic.apply)
 
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
         action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
 
-        self._rollout_jit = jax.jit(
+        self._rollout_jit = logged_jit(
             partial(
                 _rollout_jit,
                 max_steps=self.ppo.num_steps,
@@ -515,7 +521,7 @@ class PPOTrainer:
                 adj_matrix=self.adj,
             )
         )
-        self._compute_gae_jit = jax.jit(
+        self._compute_gae_jit = logged_jit(
             partial(
                 _compute_gae_jit,
                 num_envs=self.ppo.num_envs,
@@ -527,10 +533,17 @@ class PPOTrainer:
             )
         )
 
-        apply_sensor = lambda p, x: apply_per_node(self.sensor, p, x)
-        apply_actor = lambda p, x: apply_per_node(self.actor, p, x)
-        apply_critic = lambda p, x: apply_shared(self.critic, p, x)
-        apply_feature = lambda p, x: apply_shared(self.feature_extractor, p, x)
+        def apply_sensor(p, x):
+            return apply_per_node(self.sensor, p, x)
+
+        def apply_actor(p, x):
+            return apply_per_node(self.actor, p, x)
+
+        def apply_critic(p, x):
+            return apply_shared(self.critic, p, x)
+
+        def apply_feature(p, x):
+            return apply_shared(self.feature_extractor, p, x)
 
         self._ppo = PPO(self.ppo, apply_sensor, apply_actor, apply_critic, apply_feature)
 
@@ -553,11 +566,11 @@ class PPOTrainer:
             case MorphMode.CENTRALIZED:
                 needed_copies = 1
             case MorphMode.FULLY_CONNECTED | MorphMode.RING:
-                needed_copies = jnp.where(self.segments_per_arm > 0, 1, 0).sum()
+                needed_copies = jnp.where(self.segments_per_arm > 0, 1, 0).sum().item()
             case MorphMode.SEGMENT:
                 needed_copies = (
                     self.segments_per_arm.sum() + jnp.where(self.segments_per_arm > 0, 1, 0).sum()
-                )
+                ).item()
 
         actor = Actor(action_dim=self.env.single_action_space.shape[0])
         sensor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
@@ -604,12 +617,11 @@ class PPOTrainer:
             )
         )(message_passer_keys)
 
-        flat_obs = sample_obs.reshape(-1) # BECAUSE 1 centralized critic
+        flat_obs = sample_obs.reshape(-1)  # BECAUSE 1 centralized critic
         feature_extractor_params = self.feature_extractor.init(feature_extractor_key, flat_obs)
 
         critic_params = self.critic.init(
-            critic_key,
-            self.feature_extractor.apply(feature_extractor_params, flat_obs)
+            critic_key, self.feature_extractor.apply(feature_extractor_params, flat_obs)
         )
 
         return TrainState.create(
