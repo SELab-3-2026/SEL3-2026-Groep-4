@@ -234,7 +234,6 @@ def _get_action_and_value_noise(
     logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
     value = apply_shared(critic, agent_state.params["critic_params"], hidden_critic)
     
-    raw_action = raw_action.reshape(-1)
     raw_action = raw_action.reshape(raw_action.shape[0], -1) # concat the per agent, keep the envs dim
     clipped_action = _clip_action(raw_action, action_low, action_high)
     return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
