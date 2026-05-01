@@ -3,8 +3,9 @@ from functools import partial
 import flax
 import jax
 import jax.numpy as jnp
+from experiment_logger import get_logger
 
-
+logger = get_logger()
 # Chose to use a class as it seemed the easiest way to integrate the CleanRL code style
 # with our need to seperate concerns
 class PPO:
@@ -31,6 +32,12 @@ class PPO:
     # or this function will need to recompile
     @partial(jax.jit, static_argnums=0)
     def update_ppo(self, agent_state, storage, key):
+        logger.info(f"[PPO] storage.obs shape: {getattr(storage, 'obs', None).shape}")
+        logger.info(f"[PPO] storage.actions shape: {storage.actions.shape}")
+        logger.info(f"[PPO] storage.logprobs shape: {storage.logprobs.shape}")
+        logger.info(f"[PPO] storage.advantages shape: {storage.advantages.shape}")
+        logger.info(f"[PPO] storage.returns shape: {storage.returns.shape}")
+
         args = self.args
         ppo_loss_grad_fn = self.ppo_loss_grad_fn
 
@@ -49,6 +56,11 @@ class PPO:
             shuffled_storage = jax.tree.map(convert_data, flatten_storage)
 
             def update_minibatch(agent_state, minibatch):
+                logger.info(f"[PPO] minibatch.obs: {minibatch.obs.shape}")
+                logger.info(f"[PPO] minibatch.actions: {minibatch.actions.shape}")
+                logger.info(f"[PPO] minibatch.logprobs: {minibatch.logprobs.shape}")
+                logger.info(f"[PPO] minibatch.advantages: {minibatch.advantages.shape}")
+                logger.info(f"[PPO] minibatch.returns: {minibatch.returns.shape}")
                 (loss, (pg_loss, v_loss, entropy_loss, approx_kl)), grads = ppo_loss_grad_fn(
                     agent_state.params,
                     minibatch.obs,
@@ -97,16 +109,26 @@ def get_action_and_value(
     hidden_sensor = sensor_apply(params["sensor_params"], x)
     hidden_critic = feature_extractor_apply(params["feature_extractor_params"], x)
     hidden_sensor = message_passer(hidden_sensor)
+
+    logger.info(f"[SHAPE] hidden_sensor: {hidden_sensor.shape}")
+    logger.info(f"[SHAPE] hidden_critic: {hidden_critic.shape}")
+
     mean, log_std = actor_apply(params["actor_params"], hidden_sensor)
+
+    logger.info(f"[SHAPE] mean: {mean.shape}")
+    logger.info(f"[SHAPE] log_std: {log_std.shape}")
+    logger.info(f"[SHAPE] action: {action.shape}")
+
     log_std = jnp.clip(log_std, -5, 2)
     std = jnp.exp(log_std)
 
     logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi))
-    # Sum over BOTH the action dimensions (-1) AND the node dimension (-2) (sums per arm logprob)
-    logprob = logprob.sum(axis=(-2, -1)) 
+    logger.info(f"[SHAPE] logprob pre-sum: {logprob.shape}")
+    logprob = logprob.sum(axis=(-2, -1))
+    logger.info(f"[SHAPE] logprob final: {logprob.shape}")
     entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(axis=(-2, -1))
     value = critic_apply(params["critic_params"], hidden_critic).squeeze(-1)
-
+    logger.info(f"[SHAPE] value: {value.shape}")
     return logprob, entropy, value
 
 
