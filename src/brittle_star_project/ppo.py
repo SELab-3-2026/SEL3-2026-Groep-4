@@ -63,14 +63,13 @@ class PPO:
                     pg_loss,
                     v_loss,
                     entropy_loss,
-                    approx_kl,
-                    grads,
+                    approx_kl
                 )
 
             agent_state, metrics = jax.lax.scan(update_minibatch, agent_state, shuffled_storage)
             return (agent_state, key), metrics
 
-        (agent_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl, grads) = jax.lax.scan(
+        (agent_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl) = jax.lax.scan(
             update_epoch, (agent_state, key), (), length=args.update_epochs
         )
         return agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key
@@ -102,8 +101,10 @@ def get_action_and_value(
     log_std = jnp.clip(log_std, -5, 2)
     std = jnp.exp(log_std)
 
-    logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
-    entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(-1)
+    logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi))
+    # Sum over BOTH the action dimensions (-1) AND the node dimension (-2) (sums per arm logprob)
+    logprob = logprob.sum(axis=(-2, -1)) 
+    entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(axis=(-2, -1))
     value = critic_apply(params["critic_params"], hidden_critic).squeeze(-1)
 
     return logprob, entropy, value
