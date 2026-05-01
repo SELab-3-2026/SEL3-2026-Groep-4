@@ -8,7 +8,7 @@ import jax.numpy as jnp
 # Chose to use a class as it seemed the easiest way to integrate the CleanRL code style
 # with our need to seperate concerns
 class PPO:
-    def __init__(self, args, sensor, actor, critic, feature_extractor, message_passer=None):
+    def __init__(self, args, sensor_apply, actor_apply, critic_apply, feature_extractor_apply, message_passer=None):
         self.args = args
 
         if not message_passer:
@@ -18,10 +18,10 @@ class PPO:
             partial(
                 ppo_loss,
                 args=args,
-                sensor_apply=sensor.apply,
-                actor_apply=actor.apply,
-                critic_apply=critic.apply,
-                feature_extractor_apply=feature_extractor.apply,
+                sensor_apply=sensor_apply,
+                actor_apply=actor_apply,
+                critic_apply=critic_apply,
+                feature_extractor_apply=feature_extractor_apply,
                 message_passer=message_passer,
             ),
             has_aux=True,

@@ -217,7 +217,7 @@ def _get_action_and_value_noise(
     adj_matrix: jnp.ndarray,
 ):
     hidden = apply_per_node(sensor, agent_state.params["sensor_params"], next_obs)
-    hidden_critic = apply_per_node(
+    hidden_critic = apply_shared(
         feature_extractor, agent_state.params["feature_extractor_params"], next_obs
     )
 
@@ -226,11 +226,17 @@ def _get_action_and_value_noise(
     key, subkey = jax.random.split(key)
     noise = jax.random.normal(subkey, shape=mean.shape)
     std = jnp.exp(log_std)
+
     raw_action = mean + noise * std
     clipped_action = _clip_action(raw_action, action_low, action_high)
-    logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
-    value = critic.apply(agent_state.params["critic_params"], hidden_critic)
 
+
+    logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
+    value = apply_shared(critic, agent_state.params["critic_params"], hidden_critic)
+    
+    raw_action = raw_action.reshape(-1)
+    raw_action = raw_action.reshape(raw_action.shape[0], -1) # concat the per agent, keep the envs dim
+    clipped_action = _clip_action(raw_action, action_low, action_high)
     return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
 
 
@@ -333,11 +339,22 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn, morph_mode,
         ),
     )
 
-
 def apply_per_node(net, params, x):
+    # params: (nodes, ...)
     # x: (batch, nodes, feat)
-    return jax.vmap(net.apply, in_axes=(0, 1), out_axes=1)(params, x)
 
+    def apply_single_node(p, x_node):
+        # x_node: (batch, feat)
+        return jax.vmap(lambda xi: net.apply(p, xi))(x_node)
+
+    return jax.vmap(apply_single_node, in_axes=(0, 1), out_axes=1)(params, x)
+
+def apply_shared(net, params, x):
+    # x: (batch, nodes, feat)
+    # If the critic expects a single vector per environment:
+    batch_size = x.shape[0]
+    x_flattened = x.reshape(batch_size, -1)
+    return jax.vmap(lambda xi: net.apply(params, xi))(x_flattened)
 
 # TODO: update to work with extra dimension + message passing
 def _rollout_jit(
@@ -399,9 +416,9 @@ def _compute_gae_jit(
     critic,
     adj_matrix: jnp.ndarray,
 ):
-    next_value = critic.apply(
+    next_value = apply_shared(critic,
         agent_state.params["critic_params"],
-        feature_extractor.apply(agent_state.params["feature_extractor_params"], next_obs),
+        apply_shared(feature_extractor,agent_state.params["feature_extractor_params"], next_obs),
     ).squeeze(-1)
 
     advantages = jnp.zeros((num_envs,))
@@ -511,7 +528,12 @@ class PPOTrainer:
             )
         )
 
-        self._ppo = PPO(self.ppo, self.sensor, self.actor, self.critic, self.feature_extractor)
+        apply_sensor = lambda p, x: apply_per_node(self.sensor, p, x)
+        apply_actor = lambda p, x: apply_per_node(self.actor, p, x)
+        apply_critic = lambda p, x: apply_shared(self.critic, p, x)
+        apply_feature = lambda p, x: apply_shared(self.feature_extractor, p, x)
+
+        self._ppo = PPO(self.ppo, apply_sensor, apply_actor, apply_critic, apply_feature)
 
         self.agent_state = self._init_agent_state()
 
@@ -583,9 +605,12 @@ class PPOTrainer:
             )
         )(message_passer_keys)
 
-        feature_extractor_params = self.feature_extractor.init(feature_extractor_key, sample_obs)
+        flat_obs = sample_obs.reshape(-1) # BECAUSE 1 centralized critic
+        feature_extractor_params = self.feature_extractor.init(feature_extractor_key, flat_obs)
+
         critic_params = self.critic.init(
-            critic_key, self.feature_extractor.apply(feature_extractor_params, sample_obs)
+            critic_key,
+            self.feature_extractor.apply(feature_extractor_params, flat_obs)
         )
 
         return TrainState.create(
