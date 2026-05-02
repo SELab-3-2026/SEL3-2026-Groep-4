@@ -229,15 +229,14 @@ def _get_action_and_value_noise(
     std = jnp.exp(log_std)
 
     raw_action = mean + noise * std
-    clipped_action = _clip_action(raw_action, action_low, action_high)
+    flat_action = raw_action.reshape(raw_action.shape[0], -1) # concat the per agent, keep the envs dim
+    flat_clipped_action = _clip_action(flat_action, action_low, action_high)
 
 
-    logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
+    logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(axis=(-2, -1))
     value = apply_shared(critic, agent_state.params["critic_params"], hidden_critic)
     
-    raw_action = raw_action.reshape(raw_action.shape[0], -1) # concat the per agent, keep the envs dim
-    clipped_action = _clip_action(raw_action, action_low, action_high)
-    return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
+    return flat_clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
 
 
 # TODO: update to work vectorized (sensor, actor, message passer) + message passing
@@ -255,7 +254,7 @@ def _step_once(
     action_high,
 ):
     agent_state, episode_stats, obs, done, key, env_state = carry
-    clipped_action, raw_action, logprob, value, mean, std, key = _get_action_and_value_noise(
+    flat_clipped_action, raw_action, logprob, value, mean, std, key = _get_action_and_value_noise(
         sensor,
         feature_extractor,
         actor,
@@ -268,7 +267,7 @@ def _step_once(
         adj_matrix,
     )
     logger11.info(f"[_step_once] raw_action: {raw_action.shape}")
-    logger11.info(f"[_step_once] clipped_action: {clipped_action.shape}")
+    logger11.info(f"[_step_once] clipped_action: {flat_clipped_action.shape}")
 
     # Supporting signals (often where mismatch originates)
     logger11.info(f"[_step_once] logprob: {logprob.shape}")
@@ -278,15 +277,12 @@ def _step_once(
 
     # ---- ENV STEP ----
     episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
-        episode_stats, env_state, clipped_action
+        episode_stats, env_state, flat_clipped_action
     )
 
     logger11.info(f"[_step_once] next_obs: {next_obs.shape}")
     logger11.info(f"[_step_once] reward: {reward.shape}")
     logger11.info(f"[_step_once] next_done: {next_done.shape}")
-    episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
-        episode_stats, env_state, clipped_action
-    )
 
     storage = Storage(
         obs=obs,
@@ -788,7 +784,7 @@ class PPOTrainer:
             self.logger.log_non_interactive(f"First rollout completed: {time.ctime()}")
 
         storage = self._compute_gae(storage, next_obs, next_done)
-
+        self.logger.info(f"[_step] storage.obs (post-gae): {storage.obs.shape}")
         if iteration == 1:
             self.logger.log_non_interactive(f"Starting first PPO update (JIT): {time.ctime()}")
 
