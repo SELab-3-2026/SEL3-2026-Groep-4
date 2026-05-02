@@ -220,16 +220,18 @@ def _get_action_and_value_noise(
     action_high,
     adj_matrix: jnp.ndarray,
 ):
-    def apply_message_passing(h):
+    def apply_message_passing(p, h):
         assert message_passer is not None, (
             "message passing shouldn't be performed if morphology mode is Centralized"
         )
 
-        return message_passer.apply(agent_state.params["message_passer_params"], h, adj_matrix)
+        return jax.vmap(lambda x: message_passer.apply(p, x, adj_matrix))(h)
 
     hidden = apply_per_node(sensor, agent_state.params["sensor_params"], next_obs)
     if message_passer is not None:
-        hidden = jax.vmap(apply_message_passing)(hidden)
+        hidden = jax.vmap(apply_message_passing)(
+            agent_state.params["message_passer_params"], hidden
+        )
 
     hidden_critic = apply_shared(
         feature_extractor, agent_state.params["feature_extractor_params"], next_obs
@@ -334,7 +336,6 @@ def _reward_fn(env_state, next_env_state):
     return jnp.where(next_env_state.terminated, 50.0, clipped_env_reward - penalty)
 
 
-# TODO: message passing
 def _step_env_wrapped(episode_stats, env_state, action, env_step_fn, morph_mode, segments_per_arm):
     next_env_state = env_step_fn(env_state, action)
 
