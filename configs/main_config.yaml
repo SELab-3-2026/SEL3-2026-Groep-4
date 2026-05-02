@@ -11,6 +11,7 @@ defaults:
   - morphology: 5_arms_full
   - arena: default
   - environment: directed_locomotion
+  - obs_bounds: default
   - simulation: default
   - _self_
 

@@ -5,7 +5,7 @@ from experiment_logger import get_logger
 from .env_config import EnvConfig, MorphologyConfig, ArenaConfig
 from .env_types import Backend
 from .factory import BrittleStarEnvFactory
-from .padded_obs_wrapper import compute_padding_masks, pad_observations_batched
+from .padded_obs_wrapper import compute_padding_masks
 
 
 class BrittleStarJaxEnvWrapper:
@@ -49,6 +49,15 @@ class BrittleStarJaxEnvWrapper:
         return self._env
 
     @property
+    def padding_masks(self) -> dict:
+        """Pre-computed boolean masks for amputated limb padding.
+
+        Pass to create_obs_processor so the processor handles padding
+        after normalization in the correct pipeline order.
+        """
+        return self._padding_masks
+
+    @property
     def single_action_space(self):
         return self._env.action_space
 
@@ -61,10 +70,6 @@ class BrittleStarJaxEnvWrapper:
         self._action_rng, env_rng = jax.random.split(jax.random.PRNGKey(seed), 2)
         env_rngs = jnp.array(jax.random.split(env_rng, self._num_envs))
         state = self._vectorized_reset(rng=env_rngs)
-
-        state = state.replace(
-            observations=pad_observations_batched(state.observations, self._padding_masks)
-        )
         return state
 
     def sample_actions(self):
@@ -75,12 +80,7 @@ class BrittleStarJaxEnvWrapper:
         return self._vectorized_action_sample(rng=jnp.array(sub_rngs))
 
     def step(self, state, action):
-        next_state = self._vectorized_step(state=state, action=action)
-
-        next_state = next_state.replace(
-            observations=pad_observations_batched(next_state.observations, self._padding_masks)
-        )
-        return next_state
+        return self._vectorized_step(state=state, action=action)
 
     def close(self):
         self._env.close()
