@@ -1,6 +1,5 @@
 from dataclasses import dataclass, fields, field
 
-import flax
 import flax.linen as nn
 import jax.numpy as jnp
 import jax.tree_util
@@ -36,6 +35,28 @@ class Actor(nn.Module):
         mean = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01), bias_init=constant(0.0))(x)
         log_std = self.param("log_std", nn.initializers.zeros, (self.action_dim,))
         return mean, log_std
+
+
+class MessagePasser(nn.Module):
+    hidden_dim: int
+    num_propagation_steps: int
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray, adj_matrix: jnp.ndarray):
+        for _ in range(self.num_propagation_steps):
+            messages = nn.Dense(self.hidden_dim)(x)
+            messages = nn.tanh(messages)
+
+            agg = adj_matrix  # if mean is wanted: adj_matrix / (adj.sum(axis=-1, keepdims=True) + 1e-8)
+            aggregated = agg @ messages
+
+            x_concat = jnp.concatenate([x, aggregated], axis=-1)
+
+            gate = nn.sigmoid(nn.Dense(self.hidden_dim)(x_concat))
+            candidate = nn.tanh(nn.Dense(self.hidden_dim)(x_concat))
+            x = gate * x + (1 - gate) * candidate
+
+        return x
 
 
 @jax.tree_util.register_dataclass
