@@ -221,10 +221,15 @@ def _get_action_and_value_noise(
     adj_matrix: jnp.ndarray,
 ):
     def apply_message_passing(h):
+        assert message_passer is not None, (
+            "message passing shouldn't be performed if morphology mode is Centralized"
+        )
+
         return message_passer.apply(agent_state.params["message_passer_params"], h, adj_matrix)
 
     hidden = apply_per_node(sensor, agent_state.params["sensor_params"], next_obs)
-    hidden = jax.vmap(apply_message_passing)(hidden)
+    if message_passer is not None:
+        hidden = jax.vmap(apply_message_passing)(hidden)
 
     hidden_critic = apply_shared(
         feature_extractor, agent_state.params["feature_extractor_params"], next_obs

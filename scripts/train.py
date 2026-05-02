@@ -42,7 +42,7 @@ def main(dict_cfg: DictConfig):
         base_dir=os.path.dirname(run_dir),
     )
     logger = get_logger()
-    logger.set_level(logging.DEBUG)
+    logger.set_level(logging.INFO)
     logger.info(f"Hydra-initialized run: {run_name}")
     logger.info(f"Output directory: {run_dir}")
 

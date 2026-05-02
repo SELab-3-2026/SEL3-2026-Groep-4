@@ -29,4 +29,4 @@ critic:
 message_passing_steps: 4
 
 # Connectivity topology (e.g., ring, fully_connected)
-topology_type: "ring"
+topology_type: "fully_connected"
