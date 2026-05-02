@@ -27,6 +27,7 @@ from brittle_star_project.MLPs.mlps import (
 from brittle_star_project.ppo import PPO
 from brittle_star_project.environment import MorphMode
 
+logger11 = get_logger()
 # TODO: move to config
 _ALLOWED_OBS_KEYS = {
     "joint_position",
@@ -266,7 +267,23 @@ def _step_once(
         action_high,
         adj_matrix,
     )
+    logger11.info(f"[_step_once] raw_action: {raw_action.shape}")
+    logger11.info(f"[_step_once] clipped_action: {clipped_action.shape}")
 
+    # Supporting signals (often where mismatch originates)
+    logger11.info(f"[_step_once] logprob: {logprob.shape}")
+    logger11.info(f"[_step_once] value: {value.shape}")
+    logger11.info(f"[_step_once] mean: {mean.shape}")
+    logger11.info(f"[_step_once] std: {std.shape}")
+
+    # ---- ENV STEP ----
+    episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
+        episode_stats, env_state, clipped_action
+    )
+
+    logger11.info(f"[_step_once] next_obs: {next_obs.shape}")
+    logger11.info(f"[_step_once] reward: {reward.shape}")
+    logger11.info(f"[_step_once] next_done: {next_done.shape}")
     episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
         episode_stats, env_state, clipped_action
     )
@@ -582,10 +599,12 @@ class PPOTrainer:
             self.morph_mode,
             self.segments_per_arm,
         )[0]  # take first env
-
+        self.logger.info(f"[_init_agent_state] sample_obs: {sample_obs.shape}")
         self.obs_mean = jnp.zeros((len(sample_obs),))
         self.obs_var = jnp.ones((len(sample_obs),))
         self.obs_count = 1e-4
+        self.logger.info(f"[_init_agent_state] obs_mean: {self.obs_mean.shape}")
+        self.logger.info(f"[_init_agent_state] obs_var: {self.obs_var.shape}")
 
         sensor_keys = jax.random.split(sensor_key, self.needed_copies)
         actor_keys = jax.random.split(actor_key, self.needed_copies)
@@ -593,24 +612,35 @@ class PPOTrainer:
 
         # (needed_copies, 175)
         sensor_params = jax.vmap(lambda k: self.sensor.init(k, sample_obs))(sensor_keys)
+        self.logger.info(f"[_init_agent_state] sensor_params: {jax.tree.map(lambda x: x.shape, sensor_params)}")
 
         single_sensor_param = jax.tree.map(lambda x: x[0], sensor_params)
+        self.logger.info(f"[_init_agent_state] single_sensor_param: {jax.tree.map(lambda x: x.shape, single_sensor_param)}")
+
         sensor_params_sample = self.sensor.apply(single_sensor_param, sample_obs)
+        self.logger.info(f"[_init_agent_state] sensor_params_sample: {sensor_params_sample.shape}")
+
         actor_params = jax.vmap(lambda k: self.actor.init(k, sensor_params_sample))(actor_keys)
+        self.logger.info(f"[_init_agent_state] actor_params: {jax.tree.map(lambda x: x.shape, actor_params)}")
 
         message_passer_params = jax.vmap(
             lambda k: self.message_passer.init(
                 k, self.sensor.apply(single_sensor_param, sample_obs)
             )
         )(message_passer_keys)
+        self.logger.info(f"[_init_agent_state] message_passer_params: {jax.tree.map(lambda x: x.shape, message_passer_params)}")
 
-        flat_obs = sample_obs.reshape(-1) # BECAUSE 1 centralized critic
+        flat_obs = sample_obs.reshape(-1)  # BECAUSE 1 centralized critic
+        self.logger.info(f"[_init_agent_state] flat_obs: {flat_obs.shape}")
+
         feature_extractor_params = self.feature_extractor.init(feature_extractor_key, flat_obs)
+        self.logger.info(f"[_init_agent_state] feature_extractor_params: {jax.tree.map(lambda x: x.shape, feature_extractor_params)}")
 
-        critic_params = self.critic.init(
-            critic_key,
-            self.feature_extractor.apply(feature_extractor_params, flat_obs)
-        )
+        critic_input = self.feature_extractor.apply(feature_extractor_params, flat_obs)
+        self.logger.info(f"[_init_agent_state] critic_input: {critic_input.shape}")
+
+        critic_params = self.critic.init(critic_key, critic_input)
+        self.logger.info(f"[_init_agent_state] critic_params: {jax.tree.map(lambda x: x.shape, critic_params)}")
 
         return TrainState.create(
             apply_fn=None,
@@ -743,7 +773,7 @@ class PPOTrainer:
     def _step(self, env_state, next_obs, next_done, iteration: int) -> tuple:
         if iteration == 1:
             self.logger.log_non_interactive(f"Starting first rollout (JIT): {time.ctime()}")
-
+        self.logger.info(f"[_step] next_obs (in): {next_obs.shape}")
         (
             self.agent_state,
             self.episode_stats,
@@ -753,7 +783,7 @@ class PPOTrainer:
             self.key,
             next_env_state,
         ) = self._rollout(env_state, next_obs, next_done)
-
+        self.logger.info(f"[_step] next_obs (post-rollout): {next_obs.shape}")
         if iteration == 1:
             self.logger.log_non_interactive(f"First rollout completed: {time.ctime()}")
 
@@ -839,6 +869,7 @@ class PPOTrainer:
             self.morph_mode,
             self.segments_per_arm,
         )
+        self.logger.info(f"[train] next_obs: {next_obs.shape}")
         next_done = jnp.zeros(self.ppo.num_envs, dtype=jnp.bool_)
 
         self.logger.log_non_interactive(f"Initial reset completed: {time.ctime()}")
@@ -853,6 +884,7 @@ class PPOTrainer:
             env_state, next_obs, next_done, training_measurements, storage = self._step(
                 env_state, next_obs, next_done, iteration=iteration
             )
+            self.logger.info(f"[train] next_obs (post-step): {next_obs.shape}")
             self._update_obs_stats(next_obs)
             next_obs = _normalize_obs(next_obs, self.obs_mean, self.obs_var)
 
