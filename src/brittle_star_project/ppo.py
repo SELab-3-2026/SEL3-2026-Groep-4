@@ -1,15 +1,27 @@
 from functools import partial
 
-import flax
 import jax
 import jax.numpy as jnp
+from jax import debug
+from flax.core import FrozenDict
 from experiment_logger import get_logger
+from brittle_star_project.utils import logged_jit
 
 logger = get_logger()
+
+
 # Chose to use a class as it seemed the easiest way to integrate the CleanRL code style
 # with our need to seperate concerns
 class PPO:
-    def __init__(self, args, sensor_apply, actor_apply, critic_apply, feature_extractor_apply, message_passer=None):
+    def __init__(
+        self,
+        args,
+        sensor_apply,
+        actor_apply,
+        critic_apply,
+        feature_extractor_apply,
+        message_passer=None,
+    ):
         self.args = args
 
         if not message_passer:
@@ -30,13 +42,13 @@ class PPO:
 
     # This PPO class should be initialized only once,
     # or this function will need to recompile
-    @partial(jax.jit, static_argnums=0)
+    @partial(logged_jit, static_argnums=0)
     def update_ppo(self, agent_state, storage, key):
-        logger.info(f"[update_ppo] storage.obs shape: {getattr(storage, 'obs', None).shape}")
-        logger.info(f"[update_ppo] storage.actions shape: {storage.actions.shape}")
-        logger.info(f"[update_ppo] storage.logprobs shape: {storage.logprobs.shape}")
-        logger.info(f"[update_ppo] storage.advantages shape: {storage.advantages.shape}")
-        logger.info(f"[update_ppo] storage.returns shape: {storage.returns.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.obs shape: {storage.obs.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.actions shape: {storage.actions.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.logprobs shape: {storage.logprobs.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.advantages shape: {storage.advantages.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.returns shape: {storage.returns.shape}")
 
         args = self.args
         ppo_loss_grad_fn = self.ppo_loss_grad_fn
@@ -56,11 +68,16 @@ class PPO:
             shuffled_storage = jax.tree.map(convert_data, flatten_storage)
 
             def update_minibatch(agent_state, minibatch):
-                logger.info(f"[update_ppo] minibatch.obs: {minibatch.obs.shape}")
-                logger.info(f"[update_ppo] minibatch.actions: {minibatch.actions.shape}")
-                logger.info(f"[update_ppo] minibatch.logprobs: {minibatch.logprobs.shape}")
-                logger.info(f"[update_ppo] minibatch.advantages: {minibatch.advantages.shape}")
-                logger.info(f"[update_ppo] minibatch.returns: {minibatch.returns.shape}")
+                debug.callback(logger.debug, f"[PPO] minibatch.obs: {minibatch.obs.shape}")
+                debug.callback(logger.debug, f"[PPO] minibatch.actions: {minibatch.actions.shape}")
+                debug.callback(
+                    logger.debug, f"[PPO] minibatch.logprobs: {minibatch.logprobs.shape}"
+                )
+                debug.callback(
+                    logger.debug, f"[PPO] minibatch.advantages: {minibatch.advantages.shape}"
+                )
+                debug.callback(logger.debug, f"[PPO] minibatch.returns: {minibatch.returns.shape}")
+
                 (loss, (pg_loss, v_loss, entropy_loss, approx_kl)), grads = ppo_loss_grad_fn(
                     agent_state.params,
                     minibatch.obs,
@@ -70,13 +87,7 @@ class PPO:
                     minibatch.returns,
                 )
                 agent_state = agent_state.apply_gradients(grads=grads)
-                return agent_state, (
-                    loss,
-                    pg_loss,
-                    v_loss,
-                    entropy_loss,
-                    approx_kl
-                )
+                return agent_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl)
 
             agent_state, metrics = jax.lax.scan(update_minibatch, agent_state, shuffled_storage)
             return (agent_state, key), metrics
@@ -95,14 +106,14 @@ that are now not in the same scope
 """
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4))
+@partial(logged_jit, static_argnums=(0, 1, 2, 3, 4))
 def get_action_and_value(
     sensor_apply,
     actor_apply,
     message_passer,
     critic_apply,
     feature_extractor_apply,
-    params: flax.core.FrozenDict,
+    params: FrozenDict,
     x: jnp.ndarray,
     action: jnp.ndarray,
 ):
@@ -110,25 +121,28 @@ def get_action_and_value(
     hidden_critic = feature_extractor_apply(params["feature_extractor_params"], x)
     hidden_sensor = message_passer(hidden_sensor)
 
-    logger.info(f"[get_action_and_value] hidden_sensor: {hidden_sensor.shape}")
-    logger.info(f"[get_action_and_value] hidden_critic: {hidden_critic.shape}")
+    debug.callback(logger.debug, f"[SHAPE] hidden_sensor: {hidden_sensor.shape}")
+    debug.callback(logger.debug, f"[SHAPE] hidden_critic: {hidden_critic.shape}")
 
     mean, log_std = actor_apply(params["actor_params"], hidden_sensor)
 
-    logger.info(f"[get_action_and_value] mean: {mean.shape}")
-    logger.info(f"[get_action_and_value] log_std: {log_std.shape}")
-    logger.info(f"[get_action_and_value] action: {action.shape}")
+    debug.callback(logger.debug, f"[SHAPE] mean: {mean.shape}")
+    debug.callback(logger.debug, f"[SHAPE] log_std: {log_std.shape}")
+    debug.callback(logger.debug, f"[SHAPE] action: {action.shape}")
 
     log_std = jnp.clip(log_std, -5, 2)
     std = jnp.exp(log_std)
 
     logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi))
-    logger.info(f"[get_action_and_value] logprob pre-sum: {logprob.shape}")
+    debug.callback(logger.debug, f"[SHAPE] logprob pre-sum: {logprob.shape}")
+
     logprob = logprob.sum(axis=(-2, -1))
-    logger.info(f"[get_action_and_value] logprob final: {logprob.shape}")
+    debug.callback(logger.debug, f"[SHAPE] logprob final: {logprob.shape}")
+
     entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(axis=(-2, -1))
     value = critic_apply(params["critic_params"], hidden_critic).squeeze(-1)
-    logger.info(f"[get_action_and_value] value: {value.shape}")
+    debug.callback(logger.debug, f"[SHAPE] value: {value.shape}")
+
     return logprob, entropy, value
 
 

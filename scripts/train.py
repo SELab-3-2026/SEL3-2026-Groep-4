@@ -8,6 +8,7 @@ from brittle_star_project.configs.register_configs import register_configs
 from brittle_star_project.trainers.PPOTrainer import PPOTrainer
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from experiment_logger import init_logger, get_logger
+import logging
 
 
 def make_env(cfg: BrittleStarConfig) -> BrittleStarJaxEnvWrapper:
@@ -41,6 +42,7 @@ def main(dict_cfg: DictConfig):
         base_dir=os.path.dirname(run_dir),
     )
     logger = get_logger()
+    logger.set_level(logging.DEBUG)
     logger.info(f"Hydra-initialized run: {run_name}")
     logger.info(f"Output directory: {run_dir}")
 
