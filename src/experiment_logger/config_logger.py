@@ -18,6 +18,13 @@ class LoggingConfig:
     upload_final_model: bool = False
     upload_checkpoints: bool = False
 
+    # Checkpoint evaluation (synchronous, in-process)
+    # When enabled, each saved checkpoint is evaluated headlessly and the results
+    # are appended to a CSV in the run's metrics/ folder.
+    evaluate_checkpoints: bool = False
+    eval_max_steps: int = 5000
+    eval_seed: int = 0
+
     hf_entity: str = ""
 
     def __post_init__(self):
@@ -31,3 +38,20 @@ class LoggingConfig:
                 "Configuration Error: 'upload_checkpoints' is True, but it requires "
                 "both 'track' and 'save_checkpoints' to also be True."
             )
+
+        if self.evaluate_checkpoints:
+            if not self.save_checkpoints:
+                raise ValueError(
+                    "Configuration Error: 'evaluate_checkpoints' is True, but it requires "
+                    "'save_checkpoints' to also be True."
+                )
+            if self.checkpoint_frequency <= 0:
+                raise ValueError(
+                    "Configuration Error: 'evaluate_checkpoints' is True, but it requires "
+                    "'checkpoint_frequency' to be > 0."
+                )
+            if self.eval_max_steps <= 0:
+                raise ValueError(
+                    "Configuration Error: 'eval_max_steps' must be > 0 when "
+                    "'evaluate_checkpoints' is enabled."
+                )
