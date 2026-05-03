@@ -86,6 +86,7 @@ def _step_once(
     carry,
     _,
     env_step_fn,
+    num_envs: int,
     sensor: GenericDenseLayersWithActivation,
     feature_extractor: GenericDenseLayersWithActivation,
     actor: Actor,
@@ -93,14 +94,23 @@ def _step_once(
     action_low,
     action_high,
 ):
-    agent_state, episode_stats, obs, done, key, env_state = carry
+    agent_state, episode_stats, obs, done, key, env_state, terminated_any, truncated_any = carry
     clipped_action, raw_action, logprob, value, mean, std, key = _get_action_and_value_noise(
         sensor, feature_extractor, actor, critic, agent_state, obs, key, action_low, action_high
     )
 
-    episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
-        episode_stats, env_state, clipped_action
+    key, reset_key = jax.random.split(key)
+    reset_rngs = jax.random.split(reset_key, num_envs)
+
+    episode_stats, env_state, (next_obs, reward, next_done, terminated, truncated) = env_step_fn(
+        episode_stats,
+        env_state,
+        clipped_action,
+        reset_rngs,
     )
+
+    terminated_any = terminated_any | terminated
+    truncated_any = truncated_any | truncated
 
     storage = Storage(
         obs=obs,
@@ -115,7 +125,16 @@ def _step_once(
         returns=jnp.zeros_like(reward),
         advantages=jnp.zeros_like(reward),
     )
-    return (agent_state, episode_stats, next_obs, next_done, key, env_state), storage
+    return (
+        agent_state,
+        episode_stats,
+        next_obs,
+        next_done,
+        key,
+        env_state,
+        terminated_any,
+        truncated_any,
+    ), storage
 
 
 def _reward_fn(env_state, next_env_state):
@@ -135,12 +154,20 @@ def _reward_fn(env_state, next_env_state):
     return jnp.where(next_env_state.terminated, 50.0, clipped_env_reward - penalty)
 
 
-def _step_env_wrapped(episode_stats, env_state, action, env_step_fn, obs_processor):
-    next_env_state = env_step_fn(env_state, action)
+def _step_env_wrapped(
+    episode_stats,
+    env_state,
+    action,
+    reset_rngs,
+    env_step_fn,
+    reset_single_fn,
+    obs_processor,
+):
+    next_env_state_pre_reset = env_step_fn(env_state, action)
 
-    reward = _reward_fn(env_state, next_env_state)
-    terminated = next_env_state.terminated
-    truncated = next_env_state.truncated
+    reward = _reward_fn(env_state, next_env_state_pre_reset)
+    terminated = next_env_state_pre_reset.terminated
+    truncated = next_env_state_pre_reset.truncated
     done = terminated | truncated
 
     new_episode_return = episode_stats.episode_returns + reward
@@ -156,10 +183,39 @@ def _step_env_wrapped(episode_stats, env_state, action, env_step_fn, obs_process
             done, new_episode_length, episode_stats.returned_episode_lengths
         ),
     )
+
+    def _maybe_reset(state_i, rng_i, do_reset_i):
+        def _do(_):
+            reset_state = reset_single_fn(rng=rng_i)
+
+            def _cast_leaf(new_leaf, like_leaf):
+                if like_leaf is None or new_leaf is None:
+                    return new_leaf
+
+                # Use jnp.asarray(...) to robustly get dtype for both JAX arrays and Python scalars.
+                like_dtype = jnp.asarray(like_leaf).dtype
+
+                # Avoid unnecessary work when already matching.
+                if hasattr(new_leaf, "dtype") and new_leaf.dtype == like_dtype:
+                    return new_leaf
+
+                return jnp.asarray(new_leaf, dtype=like_dtype)
+
+            # `lax.cond` requires both branches to return identical PyTree types/dtypes.
+            return jax.tree_util.tree_map(_cast_leaf, reset_state, state_i)
+
+        def _dont(_):
+            return state_i
+
+        return jax.lax.cond(do_reset_i, _do, _dont, operand=None)
+
+    # Auto-reset done envs so rollouts continue with fresh episode initial states.
+    next_env_state = jax.vmap(_maybe_reset)(next_env_state_pre_reset, reset_rngs, done)
+
     return (
         episode_stats,
         next_env_state,
-        (obs_processor(next_env_state.observations), reward, done),
+        (obs_processor(next_env_state.observations), reward, done, terminated, truncated),
     )
 
 
@@ -172,6 +228,7 @@ def _rollout_jit(
     key,
     max_steps,
     step_env_fn,
+    num_envs: int,
     sensor: GenericDenseLayersWithActivation,
     feature_extractor: GenericDenseLayersWithActivation,
     actor: Actor,
@@ -179,7 +236,19 @@ def _rollout_jit(
     action_low,
     action_high,
 ):
-    (agent_state, episode_stats, next_obs, next_done, key, env_state), storage = jax.lax.scan(
+    terminated_any0 = jnp.zeros((num_envs,), dtype=jnp.bool_)
+    truncated_any0 = jnp.zeros((num_envs,), dtype=jnp.bool_)
+
+    (
+        agent_state,
+        episode_stats,
+        next_obs,
+        next_done,
+        key,
+        env_state,
+        terminated_any,
+        truncated_any,
+    ), storage = jax.lax.scan(
         partial(
             _step_once,
             sensor=sensor,
@@ -187,14 +256,34 @@ def _rollout_jit(
             actor=actor,
             critic=critic,
             env_step_fn=step_env_fn,
+            num_envs=num_envs,
             action_low=action_low,
             action_high=action_high,
         ),
-        (agent_state, episode_stats, next_obs, next_done, key, env_state),
+        (
+            agent_state,
+            episode_stats,
+            next_obs,
+            next_done,
+            key,
+            env_state,
+            terminated_any0,
+            truncated_any0,
+        ),
         (),
         max_steps,
     )
-    return agent_state, episode_stats, next_obs, next_done, storage, key, env_state
+    return (
+        agent_state,
+        episode_stats,
+        next_obs,
+        next_done,
+        storage,
+        key,
+        env_state,
+        terminated_any,
+        truncated_any,
+    )
 
 
 def _compute_gae_once(carry, inp, gamma, gae_lambda):
@@ -292,8 +381,10 @@ class PPOTrainer:
                 step_env_fn=partial(
                     _step_env_wrapped,
                     env_step_fn=self.env.step,
+                    reset_single_fn=self.env.raw.reset,
                     obs_processor=self.obs_processor,
                 ),
+                num_envs=self.ppo.num_envs,
                 sensor=self.sensor,
                 feature_extractor=self.feature_extractor,
                 actor=self.actor,
@@ -467,6 +558,8 @@ class PPOTrainer:
             storage,
             self.key,
             next_env_state,
+            terminated_any,
+            truncated_any,
         ) = self._rollout(env_state, next_obs, next_done)
 
         if iteration == 1:
@@ -490,8 +583,8 @@ class PPOTrainer:
 
         explained_var = _compute_explained_variance(storage.values, storage.returns)
 
-        terminated = next_env_state.terminated
-        truncated = next_env_state.truncated
+        terminated = terminated_any
+        truncated = truncated_any
         episode_lengths = self.episode_stats.returned_episode_lengths
 
         num_terminated = int(jnp.sum(terminated).item())
