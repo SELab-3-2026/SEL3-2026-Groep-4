@@ -62,6 +62,28 @@ class PolicyAgent:
         self._obs_processor = obs_processor
 
     @classmethod
+    def from_params(
+        cls,
+        *,
+        sensor_params: Any,
+        actor_params: Any,
+        action_dim: int,
+        obs_processor: Any,
+    ) -> "PolicyAgent":
+        """Construct a PolicyAgent directly from in-memory parameters."""
+        return cls(
+            sensor_params=sensor_params,
+            actor_params=actor_params,
+            action_dim=action_dim,
+            obs_processor=obs_processor,
+        )
+
+    def set_params(self, *, sensor_params: Any, actor_params: Any) -> None:
+        """Update parameters for evaluation without rebuilding the model."""
+        self._params["sensor_params"] = sensor_params
+        self._params["actor_params"] = actor_params
+
+    @classmethod
     def from_checkpoint(
         cls,
         model_path: Path,

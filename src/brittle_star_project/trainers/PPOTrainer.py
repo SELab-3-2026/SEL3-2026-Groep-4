@@ -28,9 +28,7 @@ from brittle_star_project.MLPs.mlps import (
 )
 from brittle_star_project.ppo import PPO
 
-from brittle_star_project import Backend, BrittleStarEnv, BrittleStarEnvFactory
-from brittle_star_project.evaluation.policy import PolicyAgent
-from brittle_star_project.evaluation.rollout import rollout_headless
+from brittle_star_project.environment.env_types import Backend
 
 # TODO: clip scaled reward?
 
@@ -290,6 +288,8 @@ class PPOTrainer:
 
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
         action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
+        self._action_low = action_low
+        self._action_high = action_high
 
         self._rollout_jit = jax.jit(
             partial(
@@ -326,6 +326,60 @@ class PPOTrainer:
         self.episode_stats = self._init_episode_stats()
 
         self._init_random()
+        # Lazily created MJX/JAX evaluation rollout (compiled on first use)
+        self._eval_rollout_mjx_fn = None
+
+    def _get_or_create_eval_rollout_mjx_fn(self):
+        if self._eval_rollout_mjx_fn is not None:
+            return self._eval_rollout_mjx_fn
+
+        # Use the same backend as training (typically MJX).
+        if getattr(self.env, "backend", None) != Backend.MJX:
+            self.logger.warning(
+                f"[EVAL]: Training env backend is {self.env.backend}; "
+                "MJX evaluation may be unavailable/slow."
+            )
+
+        # We vmap over a single environment (batch size 1) for simplicity.
+        reset_1 = jax.vmap(self.env.raw.reset)
+        step_1 = jax.vmap(self.env.raw.step)
+
+        action_low = self._action_low
+        action_high = self._action_high
+        obs_processor = self.obs_processor
+        sensor_apply = self.sensor.apply
+        actor_apply = self.actor.apply
+
+        def _eval_rollout(params, seed: int, max_steps: int):
+            rng = jax.random.PRNGKey(seed)
+            rngs = jnp.asarray(jax.random.split(rng, 1))
+            state = reset_1(rng=rngs)
+
+            t0 = jnp.asarray(0, dtype=jnp.int32)
+            done0 = jnp.squeeze(state.terminated | state.truncated)
+
+            def cond(carry):
+                t, _state, done = carry
+                return jnp.logical_and(t < max_steps, jnp.logical_not(done))
+
+            def body(carry):
+                t, state, _done = carry
+
+                obs = obs_processor(state.observations)
+                hidden = sensor_apply(params["sensor_params"], obs)
+                mean, _log_std = actor_apply(params["actor_params"], hidden)
+
+                action = jnp.clip(mean, action_low, action_high)
+                next_state = step_1(state=state, action=action)
+
+                done_next = jnp.squeeze(next_state.terminated | next_state.truncated)
+                return (t + 1, next_state, done_next)
+
+            t, _state, done = jax.lax.while_loop(cond, body, (t0, state, done0))
+            return t, done
+
+        self._eval_rollout_mjx_fn = jax.jit(_eval_rollout)
+        return self._eval_rollout_mjx_fn
 
     def _init_random(self):
         self.logger.info(f"[RANDOM]: Setting random seed to {self.experiment.seed}")
@@ -564,24 +618,51 @@ class PPOTrainer:
         iteration: int,
         reached_target: bool,
         steps_to_target: int,
-        max_steps: int,
-        seed: int,
     ) -> Path:
         metrics_dir = Path(self.run_dir) / "metrics"
         metrics_dir.mkdir(parents=True, exist_ok=True)
         csv_path = metrics_dir / "checkpoint_evaluation.csv"
 
+        fieldnames = [
+            "iteration",
+            "steps_to_target",
+            "reached_target",
+        ]
+
+        # If a previous version created this CSV with a different header, migrate it.
+        if csv_path.exists():
+            try:
+                with open(csv_path, "r", newline="") as f:
+                    reader = csv.reader(f)
+                    header = next(reader, None)
+
+                if header is not None and list(header) != fieldnames:
+                    migrated_rows: list[dict[str, Any]] = []
+                    with open(csv_path, "r", newline="") as f:
+                        dict_reader = csv.DictReader(f)
+                        for row in dict_reader:
+                            migrated_rows.append(
+                                {
+                                    "iteration": row.get("iteration"),
+                                    "steps_to_target": row.get("steps_to_target"),
+                                    "reached_target": row.get("reached_target"),
+                                }
+                            )
+
+                    with open(csv_path, "w", newline="") as f:
+                        writer = csv.DictWriter(f, fieldnames=fieldnames)
+                        writer.writeheader()
+                        for row in migrated_rows:
+                            writer.writerow(row)
+            except Exception:
+                # Best-effort only; do not fail training on migration issues.
+                pass
+
         file_exists = csv_path.exists()
         with open(csv_path, "a", newline="") as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=[
-                    "iteration",
-                    "steps_to_target",
-                    "reached_target",
-                    "max_steps",
-                    "seed",
-                ],
+                fieldnames=fieldnames,
             )
             if not file_exists:
                 writer.writeheader()
@@ -590,8 +671,6 @@ class PPOTrainer:
                     "iteration": int(iteration),
                     "steps_to_target": int(steps_to_target),
                     "reached_target": bool(reached_target),
-                    "max_steps": int(max_steps),
-                    "seed": int(seed),
                 }
             )
 
@@ -601,86 +680,24 @@ class PPOTrainer:
         if not self.logging_cfg.evaluate_checkpoints:
             return
 
-        checkpoint_path = Path(self.run_dir) / "checkpoints" / f"checkpoint_step_{iteration}.flax"
-        if not checkpoint_path.exists():
-            self.logger.warning(
-                f"[EVAL]: Checkpoint not found at {checkpoint_path} (skipping evaluation)"
-            )
-            return
-
         max_steps = int(self.logging_cfg.eval_max_steps)
         seed = int(self.logging_cfg.eval_seed)
 
         # Run evaluation best-effort; never fail training because evaluation failed.
-        env = None
         try:
-            backend = Backend.MJC
+            eval_fn = self._get_or_create_eval_rollout_mjx_fn()
+            steps, reached = eval_fn(self.agent_state.params, seed, max_steps)
+            steps_to_target = int(steps)
+            reached_target = bool(reached)
 
-            factory = BrittleStarEnvFactory()
-            raw_env = factory.create_environment(
-                backend,
-                self.cfg.morphology,
-                self.cfg.arena,
-                self.cfg.environment,
-            )
-            env = BrittleStarEnv(
-                raw_env,
-                backend=backend,
-                config=self.cfg.environment,
-                morphology_config=self.cfg.morphology,
-            )
-
-            action_space = getattr(raw_env, "action_space", None)
-            action_dim = (
-                int(np.asarray(action_space.shape).reshape(-1)[0])
-                if action_space is not None and hasattr(action_space, "shape")
-                else sum(self.cfg.morphology.segments_per_arm) * 2
-            )
-
-            action_low = (
-                None
-                if action_space is None
-                else np.asarray(action_space.low, dtype=np.float32).ravel()
-            )
-            action_high = (
-                None
-                if action_space is None
-                else np.asarray(action_space.high, dtype=np.float32).ravel()
-            )
-
-            policy = PolicyAgent.from_checkpoint(
-                checkpoint_path,
-                action_dim=action_dim,
-                obs_processor=self.obs_processor,
-            )
-
-            result = rollout_headless(
-                env=env,
-                policy=policy,
-                seed=seed,
-                max_steps=max_steps,
-                action_low=action_low,
-                action_high=action_high,
-                action_mask=None,
-            )
-
-            steps_to_target = int(result.length) if result.reached_target else int(max_steps)
             csv_path = self._append_checkpoint_eval_row(
                 iteration=iteration,
-                reached_target=bool(result.reached_target),
+                reached_target=reached_target,
                 steps_to_target=steps_to_target,
-                max_steps=max_steps,
-                seed=seed,
             )
             self._maybe_sync_csv_to_wandb(csv_path)
         except Exception as e:
             self.logger.warning(f"[EVAL]: Checkpoint evaluation failed: {e}")
-        finally:
-            try:
-                if env is not None:
-                    env.close()
-            except Exception:
-                pass
 
     def train(self):
         """
