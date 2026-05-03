@@ -240,15 +240,18 @@ def _rollout_jit(
     truncated_any0 = jnp.zeros((num_envs,), dtype=jnp.bool_)
 
     (
-        agent_state,
-        episode_stats,
-        next_obs,
-        next_done,
-        key,
-        env_state,
-        terminated_any,
-        truncated_any,
-    ), storage = jax.lax.scan(
+        (
+            agent_state,
+            episode_stats,
+            next_obs,
+            next_done,
+            key,
+            env_state,
+            terminated_any,
+            truncated_any,
+        ),
+        storage,
+    ) = jax.lax.scan(
         partial(
             _step_once,
             sensor=sensor,
