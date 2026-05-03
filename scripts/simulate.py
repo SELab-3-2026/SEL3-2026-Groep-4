@@ -101,7 +101,8 @@ def main(dict_cfg: DictConfig) -> None:
         morphology_config=env_morphology,
     )
 
-    state0 = env.reset(seed=seed)
+    target_override = (2.25, -0.75, 0.0)
+    state0 = env.reset(seed=seed, target_position=target_override)
 
     # Calculate the action dimension the model was trained with
     trained_action_dim = sum(training.morphology.segments_per_arm) * 2
