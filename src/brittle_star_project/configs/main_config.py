@@ -5,7 +5,12 @@ from brittle_star_project.configs.config_experiment import ExperimentConfig
 from brittle_star_project.configs.config_ppo import PPOConfig
 from brittle_star_project.configs.config_architecture import ArchitectureConfig
 from brittle_star_project.configs.config_simulation import SimulationSettings
-from brittle_star_project.environment.env_config import MorphologyConfig, ArenaConfig, EnvConfig
+from brittle_star_project.environment.env_config import (
+    MorphologyConfig,
+    ArenaConfig,
+    EnvConfig,
+    ObservationBoundsConfig,
+)
 
 
 @dataclass
@@ -25,4 +30,5 @@ class BrittleStarConfig:
     morphology: MorphologyConfig = field(default_factory=MorphologyConfig)
     arena: ArenaConfig = field(default_factory=ArenaConfig)
     environment: EnvConfig = field(default_factory=EnvConfig)
+    obs_bounds: ObservationBoundsConfig = field(default_factory=ObservationBoundsConfig)
     simulation: SimulationSettings = field(default_factory=SimulationSettings)

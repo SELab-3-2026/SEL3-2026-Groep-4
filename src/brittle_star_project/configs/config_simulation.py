@@ -13,7 +13,20 @@ class SimulationSettings:
     # If None, viewer mode runs until window closed or target reached.
     max_steps: Optional[int] = None
 
-    # Optional: point to a Hydra config.yaml from a training run (e.g. runs/.../.hydra/config.yaml).
-    # When set, the simulation script can override
-    # morphology/arena/environment/architecture to match.
-    trained_config_path: Optional[str] = None
+    # Override morphology for amputation experiments.
+    # When set, the environment uses this morphology instead of the trained one.
+    # Points to a morphology config YAML file (e.g. configs/morphology/3_arms.yaml).
+    # Observations are padded from the override morphology UP TO the training
+    # morphology's shape via compute_padding_masks(override, reference=training).
+    morphology_override: Optional[str] = None
+
+    # Video recording (requires [evaluation] extra)
+    record_video: bool = False
+    # When None, video is saved in a per-model evaluation folder alongside the model.
+    video_output_path: Optional[str] = None
+    # Camera ID to use for video recording (1 is usually the close-up camera)
+    camera_id: int = 1
+
+    # Optional override for the sidecar metadata YAML file.
+    # If None, it defaults to the model_path with a `_metadata.yaml` suffix.
+    metadata_path: Optional[str] = None

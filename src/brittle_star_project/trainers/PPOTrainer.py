@@ -17,6 +17,7 @@ from experiment_logger import get_logger
 from brittle_star_project.configs.main_config import BrittleStarConfig
 from brittle_star_project.dataclasses import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
+from brittle_star_project.environment.obs_processing import create_obs_processor
 from brittle_star_project.MLPs.mlps import (
     Actor,
     AgentParams,
@@ -132,7 +133,7 @@ def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, lear
 def _normalize_obs(obs, mean, var, eps=1e-8):
     return jnp.clip((obs - mean) / jnp.sqrt(var + eps), -10.0, 10.0)
 
-
+# TODO: update to work with new obs_processor
 def _convert_obs_dict_to_array_morphology(obs_dict, morph_mode, num_segments: int, num_arms: int):
     @logged_jit
     def _filter_and_flatten(o) -> jnp.ndarray:
@@ -203,7 +204,6 @@ _SEGMENT_SCALED_KEYS = frozenset(
 )
 
 
-# TODO: update to work with extra dimension + message passing
 def _get_action_and_value_noise(
     sensor: nn.Module,
     feature_extractor: nn.Module,
@@ -329,7 +329,7 @@ def _reward_fn(env_state, next_env_state):
 
 
 def _step_env_wrapped(
-    episode_stats, env_state, action, env_step_fn, morph_mode, num_segments: int, num_arms: int
+    episode_stats, env_state, action, env_step_fn, morph_mode, num_segments: int, num_arms: int, # TODO: obs_processor
 ):
     next_env_state = env_step_fn(env_state, action)
 
@@ -361,6 +361,7 @@ def _step_env_wrapped(
             reward,
             done,
         ),
+        # TODO (obs_processor(next_env_state.observations), reward, done),
     )
 
 
@@ -501,8 +502,8 @@ class PPOTrainer:
         self.key = jax.random.PRNGKey(self.experiment.seed)
 
         self.morph_mode = self.cfg.morphology.morph_mode
+        
         self.segments_per_arm = jnp.asarray(self.cfg.morphology.segments_per_arm, dtype=jnp.int32)
-
         self.num_segments = self.segments_per_arm.sum().item()
         self.num_arms = jnp.where(self.segments_per_arm > 0, 1, 0).sum().item()
 
@@ -523,6 +524,12 @@ class PPOTrainer:
         self.actor.apply = logged_jit(self.actor.apply)
         self.critic.apply = logged_jit(self.critic.apply)
 
+        # Build the centralized observation processor: derive -> normalize -> pad -> flatten.
+        self.obs_processor = create_obs_processor(
+            bounds_dict=self.cfg.obs_bounds.to_bounds_dict(),
+            padding_masks=self.env.padding_masks,
+        )
+
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
         action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
 
@@ -536,6 +543,7 @@ class PPOTrainer:
                     morph_mode=self.morph_mode,
                     num_segments=self.num_segments,
                     num_arms=self.num_arms,
+                    # TODO: obs_processor=self.obs_processor,
                 ),
                 sensor=self.sensor,
                 feature_extractor=self.feature_extractor,
@@ -569,9 +577,6 @@ class PPOTrainer:
 
         def apply_feature(p, x):
             return apply_shared(self.feature_extractor, p, x)
-
-        def apply_message_passer(p, x):
-            return apply_shared(self.message_passer, p, x)
 
         self._ppo = PPO(self.ppo, apply_sensor, apply_actor, apply_critic, apply_feature)
 
@@ -623,6 +628,7 @@ class PPOTrainer:
         )
 
         dummy_reset = self.env.reset(seed=0)
+        
         for k, v in dummy_reset.observations.items():
             self.logger.debug(k, v.shape)
         sample_obs = _convert_obs_dict_to_array_morphology(
@@ -697,6 +703,7 @@ class PPOTrainer:
         critic_params = self.critic.init(critic_key, critic_input)
         self.logger.debug(
             f"[_init_agent_state] critic_params: {jax.tree.map(lambda x: x.shape, critic_params)}"
+        # TODO: sample_obs = self.obs_processor(dummy_reset.observations)[0]  # take first env
         )
 
         return TrainState.create(
@@ -924,6 +931,7 @@ class PPOTrainer:
         self.logger.log_non_interactive(f"Initial reset started: {time.ctime()}")
 
         env_state = self.env.reset(seed=self.experiment.seed)
+        
         next_obs = _convert_obs_dict_to_array_morphology(
             env_state.observations,
             self.morph_mode,
@@ -931,6 +939,7 @@ class PPOTrainer:
             self.num_arms,
         )
         self.logger.info(f"[train] next_obs: {next_obs.shape}")
+        # TODO: next_obs = self.obs_processor(env_state.observations)
         next_done = jnp.zeros(self.ppo.num_envs, dtype=jnp.bool_)
 
         self.logger.log_non_interactive(f"Initial reset completed: {time.ctime()}")
@@ -945,7 +954,7 @@ class PPOTrainer:
             env_state, next_obs, next_done, training_measurements, storage = self._step(
                 env_state, next_obs, next_done, iteration=iteration
             )
-            self.logger.info(f"[train] next_obs (post-step): {next_obs.shape}")
+            self.logger.debug(f"[train] next_obs (post-step): {next_obs.shape}")
             self._update_obs_stats(next_obs)
             next_obs = _normalize_obs(next_obs, self.obs_mean, self.obs_var)
 
