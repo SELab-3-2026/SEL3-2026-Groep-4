@@ -220,18 +220,16 @@ def _get_action_and_value_noise(
     action_high,
     adj_matrix: jnp.ndarray,
 ):
-    def apply_message_passing(p, h):
-        assert message_passer is not None, (
-            "message passing shouldn't be performed if morphology mode is Centralized"
-        )
-
-        return jax.vmap(lambda x: message_passer.apply(p, x, adj_matrix))(h)
-
+    # (B, n_nodes, feat)
     hidden = apply_per_node(sensor, agent_state.params["sensor_params"], next_obs)
+    get_logger().debug(f"[_get_action_and_value_noise] hidden (before): {hidden.shape}")
+
     if message_passer is not None:
-        hidden = jax.vmap(apply_message_passing)(
-            agent_state.params["message_passer_params"], hidden
-        )
+        params = agent_state.params["message_passer_params"]
+        # (n_nodes, feat) --> let each node talk with its neighbours ==> vmap over B dimension
+        hidden = jax.vmap(lambda x: message_passer.apply(params, x, adj_matrix))(hidden)
+
+    get_logger().debug(f"[_get_action_and_value_noise] hidden (after): {hidden.shape}")
 
     hidden_critic = apply_shared(
         feature_extractor, agent_state.params["feature_extractor_params"], next_obs
@@ -244,10 +242,11 @@ def _get_action_and_value_noise(
     std = jnp.exp(log_std)
 
     raw_action = mean + noise * std
-    flat_action = raw_action.reshape(
-        raw_action.shape[0], -1
+    clipped_action = _clip_action(raw_action, action_low, action_high)
+
+    flat_clipped_action = clipped_action.reshape(
+        clipped_action.shape[0], -1
     )  # concat the per agent, keep the envs dim (batch, agent * action)
-    flat_clipped_action = _clip_action(flat_action, action_low, action_high)
 
     logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(
         axis=(-2, -1)
@@ -632,73 +631,81 @@ class PPOTrainer:
             self.morph_mode,
             self.segments_per_arm,
         )[0]  # take first env
-        self.logger.info(f"[_init_agent_state] sample_obs: {sample_obs.shape}")
+
+        self.logger.debug(f"[_init_agent_state] sample_obs: {sample_obs.shape}")
         self.obs_mean = jnp.zeros((len(sample_obs),))
         self.obs_var = jnp.ones((len(sample_obs),))
         self.obs_count = 1e-4
-        self.logger.info(f"[_init_agent_state] obs_mean: {self.obs_mean.shape}")
-        self.logger.info(f"[_init_agent_state] obs_var: {self.obs_var.shape}")
+        self.logger.debug(f"[_init_agent_state] obs_mean: {self.obs_mean.shape}")
+        self.logger.debug(f"[_init_agent_state] obs_var: {self.obs_var.shape}")
 
+        self.logger.debug(f"[_init_agent_state]: Needed copies: {self.needed_copies}")
         sensor_keys = jax.random.split(sensor_key, self.needed_copies)
         actor_keys = jax.random.split(actor_key, self.needed_copies)
 
         # note: assumed only 1 message passer needed for now
         # message_passer_keys = jax.random.split(message_passer_key, self.needed_copies)
-        message_passer_keys = jnp.asarray([message_passer_key], dtype=jnp.uint32)
 
         # (needed_copies, 175)
         sensor_params = jax.vmap(lambda k: self.sensor.init(k, sample_obs))(sensor_keys)
-        self.logger.info(
-            f"[_init_agent_state] sensor_params: {jax.tree.map(lambda x: x.shape, sensor_params)}"
-        )
+        # self.logger.debug(
+        #     f"[_init_agent_state] sensor_params: {jax.tree.map(lambda x: x.shape, sensor_params)}"
+        # )
 
         single_sensor_param = jax.tree.map(lambda x: x[0], sensor_params)
-        self.logger.info(
-            f"[_init_agent_state] single_sensor_param: {
-                jax.tree.map(lambda x: x.shape, single_sensor_param)
-            }"
-        )
+        # self.logger.debug(
+        # f"[_init_agent_state] single_sensor_param: {
+        # jax.tree.map(lambda x: x.shape, single_sensor_param)
+        # }"
+        # )
 
         sensor_params_sample = self.sensor.apply(single_sensor_param, sample_obs)
-        self.logger.info(f"[_init_agent_state] sensor_params_sample: {sensor_params_sample.shape}")
+        self.logger.debug(
+            f"[_init_agent_state] sensor_params_sample shape: {sensor_params_sample.shape}"
+        )
 
         actor_params = jax.vmap(lambda k: self.actor.init(k, sensor_params_sample))(actor_keys)
-        self.logger.info(
-            f"[_init_agent_state] actor_params: {jax.tree.map(lambda x: x.shape, actor_params)}"
-        )
+        # self.logger.debug(
+        # f"[_init_agent_state] actor_params: {jax.tree.map(lambda x: x.shape, actor_params)}"
+        # )
 
         message_passer_params = {}
         if self.morph_mode != MorphMode.CENTRALIZED:
             assert self.message_passer is not None, "MessagePasser is None"
 
-            message_passer_params = jax.vmap(
-                lambda k: self.message_passer.init(
-                    k, self.sensor.apply(single_sensor_param, sample_obs), self.adj
-                )
-            )(message_passer_keys)
-        self.logger.info(
-            f"[_init_agent_state] message_passer_params: {
-                jax.tree.map(lambda x: x.shape, message_passer_params)
-            }"
-        )
+            # message_passer_params = jax.vmap(
+            #     lambda k: self.message_passer.init(
+            #         k, self.sensor.apply(single_sensor_param, sample_obs), self.adj
+            #     )
+            # )(message_passer_keys)
+            message_passer_params = self.message_passer.init(
+                message_passer_key,
+                self.sensor.apply(single_sensor_param, sample_obs),
+                self.adj,
+            )
+        # self.logger.debug(
+        #     f"[_init_agent_state] message_passer_params: {
+        #         jax.tree.map(lambda x: x.shape, message_passer_params)
+        #     }"
+        # )
 
         flat_obs = sample_obs.reshape(-1)  # BECAUSE 1 centralized critic
-        self.logger.info(f"[_init_agent_state] flat_obs: {flat_obs.shape}")
+        self.logger.debug(f"[_init_agent_state] flat_obs: {flat_obs.shape}")
 
         feature_extractor_params = self.feature_extractor.init(feature_extractor_key, flat_obs)
-        self.logger.info(
-            f"[_init_agent_state] feature_extractor_params: {
-                jax.tree.map(lambda x: x.shape, feature_extractor_params)
-            }"
-        )
+        # self.logger.debug(
+        #     f"[_init_agent_state] feature_extractor_params: {
+        #         jax.tree.map(lambda x: x.shape, feature_extractor_params)
+        #     }"
+        # )
 
         critic_input = self.feature_extractor.apply(feature_extractor_params, flat_obs)
-        self.logger.info(f"[_init_agent_state] critic_input: {critic_input.shape}")
+        self.logger.debug(f"[_init_agent_state] critic_input: {critic_input.shape}")
 
         critic_params = self.critic.init(critic_key, critic_input)
-        self.logger.info(
-            f"[_init_agent_state] critic_params: {jax.tree.map(lambda x: x.shape, critic_params)}"
-        )
+        # self.logger.debug(
+        #     f"[_init_agent_state] critic_params: {jax.tree.map(lambda x: x.shape, critic_params)}"
+        # )
 
         return TrainState.create(
             apply_fn=None,

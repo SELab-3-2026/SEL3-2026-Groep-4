@@ -44,6 +44,7 @@ class MessagePasser(nn.Module):
     @nn.compact
     def __call__(self, x: jnp.ndarray, adj_matrix: jnp.ndarray):
         for _ in range(self.num_propagation_steps):
+            # (n_nodes, feat)
             messages = nn.Dense(self.hidden_dim)(x)
             messages = nn.tanh(messages)
 
