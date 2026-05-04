@@ -2,6 +2,9 @@ import jax
 import jax.numpy as jnp
 from typing import Dict, Tuple, Optional
 
+from brittle_star_project.environment.env_config import MorphMode
+from experiment_logger import get_logger
+
 _JOINT_SCALED_KEYS = frozenset(
     {
         "joint_position",
@@ -19,7 +22,11 @@ _SEGMENT_SCALED_KEYS = frozenset(
 
 
 def create_obs_processor(
-    bounds_dict: Dict[str, Tuple[float, float]], padding_masks: Optional[Dict] = None
+    bounds_dict: Dict[str, Tuple[float, float]],
+    num_segments: int,
+    num_arms: int,
+    padding_masks: Optional[Dict] = None,
+    morph_mode: MorphMode = MorphMode.CENTRALIZED,
 ):
     def _add_derived_features(obs: dict) -> dict:
         new_obs = dict(obs)
@@ -52,6 +59,8 @@ def create_obs_processor(
         return normalized
 
     def _pad_features(obs: dict) -> dict:
+        assert padding_masks is not None
+
         padded = {}
         for key, arr in obs.items():
             if key in _JOINT_SCALED_KEYS:
@@ -73,13 +82,55 @@ def create_obs_processor(
             "robot_direction_to_target",
             "segment_contact",
         ]
+
         values = []
-        for key in ordered_keys:
-            if key in obs:
-                arr = jnp.asarray(obs[key]).flatten()
-                if arr.size > 0:
-                    values.append(arr)
-        return jnp.concatenate(values)
+
+        for key in sorted(obs.keys()):
+            if key not in ordered_keys:
+                continue
+            v = obs[key]
+
+            # skip empty arrays and scalars
+            if v.size == 0:
+                continue
+
+            # reshape scalars
+            if v.ndim == 0:
+                v = v.reshape(1)
+
+            # -------- CENTRALIZED --------
+            if morph_mode == MorphMode.CENTRALIZED:
+                values.append(v.reshape(1, -1))  # (1, feat)
+                continue
+
+            # -------- SPLIT TO SEGMENTS --------
+            if key in _JOINT_SCALED_KEYS:
+                if morph_mode == MorphMode.SEGMENT:
+                    center_size = num_arms * 3 * 2
+                    v_center = v[:center_size].reshape(num_arms, 3 * 2)  # (arms, 6)
+                    v_segs = v[center_size:].reshape(-1, 2)  # (segs, 2)
+                    values.append(jnp.concatenate([v_center, v_segs], axis=0))  # (arms+segs, ?)
+                    continue
+                v = v.reshape(num_arms, -1)  # (n_arms, 2)
+
+            elif key in _SEGMENT_SCALED_KEYS:
+                v = v[:, None]  # (segments, 1)
+
+            else:
+                # global key, broadcast to all nodes
+                n_nodes = (num_segments + num_arms) if morph_mode == MorphMode.SEGMENT else num_arms
+                v = jnp.repeat(v[None, :], n_nodes, axis=0)  # (n_nodes, feat)
+
+            # -------- SEGMENT MODE --------
+            if morph_mode == MorphMode.SEGMENT:
+                values.append(v)  # (n_nodes, feat)
+                continue
+
+            # -------- ARM MODE --------
+            v = v.reshape(num_arms, -1)
+            values.append(v)  # (n_arms, feat)
+
+        return jnp.concatenate(values, axis=-1)
 
     def _process_single(obs_dict: dict) -> jnp.ndarray:
         processed = _add_derived_features(obs_dict)

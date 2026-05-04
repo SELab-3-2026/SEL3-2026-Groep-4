@@ -48,7 +48,8 @@ class MessagePasser(nn.Module):
             messages = nn.Dense(self.hidden_dim)(x)
             messages = nn.tanh(messages)
 
-            agg = adj_matrix  # if mean is wanted: adj_matrix / (adj.sum(axis=-1, keepdims=True) + 1e-8)
+            # note: if mean is wanted: adj_matrix / (adj.sum(axis=-1, keepdims=True) + 1e-8)
+            agg = adj_matrix
             aggregated = agg @ messages
 
             x_concat = jnp.concatenate([x, aggregated], axis=-1)
