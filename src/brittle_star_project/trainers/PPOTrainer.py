@@ -643,21 +643,18 @@ class PPOTrainer:
         sensor_keys = jax.random.split(sensor_key, self.needed_copies)
         actor_keys = jax.random.split(actor_key, self.needed_copies)
 
-        # note: assumed only 1 message passer needed for now
-        # message_passer_keys = jax.random.split(message_passer_key, self.needed_copies)
-
-        # (needed_copies, 175)
+        # (needed_copies, X)
         sensor_params = jax.vmap(lambda k: self.sensor.init(k, sample_obs))(sensor_keys)
-        # self.logger.debug(
-        #     f"[_init_agent_state] sensor_params: {jax.tree.map(lambda x: x.shape, sensor_params)}"
-        # )
+        self.logger.debug(
+            f"[_init_agent_state] sensor_params: {jax.tree.map(lambda x: x.shape, sensor_params)}"
+        )
 
         single_sensor_param = jax.tree.map(lambda x: x[0], sensor_params)
-        # self.logger.debug(
-        # f"[_init_agent_state] single_sensor_param: {
-        # jax.tree.map(lambda x: x.shape, single_sensor_param)
-        # }"
-        # )
+        self.logger.debug(
+            f"[_init_agent_state] single_sensor_param: {
+                jax.tree.map(lambda x: x.shape, single_sensor_param)
+            }"
+        )
 
         sensor_params_sample = self.sensor.apply(single_sensor_param, sample_obs)
         self.logger.debug(
@@ -665,47 +662,42 @@ class PPOTrainer:
         )
 
         actor_params = jax.vmap(lambda k: self.actor.init(k, sensor_params_sample))(actor_keys)
-        # self.logger.debug(
-        # f"[_init_agent_state] actor_params: {jax.tree.map(lambda x: x.shape, actor_params)}"
-        # )
+        self.logger.debug(
+            f"[_init_agent_state] actor_params: {jax.tree.map(lambda x: x.shape, actor_params)}"
+        )
 
         message_passer_params = {}
         if self.morph_mode != MorphMode.CENTRALIZED:
             assert self.message_passer is not None, "MessagePasser is None"
 
-            # message_passer_params = jax.vmap(
-            #     lambda k: self.message_passer.init(
-            #         k, self.sensor.apply(single_sensor_param, sample_obs), self.adj
-            #     )
-            # )(message_passer_keys)
             message_passer_params = self.message_passer.init(
                 message_passer_key,
                 self.sensor.apply(single_sensor_param, sample_obs),
                 self.adj,
             )
-        # self.logger.debug(
-        #     f"[_init_agent_state] message_passer_params: {
-        #         jax.tree.map(lambda x: x.shape, message_passer_params)
-        #     }"
-        # )
+        self.logger.debug(
+            f"[_init_agent_state] message_passer_params: {
+                jax.tree.map(lambda x: x.shape, message_passer_params)
+            }"
+        )
 
         flat_obs = sample_obs.reshape(-1)  # BECAUSE 1 centralized critic
         self.logger.debug(f"[_init_agent_state] flat_obs: {flat_obs.shape}")
 
         feature_extractor_params = self.feature_extractor.init(feature_extractor_key, flat_obs)
-        # self.logger.debug(
-        #     f"[_init_agent_state] feature_extractor_params: {
-        #         jax.tree.map(lambda x: x.shape, feature_extractor_params)
-        #     }"
-        # )
+        self.logger.debug(
+            f"[_init_agent_state] feature_extractor_params: {
+                jax.tree.map(lambda x: x.shape, feature_extractor_params)
+            }"
+        )
 
         critic_input = self.feature_extractor.apply(feature_extractor_params, flat_obs)
         self.logger.debug(f"[_init_agent_state] critic_input: {critic_input.shape}")
 
         critic_params = self.critic.init(critic_key, critic_input)
-        # self.logger.debug(
-        #     f"[_init_agent_state] critic_params: {jax.tree.map(lambda x: x.shape, critic_params)}"
-        # )
+        self.logger.debug(
+            f"[_init_agent_state] critic_params: {jax.tree.map(lambda x: x.shape, critic_params)}"
+        )
 
         return TrainState.create(
             apply_fn=None,
