@@ -70,7 +70,7 @@ class EnvConfig:
     # Per docs in upstream env config: integer factors of 200.
     light_perlin_noise_scale: int = 0
 
-      
+
 @dataclass
 class ObservationBoundsConfig:
     """Physical observation bounds for deterministic min-max normalization."""

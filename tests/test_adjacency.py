@@ -1,8 +1,8 @@
 import jax.numpy as jnp
-import pytest
 import numpy as np
 
-from brittle_star_project.trainers.PPOTrainer import build_adjacency, MorphMode
+from brittle_star_project.MLPs import build_adjacency
+from brittle_star_project.environment.env_config import MorphMode
 
 
 def assert_symmetric(adj):

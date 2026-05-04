@@ -3,7 +3,6 @@ import jax.numpy as jnp
 from typing import Dict, Tuple, Optional
 
 from brittle_star_project.environment.env_config import MorphMode
-from experiment_logger import get_logger
 
 _JOINT_SCALED_KEYS = frozenset(
     {
