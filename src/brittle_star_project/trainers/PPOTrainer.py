@@ -62,7 +62,6 @@ def _get_action_and_value_noise(
     key,
     action_low,
     action_high,
-    adj_matrix: jnp.ndarray,
 ):
     # (B, n_nodes, feat)
     hidden = apply_per_node(sensor, agent_state.params["sensor_params"], next_obs)
@@ -70,7 +69,7 @@ def _get_action_and_value_noise(
     if message_passer is not None:
         params = agent_state.params["message_passer_params"]
         # (n_nodes, feat) --> let each node talk with its neighbours ==> vmap over B dimension
-        hidden = jax.vmap(lambda x: message_passer.apply(params, x, adj_matrix))(hidden)
+        hidden = jax.vmap(lambda x: message_passer.apply(params, x))(hidden)
 
     hidden_critic = apply_shared(
         feature_extractor, agent_state.params["feature_extractor_params"], next_obs
@@ -100,7 +99,6 @@ def _step_once(
     carry,
     _,
     env_step_fn,
-    adj_matrix,
     sensor: nn.Module,
     feature_extractor: nn.Module,
     actor: nn.Module,
@@ -121,7 +119,6 @@ def _step_once(
         key,
         action_low,
         action_high,
-        adj_matrix,
     )
     logger11.debug(f"[_step_once] raw_action: {raw_action.shape}")
     logger11.debug(f"[_step_once] clipped_action: {flat_clipped_action.shape}")
@@ -242,7 +239,6 @@ def _rollout_jit(
     message_passer: Optional[nn.Module],
     action_low,
     action_high,
-    adj_matrix,
 ):
     (agent_state, episode_stats, next_obs, next_done, key, env_state), storage = jax.lax.scan(
         partial(
@@ -255,7 +251,6 @@ def _rollout_jit(
             env_step_fn=step_env_fn,
             action_low=action_low,
             action_high=action_high,
-            adj_matrix=adj_matrix,
         ),
         (agent_state, episode_stats, next_obs, next_done, key, env_state),
         (),
@@ -393,7 +388,6 @@ class PPOTrainer:
                 message_passer=self.message_passer,
                 action_low=action_low,
                 action_high=action_high,
-                adj_matrix=self.adj,
             )
         )
         self._compute_gae_jit = logged_jit(
@@ -419,7 +413,13 @@ class PPOTrainer:
         def apply_feature(p, x):
             return apply_shared(self.feature_extractor, p, x)
 
-        self._ppo = PPO(self.ppo, apply_sensor, apply_actor, apply_critic, apply_feature)
+        def apply_message_passer(p, x):
+            assert self.message_passer is not None
+            return jax.vmap(lambda x_in: self.message_passer.apply(p, x_in))(x)
+
+        self._ppo = PPO(
+            self.ppo, apply_sensor, apply_actor, apply_critic, apply_feature, apply_message_passer
+        )
 
         self.agent_state = self._init_agent_state()
 
@@ -453,6 +453,7 @@ class PPOTrainer:
             MessagePasser(
                 hidden_dim=300,
                 num_propagation_steps=self.cfg.architecture.message_passing_steps or 4,
+                adj_matrix=self.adj,
             )
             if self.morph_mode != MorphMode.CENTRALIZED
             else None
@@ -517,7 +518,6 @@ class PPOTrainer:
             message_passer_params = self.message_passer.init(
                 message_passer_key,
                 self.sensor.apply(single_sensor_param, sample_obs),
-                self.adj,
             )
         self.logger.debug(
             f"[_init_agent_state] message_passer_params: {

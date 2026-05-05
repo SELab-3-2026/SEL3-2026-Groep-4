@@ -40,16 +40,17 @@ class Actor(nn.Module):
 class MessagePasser(nn.Module):
     hidden_dim: int
     num_propagation_steps: int
+    adj_matrix: jnp.ndarray
 
     @nn.compact
-    def __call__(self, x: jnp.ndarray, adj_matrix: jnp.ndarray):
+    def __call__(self, x: jnp.ndarray):
         for _ in range(self.num_propagation_steps):
             # (n_nodes, feat)
             messages = nn.Dense(self.hidden_dim)(x)
             messages = nn.tanh(messages)
 
             # note: if mean is wanted: adj_matrix / (adj.sum(axis=-1, keepdims=True) + 1e-8)
-            agg = adj_matrix
+            agg = self.adj_matrix
             aggregated = agg @ messages
 
             x_concat = jnp.concatenate([x, aggregated], axis=-1)

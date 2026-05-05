@@ -72,6 +72,10 @@ def create_obs_processor(
                 padded[key] = arr
         return padded
 
+    # TODO
+    def _split_to_agents() -> dict:
+        return {}
+
     def _flatten_features(obs: dict) -> jnp.ndarray:
         ordered_keys = [
             "disk_z_tilt",
@@ -93,7 +97,7 @@ def create_obs_processor(
             if v.size == 0:
                 continue
 
-            # reshape scalars
+            # reshape scalars to 1D array
             if v.ndim == 0:
                 v = v.reshape(1)
 
@@ -102,19 +106,8 @@ def create_obs_processor(
                 values.append(v.reshape(1, -1))  # (1, feat)
                 continue
 
-            # -------- SPLIT TO SEGMENTS --------
+            # -------- SCALE WITH SEGMENTS --------
             if key in _JOINT_SCALED_KEYS:
-                if morph_mode == MorphMode.SEGMENT:
-                    joint_count = 3
-                    axis_per_joint = 2
-
-                    center_size = num_arms * joint_count * axis_per_joint
-                    v_center = v[:center_size].reshape(
-                        num_arms, joint_count * axis_per_joint
-                    )  # (arms, 6)
-                    v_segs = v[center_size:].reshape(-1, 2)  # (segs, 2)
-                    values.append(jnp.concatenate([v_center, v_segs], axis=0))  # (arms+segs, ?)
-                    continue
                 v = v.reshape(num_arms, -1)  # (n_arms, 2)
 
             elif key in _SEGMENT_SCALED_KEYS:
@@ -122,25 +115,20 @@ def create_obs_processor(
 
             else:
                 # global key, broadcast to all nodes
-                n_nodes = (num_segments + num_arms) if morph_mode == MorphMode.SEGMENT else num_arms
-                v = jnp.repeat(v[None, :], n_nodes, axis=0)  # (n_nodes, feat)
+                v = jnp.repeat(v[None, :], num_arms, axis=0)  # (num_arms, feat)
 
-            # -------- SEGMENT MODE --------
-            if morph_mode == MorphMode.SEGMENT:
-                values.append(v)  # (n_nodes, feat)
-                continue
-
-            # -------- ARM MODE --------
+            # RING + FULLY CONNECTED
             v = v.reshape(num_arms, -1)
             values.append(v)  # (n_arms, feat)
 
-        return jnp.concatenate(values, axis=-1)
+        return jnp.concatenate(values, axis=-1)  # (agent, feat)
 
     def _process_single(obs_dict: dict) -> jnp.ndarray:
-        processed = _add_derived_features(obs_dict)
-        processed = _normalize_features(processed)
+        processed = _add_derived_features(obs_dict)  # key |--> (feat-count, feat-lengths, )
+        processed = _normalize_features(processed)  # key |--> (feat-count, feat-lengths, )
+        # TODO: split to agents # key |--> (agents, feat-count, feat-lengths)
         if padding_masks is not None:
-            processed = _pad_features(processed)
-        return _flatten_features(processed)
+            processed = _pad_features(processed)  # key |--> (agents, feat-count, feat-lengths')
+        return _flatten_features(processed)  # (agents, feat)
 
     return jax.jit(jax.vmap(_process_single))

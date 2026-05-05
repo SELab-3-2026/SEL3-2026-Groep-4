@@ -119,7 +119,7 @@ def get_action_and_value(
 ):
     hidden_sensor = sensor_apply(params["sensor_params"], x)
     hidden_critic = feature_extractor_apply(params["feature_extractor_params"], x)
-    hidden_sensor = message_passer(hidden_sensor)
+    hidden_sensor = message_passer(params["message_passer_params"], hidden_sensor)
 
     debug.callback(logger.debug, f"[SHAPE] hidden_sensor: {hidden_sensor.shape}")
     debug.callback(logger.debug, f"[SHAPE] hidden_critic: {hidden_critic.shape}")
