@@ -20,9 +20,18 @@ def test_centralized_forward_pass_with_padding():
         "segment_contact": jnp.zeros((batch_size, 14)),
     }
 
+    segments_per_arm = jnp.array((4, 0, 4, 2, 4))
+    num_segments = segments_per_arm.sum().item()
+    num_arms = jnp.where(segments_per_arm > 0, 1, 0).sum().item()
+
     # 2. Process and Pad Observation
-    masks = compute_padding_masks(segments_per_arm=(4, 0, 4, 2, 4))
-    obs_processor = create_obs_processor(bounds_dict={}, padding_masks=masks)
+    masks = compute_padding_masks(segments_per_arm=list(segments_per_arm))
+    obs_processor = create_obs_processor(
+        bounds_dict={},
+        num_segments=num_segments,
+        num_arms=num_arms,
+        padding_masks=masks,
+    )
     global_state = obs_processor(amputated_obs)
 
     # 40 + 40 + 20 = 100 dimensions
