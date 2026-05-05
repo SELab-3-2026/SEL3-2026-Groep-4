@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+from brittle_star_project.environment.env_config import MorphMode
 from brittle_star_project.environment.padded_obs_wrapper import (
     compute_padding_masks,
 )
@@ -31,11 +32,12 @@ def test_centralized_forward_pass_with_padding():
         num_segments=num_segments,
         num_arms=num_arms,
         padding_masks=masks,
+        morph_mode=MorphMode.CENTRALIZED,
     )
     global_state = obs_processor(amputated_obs)
 
     # 40 + 40 + 20 = 100 dimensions
-    assert global_state.shape == (batch_size, 100), (
+    assert global_state.shape == (batch_size, 1, 100), (
         f"Expected global state shape (2, 100), got {global_state.shape}"
     )
 
@@ -54,9 +56,11 @@ def test_centralized_forward_pass_with_padding():
     action_mean, action_log_std = actor.apply(actor_params, global_state)
     value = critic.apply(critic_params, global_state)
 
-    assert action_mean.shape == (batch_size, 40), f"Actor mean shape mismatch: {action_mean.shape}"
+    assert action_mean.shape == (batch_size, 1, 40), (
+        f"Actor mean shape mismatch: {action_mean.shape}"
+    )
     assert action_log_std.shape == (40,), f"Actor log_std shape mismatch: {action_log_std.shape}"
-    assert value.shape == (batch_size, 1) or value.shape == (batch_size,), (
+    assert value.shape == (batch_size, 1, 1) or value.shape == (batch_size,), (
         f"Critic value shape mismatch: {value.shape}"
     )
 

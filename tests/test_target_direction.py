@@ -88,6 +88,3 @@ def test_processor_converts_to_egocentric_direction():
         f"The obs_processor did not correctly rotate the vector to egocentric. "
         f"Expected {expected_local_target}, but got {local_target}."
     )
-
-
-test_processor_converts_to_egocentric_direction()

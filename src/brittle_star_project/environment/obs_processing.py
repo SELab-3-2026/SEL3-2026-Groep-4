@@ -105,9 +105,13 @@ def create_obs_processor(
             # -------- SPLIT TO SEGMENTS --------
             if key in _JOINT_SCALED_KEYS:
                 if morph_mode == MorphMode.SEGMENT:
-                    # TODO: remove magic constants
-                    center_size = num_arms * 3 * 2
-                    v_center = v[:center_size].reshape(num_arms, 3 * 2)  # (arms, 6)
+                    joint_count = 3
+                    axis_per_joint = 2
+
+                    center_size = num_arms * joint_count * axis_per_joint
+                    v_center = v[:center_size].reshape(
+                        num_arms, joint_count * axis_per_joint
+                    )  # (arms, 6)
                     v_segs = v[center_size:].reshape(-1, 2)  # (segs, 2)
                     values.append(jnp.concatenate([v_center, v_segs], axis=0))  # (arms+segs, ?)
                     continue
