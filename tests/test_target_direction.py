@@ -53,6 +53,7 @@ def test_processor_converts_to_egocentric_direction():
         num_arms=num_arms,
         padding_masks=env.padding_masks,
         morph_mode=MorphMode.CENTRALIZED,
+        segments_per_arm=segments_per_arm,
     )
 
     env_state = env.reset(seed=42)

@@ -4,6 +4,10 @@ from typing import Dict, Tuple, Optional
 
 from brittle_star_project.environment.env_config import MorphMode
 
+from experiment_logger import get_logger
+
+logger11 = get_logger()
+
 _JOINT_SCALED_KEYS = frozenset(
     {
         "joint_position",
@@ -20,12 +24,35 @@ _SEGMENT_SCALED_KEYS = frozenset(
 )
 
 
+def _build_joint_indices(segments_per_arm):
+    indices = []
+    start = 0
+    for segs in segments_per_arm:
+        # 2 joints per segment
+        count = segs * 2
+        idx = jnp.arange(start, start + count)
+        indices.append(idx)
+        start += count
+    return indices
+
+
+def _build_segment_indices(segments_per_arm):
+    indices = []
+    start = 0
+    for segs in segments_per_arm:
+        idx = jnp.arange(start, start + segs)
+        indices.append(idx)
+        start += segs
+    return indices
+
+
 def create_obs_processor(
     bounds_dict: Dict[str, Tuple[float, float]],
     num_arms: int,
     needed_copies: int,
     padding_masks: Optional[Dict] = None,
     morph_mode: MorphMode = MorphMode.CENTRALIZED,
+    segments_per_arm=[4, 4, 4, 4, 4],
 ):
     # made a set to allow O(1) search
     ordered_keys = frozenset(
@@ -38,6 +65,8 @@ def create_obs_processor(
             "segment_contact",
         ]
     )
+    segment_indices = _build_segment_indices(segments_per_arm)
+    joint_indices = _build_joint_indices(segments_per_arm)
 
     def _add_derived_features(obs: dict) -> dict:
         new_obs = dict(obs)
@@ -69,96 +98,101 @@ def create_obs_processor(
                 normalized[key] = arr
         return normalized
 
-    # ndarray (agents, features)
     def _pad_features(obs: dict, agent_count: int) -> dict:
         assert padding_masks is not None
 
         padded = {}
 
-        # arr shape = (agent_count, ...) TODO
         for key, arr in obs.items():
             if key in _JOINT_SCALED_KEYS:
-                padded_arr = jnp.zeros(
-                    (agent_count, padding_masks["target_size_2x"]), dtype=arr.dtype
-                )
-                padded[key] = padded_arr.at[:, padding_masks["mask_2x"]].set(arr)
+                target_size = padding_masks["target_size_2x"]
+                out = jnp.zeros((agent_count, target_size), dtype=arr.dtype)
+                # place structured values at front, rest stays 0
+                out = out.at[:, : arr.shape[1]].set(arr)
+                padded[key] = out
+
             elif key in _SEGMENT_SCALED_KEYS:
-                padded_arr = jnp.zeros(
-                    (agent_count, padding_masks["target_size_1x"]), dtype=arr.dtype
-                )
-                padded[key] = padded_arr.at[:, padding_masks["mask_1x"]].set(arr)
+                target_size = padding_masks["target_size_1x"]
+                out = jnp.zeros((agent_count, target_size), dtype=arr.dtype)
+                out = out.at[:, : arr.shape[1]].set(arr)
+                padded[key] = out
             else:
                 padded[key] = arr
         return padded
 
-    def _split_to_agents(obs: dict, agent_count: int) -> dict:
-        """
-        Each observation type is now updated to (agent_count, feature_shape),
-        thus duplicating the observation for each agent
-        """
-
+    def _split_to_agents(obs: dict, morph_mode, segments_per_arm) -> dict:
         output = {}
+        num_arms = len(segments_per_arm)
 
         for key, arr in obs.items():
             if key not in ordered_keys or arr.size == 0:
                 continue
 
+            logger11.info(f"[INPUT] {key}: {arr.shape}")
+
             if arr.ndim == 0:
                 arr = arr.reshape(1)
 
-            output[key] = jnp.repeat(arr[None, :], agent_count, axis=0)
+            if morph_mode == MorphMode.CENTRALIZED:
+                out = arr.reshape(1, -1)
+                output[key] = out
+                continue
+
+            if key in _SEGMENT_SCALED_KEYS:
+                per_agent = [jnp.take(arr, idx, axis=0) for idx in segment_indices]
+                out = jnp.stack(per_agent)
+
+            elif key in _JOINT_SCALED_KEYS:
+                per_agent = [jnp.take(arr, idx, axis=0) for idx in joint_indices]
+                out = jnp.stack(per_agent)
+
+            else:
+                out = jnp.repeat(arr[None, :], num_arms, axis=0)
+
+            logger11.info(f"[OUTPUT] {key}: {out.shape}")
+            output[key] = out
 
         return output
 
-    # TODO: update
     def _flatten_features(obs: dict) -> jnp.ndarray:
         """
-        Collapse all observations into a single array
-        """
+        Input:
+            key -> (num_arms, feat_per_key)
 
+        Output:
+            (num_arms, total_features)
+        """
         values = []
 
-        for key in sorted(obs.keys()):
-            if key not in ordered_keys:
+        for key in ordered_keys:
+            if key not in obs:
                 continue
 
-            # empty arrays handled in split_to_agents
-            v = obs[key]  # (agent_count, feat)
+            arr = jnp.asarray(obs[key])  # (num_arms, feat)
 
-            # -------- CENTRALIZED --------
-            if morph_mode == MorphMode.CENTRALIZED:
-                values.append(v.reshape(1, -1))  # (1, feat)
+            if arr.size == 0:
                 continue
 
-            # -------- SCALE WITH SEGMENTS --------
-            if key in _JOINT_SCALED_KEYS:
-                v = v.reshape(num_arms, -1)  # (n_arms, 2)
+            if arr.ndim == 1:
+                arr = arr[:, None]
 
-            elif key in _SEGMENT_SCALED_KEYS:
-                v = v[:, None]  # (segments, 1)
+            arr = arr.reshape(arr.shape[0], -1)
 
-            else:
-                # global key, broadcast to all nodes
-                v = jnp.repeat(v[None, :], num_arms, axis=0)  # (num_arms, feat)
+            values.append(arr)
 
-            # RING + FULLY CONNECTED
-            v = v.reshape(num_arms, -1)
-            values.append(v)  # (n_arms, feat)
-
-        return jnp.concatenate(values, axis=-1)  # (agent, feat)
+        return jnp.concatenate(values, axis=-1)  # (num_arms, total_feat)
 
     def _process_single(obs_dict: dict) -> jnp.ndarray:
-        processed = _add_derived_features(obs_dict)  # key |--> (feat-count,)
-        processed = _normalize_features(processed)  # key |--> (feat-count,)
-        # TODO: split to agents
-        processed = _split_to_agents(processed, needed_copies)  # key |--> (agents, feat-count)
+        processed = _add_derived_features(obs_dict)
+        processed = _normalize_features(processed)
+        # morph_mode = MorphMode.FULLY_CONNECTED
+        processed = _split_to_agents(processed, morph_mode, segments_per_arm)
+        # needed_copies = 5
         if padding_masks is not None:
-            processed = _pad_features(
-                processed, agent_count=needed_copies
-            )  # key |--> (agents, feat-count')
-        for k, v in processed.items():
-            print(k, v.shape)
-
+            processed = _pad_features(processed, agent_count=needed_copies)
+        flat = _flatten_features(processed)  # (num_arms, total_feat)
+        logger11.info(f"[FLATTENED FINAL] shape: {flat.shape}")
+        logger11.info(f"[PER AGENT] example row 0 shape: {flat[0].shape}")
         exit(1)
         return _flatten_features(processed)  # (agents, feat)
 

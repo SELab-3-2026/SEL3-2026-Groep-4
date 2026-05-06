@@ -32,6 +32,7 @@ def test_centralized_forward_pass_with_padding():
         num_arms=num_arms,
         padding_masks=masks,
         morph_mode=MorphMode.CENTRALIZED,
+        segments_per_arm=segments_per_arm,
     )
     global_state = obs_processor(amputated_obs)
 

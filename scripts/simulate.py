@@ -81,6 +81,7 @@ def main(dict_cfg: DictConfig) -> None:
     obs_processor = create_obs_processor(
         bounds_dict=training.obs_bounds.to_bounds_dict(),
         padding_masks=padding_masks,
+        segments_per_arm=env_morphology.segments_per_arm,
     )
 
     # 6. Build environment

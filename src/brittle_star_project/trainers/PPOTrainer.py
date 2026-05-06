@@ -367,6 +367,7 @@ class PPOTrainer:
             num_arms=self.num_arms,
             morph_mode=self.morph_mode,
             padding_masks=self.env.padding_masks,
+            segments_per_arm=self.segments_per_arm,
         )
 
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
