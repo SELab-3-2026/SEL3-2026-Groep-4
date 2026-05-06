@@ -363,7 +363,7 @@ class PPOTrainer:
         # Build the centralized observation processor: derive -> normalize -> pad -> flatten.
         self.obs_processor = create_obs_processor(
             bounds_dict=self.cfg.obs_bounds.to_bounds_dict(),
-            num_segments=self.num_segments,
+            needed_copies=self.needed_copies,
             num_arms=self.num_arms,
             morph_mode=self.morph_mode,
             padding_masks=self.env.padding_masks,

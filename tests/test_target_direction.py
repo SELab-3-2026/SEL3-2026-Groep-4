@@ -45,12 +45,11 @@ def test_processor_converts_to_egocentric_direction():
     env = BrittleStarJaxEnvWrapper.default(num_envs=1, backend=Backend.MJX)
 
     segments_per_arm = jnp.array((4, 4, 4, 4, 4))
-    num_segments = segments_per_arm.sum().item()
     num_arms = jnp.where(segments_per_arm > 0, 1, 0).sum().item()
 
     obs_processor = create_obs_processor(
         bounds_dict=cfg.obs_bounds.to_bounds_dict(),
-        num_segments=num_segments,
+        needed_copies=1,
         num_arms=num_arms,
         padding_masks=env.padding_masks,
         morph_mode=MorphMode.CENTRALIZED,

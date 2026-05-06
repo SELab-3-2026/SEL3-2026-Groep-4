@@ -22,14 +22,13 @@ def test_centralized_forward_pass_with_padding():
     }
 
     segments_per_arm = jnp.array((4, 0, 4, 2, 4))
-    num_segments = segments_per_arm.sum().item()
     num_arms = jnp.where(segments_per_arm > 0, 1, 0).sum().item()
 
     # 2. Process and Pad Observation
     masks = compute_padding_masks(segments_per_arm=list(segments_per_arm))
     obs_processor = create_obs_processor(
         bounds_dict={},
-        num_segments=num_segments,
+        needed_copies=1,
         num_arms=num_arms,
         padding_masks=masks,
         morph_mode=MorphMode.CENTRALIZED,
