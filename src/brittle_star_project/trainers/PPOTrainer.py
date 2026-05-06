@@ -353,6 +353,7 @@ class PPOTrainer:
             self.feature_extractor,
             self.critic,
             self.needed_copies,
+            self.agent_indices,
         ) = self._init_agent()
 
         self.sensor.apply = logged_jit(self.sensor.apply)
@@ -368,6 +369,7 @@ class PPOTrainer:
             morph_mode=self.morph_mode,
             padding_masks=self.env.padding_masks,
             segments_per_arm=self.segments_per_arm,
+            agent_indices=self.agent_indices,
         )
 
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
@@ -436,13 +438,18 @@ class PPOTrainer:
 
     def _init_agent(self):
         self.logger.info("[AGENT]: Initializing agent...")
-
+        agent_indices = [0, 1, 2, 3, 4]
         match self.morph_mode:
             case MorphMode.CENTRALIZED:
                 needed_copies = 1
             case MorphMode.FULLY_CONNECTED | MorphMode.RING:
+                agent_mask = self.segments_per_arm > 0
+                agent_indices = jnp.where(agent_mask)[0]
                 needed_copies = jnp.where(self.segments_per_arm > 0, 1, 0).sum().item()
             case MorphMode.SEGMENT:
+                agent_mask = self.segments_per_arm > 0
+                agent_indices = jnp.where(agent_mask)[0]
+                needed_copies = jnp.where(self.segments_per_arm > 0, 1, 0).sum().item()
                 needed_copies = (
                     self.segments_per_arm.sum() + jnp.where(self.segments_per_arm > 0, 1, 0).sum()
                 ).item()
@@ -462,7 +469,15 @@ class PPOTrainer:
 
         feature_extractor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
         critic = OneDenseLayerMLP()
-        return sensor, message_passer, actor, feature_extractor, critic, needed_copies
+        return (
+            sensor,
+            message_passer,
+            actor,
+            feature_extractor,
+            critic,
+            needed_copies,
+            agent_indices,
+        )
 
     def _init_agent_state(self) -> TrainState:
         self.logger.info("[AGENT STATE]: Initializing agent state...")
