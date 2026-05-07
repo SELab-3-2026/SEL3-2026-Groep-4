@@ -7,6 +7,7 @@ from .evaluate_mjx import (
     build_eval_rollout_fn,
     evaluate_checkpoint_mjx,
 )
+from .evaluate import evaluate_policy
 from .policy import PolicyAgent, ControlPolicy
 from .rollout import rollout_headless, rollout_viewer, EpisodeResult
 from .video import record_episode, create_evaluation_dir, save_evaluation_metadata
@@ -22,6 +23,8 @@ __all__ = [
     "append_checkpoint_eval_row",
     "build_eval_rollout_fn",
     "evaluate_checkpoint_mjx",
+    # CPU evaluation
+    "evaluate_policy",
     # policy
     "PolicyAgent",
     "ControlPolicy",
