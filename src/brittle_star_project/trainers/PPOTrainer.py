@@ -514,7 +514,12 @@ class PPOTrainer:
             return jax.vmap(lambda x_in: self.message_passer.apply(p, x_in))(x)
 
         self._ppo = PPO(
-            self.ppo, apply_sensor, apply_actor, apply_critic, apply_feature, apply_message_passer
+            self.ppo,
+            apply_sensor,
+            apply_actor,
+            apply_critic,
+            apply_feature,
+            apply_message_passer if self.message_passer is not None else None,
         )
 
         self.agent_state = self._init_agent_state()
