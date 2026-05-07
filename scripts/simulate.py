@@ -17,12 +17,14 @@ import numpy as np
 from omegaconf import DictConfig, OmegaConf
 import yaml
 
+import jax.numpy as jnp
+
 from brittle_star_project import Backend, BrittleStarEnv, BrittleStarEnvFactory
 from brittle_star_project.configs.main_config import BrittleStarConfig
 from brittle_star_project.configs.register_configs import register_configs
 from brittle_star_project.environment.padded_obs_wrapper import compute_padding_masks
 from brittle_star_project.environment.obs_processing import create_obs_processor
-from brittle_star_project.environment.env_config import MorphologyConfig
+from brittle_star_project.environment.env_config import MorphMode, MorphologyConfig
 
 from brittle_star_project.evaluation.checkpoint import load_metadata, metadata_to_configs
 from brittle_star_project.evaluation.policy import PolicyAgent
@@ -78,10 +80,34 @@ def main(dict_cfg: DictConfig) -> None:
         segments_per_arm=env_morphology.segments_per_arm,
         reference_segments_per_arm=training.morphology.segments_per_arm,
     )
+
+    segs_per_arm = jnp.array(env_morphology.segments_per_arm)
+
+    needed_copies = 0
+    agent_indices = [0, 1, 2, 3, 4]
+    match env_morphology.morph_mode:
+        case MorphMode.CENTRALIZED:
+            needed_copies = 1
+        case MorphMode.FULLY_CONNECTED | MorphMode.RING:
+            agent_mask = segs_per_arm > 0
+            agent_indices = jnp.where(agent_mask)[0]
+            needed_copies = jnp.where(segs_per_arm > 0, 1, 0).sum().item()
+        case MorphMode.SEGMENT:
+            agent_mask = segs_per_arm > 0
+            agent_indices = jnp.where(agent_mask)[0]
+            needed_copies = jnp.where(segs_per_arm > 0, 1, 0).sum().item()
+            needed_copies = (segs_per_arm.sum() + jnp.where(segs_per_arm > 0, 1, 0).sum()).item()
+
+    num_arms = jnp.where(segs_per_arm > 0, 1, 0).sum().item()
+
     obs_processor = create_obs_processor(
         bounds_dict=training.obs_bounds.to_bounds_dict(),
         padding_masks=padding_masks,
+        needed_copies=needed_copies,
+        num_arms=num_arms,
+        morph_mode=env_morphology.morph_mode,
         segments_per_arm=env_morphology.segments_per_arm,
+        agent_indices=agent_indices,
     )
 
     # 6. Build environment
@@ -105,7 +131,7 @@ def main(dict_cfg: DictConfig) -> None:
     state0 = env.reset(seed=seed)
 
     # Calculate the action dimension the model was trained with
-    trained_action_dim = sum(training.morphology.segments_per_arm) * 2
+    trained_action_dim = raw_env.action_space.shape[0] // needed_copies
 
     # 7. Load policy
     policy = PolicyAgent.from_checkpoint(

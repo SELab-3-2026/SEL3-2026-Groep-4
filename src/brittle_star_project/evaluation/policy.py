@@ -45,7 +45,8 @@ class PolicyAgent:
             key = f"Dense_{idx}"
             if key not in dense_params:
                 break
-            layer_sizes.append(int(np.asarray(dense_params[key]["kernel"]).shape[1]))
+
+            layer_sizes.append(int(np.asarray(dense_params[key]["kernel"]).shape[-1]))
             idx += 1
 
         if not layer_sizes:
@@ -53,8 +54,8 @@ class PolicyAgent:
 
         self._sensor = GenericDenseLayersWithActivation(layer_sizes=layer_sizes)
         self._actor = Actor(action_dim=action_dim)
-        self._sensor_apply = jax.jit(self._sensor.apply)
-        self._actor_apply = jax.jit(self._actor.apply)
+        self._sensor.apply = jax.jit(self._sensor.apply)
+        self._actor.apply = jax.jit(self._actor.apply)
         self._params = {
             "sensor_params": sensor_params,
             "actor_params": actor_params,
@@ -79,11 +80,25 @@ class PolicyAgent:
             obs_processor=obs_processor,
         )
 
+    def _apply_per_node(self, net, params, x):
+        # params: (nodes, ...)
+        # x: (batch, nodes, feat)
+
+        def apply_single_node(p, x_node):
+            # x_node: (batch, feat)
+            return jax.vmap(lambda xi: net.apply(p, xi))(x_node)
+
+        return jax.vmap(apply_single_node, in_axes=(0, 1), out_axes=1)(params, x)
+
     def act(self, *, observations: dict[str, Any]) -> np.ndarray:
         """Return deterministic action (actor mean, no exploration noise)."""
         batched_obs = jax.tree.map(lambda x: jnp.asarray(x)[None, ...], observations)
-        obs = self._obs_processor(batched_obs)[0]
-        hidden = self._sensor_apply(self._params["sensor_params"], obs)
-        mean, _log_std = self._actor_apply(self._params["actor_params"], hidden)
+        obs = self._obs_processor(batched_obs)
+
+        # TODO: message passing
+        hidden = self._apply_per_node(self._sensor, self._params["sensor_params"], obs)
+
+        # hidden = jax.vmap(...)
+        mean, _log_std = self._apply_per_node(self._actor, self._params["actor_params"], hidden)
 
         return np.asarray(mean, dtype=np.float32).ravel()
