@@ -355,15 +355,18 @@ class PPOTrainer:
             rngs = jnp.asarray(jax.random.split(rng, 1))
             state = reset_1(rng=rngs)
 
+            initial_xy_dist = jnp.squeeze(state.observations["xy_distance_to_target"])
+
             t0 = jnp.asarray(0, dtype=jnp.int32)
             done0 = jnp.squeeze(state.terminated | state.truncated)
+            return0 = jnp.asarray(0.0, dtype=jnp.float32)
 
             def cond(carry):
-                t, _state, done = carry
+                t, _state, done, _return_ = carry
                 return jnp.logical_and(t < max_steps, jnp.logical_not(done))
 
             def body(carry):
-                t, state, _done = carry
+                t, state, _done, return_ = carry
 
                 obs = obs_processor(state.observations)
                 hidden = sensor_apply(params["sensor_params"], obs)
@@ -372,11 +375,22 @@ class PPOTrainer:
                 action = jnp.clip(mean, action_low, action_high)
                 next_state = step_1(state=state, action=action)
 
-                done_next = jnp.squeeze(next_state.terminated | next_state.truncated)
-                return (t + 1, next_state, done_next)
+                # Match training's shaped reward as closely as possible.
+                shaped_reward = _reward_fn(state, next_state)
+                return_ = return_ + jnp.squeeze(shaped_reward)
 
-            t, _state, done = jax.lax.while_loop(cond, body, (t0, state, done0))
-            return t, done
+                done_next = jnp.squeeze(next_state.terminated | next_state.truncated)
+                return (t + 1, next_state, done_next, return_)
+
+            t, final_state, _done, return_ = jax.lax.while_loop(
+                cond, body, (t0, state, done0, return0)
+            )
+
+            reached_target = jnp.squeeze(final_state.terminated)
+            final_xy_dist_raw = jnp.squeeze(final_state.observations["xy_distance_to_target"])
+            final_xy_dist = jnp.where(reached_target, 0.0, final_xy_dist_raw)
+
+            return t, reached_target, return_, final_xy_dist, initial_xy_dist
 
         self._eval_rollout_mjx_fn = jax.jit(_eval_rollout)
         return self._eval_rollout_mjx_fn
@@ -616,16 +630,24 @@ class PPOTrainer:
         self,
         *,
         iteration: int,
+        trained_timesteps: int,
+        eval_steps: int,
+        eval_return: float,
+        final_xy_dist: float,
+        initial_xy_dist: float,
         reached_target: bool,
-        steps_to_target: int,
     ) -> Path:
         metrics_dir = Path(self.run_dir) / "metrics"
         metrics_dir.mkdir(parents=True, exist_ok=True)
         csv_path = metrics_dir / "checkpoint_evaluation.csv"
 
         fieldnames = [
-            "iteration",
-            "steps_to_target",
+            "checkpoint",
+            "trained_timesteps",
+            "eval_steps",
+            "eval_return",
+            "final_xy_dist",
+            "initial_xy_dist",
             "reached_target",
         ]
 
@@ -641,10 +663,17 @@ class PPOTrainer:
                     with open(csv_path, "r", newline="") as f:
                         dict_reader = csv.DictReader(f)
                         for row in dict_reader:
+                            # Support older schemas best-effort.
+                            checkpoint = row.get("checkpoint", row.get("iteration"))
+                            steps = row.get("eval_steps", row.get("steps_to_target"))
                             migrated_rows.append(
                                 {
-                                    "iteration": row.get("iteration"),
-                                    "steps_to_target": row.get("steps_to_target"),
+                                    "checkpoint": checkpoint,
+                                    "trained_timesteps": row.get("trained_timesteps"),
+                                    "eval_steps": steps,
+                                    "eval_return": row.get("eval_return"),
+                                    "final_xy_dist": row.get("final_xy_dist"),
+                                    "initial_xy_dist": row.get("initial_xy_dist"),
                                     "reached_target": row.get("reached_target"),
                                 }
                             )
@@ -668,15 +697,19 @@ class PPOTrainer:
                 writer.writeheader()
             writer.writerow(
                 {
-                    "iteration": int(iteration),
-                    "steps_to_target": int(steps_to_target),
+                    "checkpoint": int(iteration),
+                    "trained_timesteps": int(trained_timesteps),
+                    "eval_steps": int(eval_steps),
+                    "eval_return": float(eval_return),
+                    "final_xy_dist": float(final_xy_dist),
+                    "initial_xy_dist": float(initial_xy_dist),
                     "reached_target": bool(reached_target),
                 }
             )
 
         return csv_path
 
-    def _evaluate_checkpoint(self, iteration: int) -> None:
+    def _evaluate_checkpoint(self, iteration: int, *, trained_timesteps: int) -> None:
         if not self.logging_cfg.evaluate_checkpoints:
             return
 
@@ -686,14 +719,30 @@ class PPOTrainer:
         # Run evaluation best-effort; never fail training because evaluation failed.
         try:
             eval_fn = self._get_or_create_eval_rollout_mjx_fn()
-            steps, reached = eval_fn(self.agent_state.params, seed, max_steps)
-            steps_to_target = int(steps)
+            (
+                steps,
+                reached,
+                eval_return,
+                final_xy_dist,
+                initial_xy_dist,
+            ) = eval_fn(self.agent_state.params, seed, max_steps)
+
+            eval_steps = int(steps)
             reached_target = bool(reached)
+
+            # Keep numeric conversions explicit (JAX scalars -> Python scalars).
+            eval_return_f = float(eval_return)
+            final_xy_dist_f = float(final_xy_dist)
+            initial_xy_dist_f = float(initial_xy_dist)
 
             csv_path = self._append_checkpoint_eval_row(
                 iteration=iteration,
+                trained_timesteps=int(trained_timesteps),
+                eval_steps=eval_steps,
+                eval_return=eval_return_f,
+                final_xy_dist=final_xy_dist_f,
+                initial_xy_dist=initial_xy_dist_f,
                 reached_target=reached_target,
-                steps_to_target=steps_to_target,
             )
             self._maybe_sync_csv_to_wandb(csv_path)
         except Exception as e:
@@ -752,7 +801,7 @@ class PPOTrainer:
             if self.logging_cfg.save_checkpoints and self.logging_cfg.checkpoint_frequency > 0:
                 if iteration % self.logging_cfg.checkpoint_frequency == 0:
                     self._save_checkpoint(iteration)
-                    self._evaluate_checkpoint(iteration)
+                    self._evaluate_checkpoint(iteration, trained_timesteps=global_step)
 
             if getattr(self.cfg.experiment, "debug_sanity", False):
                 self.logger.info("\n[SANITY CHECK] Successfully completed 1 epoch")
