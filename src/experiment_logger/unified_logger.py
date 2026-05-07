@@ -432,6 +432,21 @@ class UnifiedLogger:
         except Exception as e:
             self.error(f"Error saving final model: {e}")
 
+    def sync_file(self, path: Path) -> None:
+        """Upload a file to W&B if tracking is enabled.
+
+        Best-effort: logs a warning on failure, never raises.
+        """
+        if self.wandb_run is None:
+            return
+        try:
+            import wandb
+
+            # "Simple sync" behavior: wandb will copy this file into the run.
+            wandb.save(str(path), base_path=str(path.parent))
+        except Exception as e:
+            self.warning(f"Failed to sync file to W&B: {e}")
+
     def finish(self):
         """Finalize logging and cleanup."""
         # Flush remaining metrics
