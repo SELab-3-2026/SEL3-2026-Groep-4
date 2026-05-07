@@ -31,8 +31,6 @@ from brittle_star_project.ppo import PPO
 from brittle_star_project.environment import MorphMode
 from brittle_star_project.utils import logged_jit
 
-logger11 = get_logger()
-
 
 @logged_jit
 def _clip_action(action: jnp.ndarray, low: jnp.ndarray, high: jnp.ndarray) -> jnp.ndarray:
@@ -121,14 +119,16 @@ def _step_once(
         action_low,
         action_high,
     )
-    logger11.debug(f"[_step_once] raw_action: {raw_action.shape}")
-    logger11.debug(f"[_step_once] clipped_action: {flat_clipped_action.shape}")
+    logger = get_logger()
+
+    logger.debug(f"[_step_once] raw_action: {raw_action.shape}")
+    logger.debug(f"[_step_once] clipped_action: {flat_clipped_action.shape}")
 
     # Supporting signals (often where mismatch originates)
-    logger11.debug(f"[_step_once] logprob: {logprob.shape}")
-    logger11.debug(f"[_step_once] value: {value.shape}")
-    logger11.debug(f"[_step_once] mean: {mean.shape}")
-    logger11.debug(f"[_step_once] std: {std.shape}")
+    logger.debug(f"[_step_once] logprob: {logprob.shape}")
+    logger.debug(f"[_step_once] value: {value.shape}")
+    logger.debug(f"[_step_once] mean: {mean.shape}")
+    logger.debug(f"[_step_once] std: {std.shape}")
 
     key, reset_key = jax.random.split(key)
     reset_rngs = jax.random.split(reset_key, num_envs)
@@ -147,9 +147,9 @@ def _step_once(
     terminated_any = terminated_any | terminated
     truncated_any = truncated_any | truncated
 
-    logger11.debug(f"[_step_once] next_obs: {next_obs.shape}")
-    logger11.debug(f"[_step_once] reward: {reward.shape}")
-    logger11.debug(f"[_step_once] next_done: {next_done.shape}")
+    logger.debug(f"[_step_once] next_obs: {next_obs.shape}")
+    logger.debug(f"[_step_once] reward: {reward.shape}")
+    logger.debug(f"[_step_once] next_done: {next_done.shape}")
 
     storage = Storage(
         obs=obs,
@@ -547,7 +547,6 @@ class PPOTrainer:
             case MorphMode.SEGMENT:
                 agent_mask = self.segments_per_arm > 0
                 agent_indices = jnp.where(agent_mask)[0]
-                needed_copies = jnp.where(self.segments_per_arm > 0, 1, 0).sum().item()
                 needed_copies = (
                     self.segments_per_arm.sum() + jnp.where(self.segments_per_arm > 0, 1, 0).sum()
                 ).item()
@@ -627,17 +626,17 @@ class PPOTrainer:
 
         message_passer_params = {}
         if self.morph_mode != MorphMode.CENTRALIZED:
-            assert self.message_passer is not None, "MessagePasser is None"
+            assert self.message_passer is not None, "decentralized modes require a message passer"
 
             message_passer_params = self.message_passer.init(
                 message_passer_key,
                 self.sensor.apply(single_sensor_param, sample_obs),
             )
-        self.logger.debug(
-            f"[_init_agent_state] message_passer_params: {
-                jax.tree.map(lambda x: x.shape, message_passer_params)
-            }"
-        )
+            self.logger.debug(
+                f"[_init_agent_state] message_passer_params: {
+                    jax.tree.map(lambda x: x.shape, message_passer_params)
+                }"
+            )
 
         flat_obs = sample_obs.reshape(-1)  # BECAUSE 1 centralized critic
         self.logger.debug(f"[_init_agent_state] flat_obs: {flat_obs.shape}")

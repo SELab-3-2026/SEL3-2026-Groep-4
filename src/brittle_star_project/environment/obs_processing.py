@@ -6,8 +6,6 @@ from brittle_star_project.environment.env_config import MorphMode
 
 from experiment_logger import get_logger
 
-logger11 = get_logger()
-
 _JOINT_SCALED_KEYS = frozenset(
     {
         "joint_position",
@@ -57,6 +55,8 @@ def create_obs_processor(
     segments_per_arm=[4, 4, 4, 4, 4],
     agent_indices=[0, 1, 2, 3, 4],
 ):
+    logger = get_logger()
+
     # made a set to allow O(1) search
     ordered_keys = frozenset(
         [
@@ -86,6 +86,13 @@ def create_obs_processor(
                 new_obs["robot_direction_to_target"] = jnp.stack([new_x, new_y])
 
         return new_obs
+
+    def _prune_features(obs: dict) -> dict:
+        pruned = {}
+        for key, arr in obs.items():
+            if key in ordered_keys:
+                pruned[key] = arr
+        return pruned
 
     def _normalize_features(obs: dict) -> dict:
         normalized = {}
@@ -124,37 +131,29 @@ def create_obs_processor(
         return padded
 
     def _split_to_agents(obs: dict, morph_mode) -> dict:
-        total = 0
-        for k, v in obs.items():
-            if hasattr(v, "shape"):
-                size = v.size
-                logger11.debug(f"[RAW] {k}: shape={v.shape}, size={size}")
-                total += size
-            else:
-                logger11.debug(f"[RAW] {k}: non-array")
-
-        logger11.debug(f"[RAW TOTAL FEATURES]: {total}")
-        output = {}
+        key_to_agents = {}
         num_agents = needed_copies  # IMPORTANT: number of MLPs
+
         for key, arr in obs.items():
-            if key not in ordered_keys or arr.size == 0:
+            # TODO Should this still be here?
+            if arr.size == 0:
                 continue
-            logger11.debug(f"[INPUT] {key}: {arr.shape}")
+
+            logger.debug(f"[INPUT] {key}: {arr.shape}")
+
             if arr.ndim == 0:
                 arr = arr.reshape(1)
-            # -------- CENTRALIZED --------
+
             if morph_mode == MorphMode.CENTRALIZED:
-                output[key] = arr.reshape(1, -1)
+                key_to_agents[key] = arr.reshape(1, -1)
                 continue
 
-            # -------- SEGMENTS --------
             if key in _SEGMENT_SCALED_KEYS:
                 per_agent = []
 
-                for i, agent_id in enumerate(agent_indices):
-                    idx = segment_indices[i]
-                    taken = jnp.take(arr, idx, axis=0)  # (segs, ...)
-                    logger11.debug(f"WHY {taken.shape}")
+                for agent_id in agent_indices:
+                    taken = jnp.take(arr, agent_id, axis=0)  # (segs, ...)
+                    logger.debug(f"WHY {taken.shape}")
                     # pad to 4
                     pad_len = 4 - taken.shape[0]
                     padded = jnp.pad(taken, [(0, pad_len)] + [(0, 0)] * (taken.ndim - 1))
@@ -163,13 +162,11 @@ def create_obs_processor(
 
                 out = jnp.stack(per_agent)
 
-            # -------- JOINTS --------
             elif key in _JOINT_SCALED_KEYS:
                 per_agent = []
 
-                for i, agent_id in enumerate(agent_indices):
-                    idx = joint_indices[i]
-                    taken = jnp.take(arr, idx, axis=0)  # (joint_n, ...)
+                for agent_id in agent_indices:
+                    taken = jnp.take(arr, agent_id, axis=0)  # (joint_n, ...)
                     # pad to 8
                     pad_len = 8 - taken.shape[0]
 
@@ -182,10 +179,10 @@ def create_obs_processor(
             else:
                 out = jnp.repeat(arr[None, :], num_agents, axis=0)
 
-            logger11.debug(f"[OUTPUT] {key}: {out.shape}")
-            output[key] = out
+            logger.debug(f"[OUTPUT] {key}: {out.shape}")
+            key_to_agents[key] = out
 
-        return output
+        return key_to_agents
 
     def _flatten_features(obs: dict) -> jnp.ndarray:
         """
@@ -217,11 +214,14 @@ def create_obs_processor(
 
     def _process_single(obs_dict: dict) -> jnp.ndarray:
         processed = _add_derived_features(obs_dict)
+        processed = _prune_features(processed)
         processed = _normalize_features(processed)
         processed = _split_to_agents(processed, morph_mode)
         flat = _flatten_features(processed)  # (num_arms, total_feat)
-        logger11.debug(f"[FLATTENED FINAL] shape: {flat.shape}")
-        logger11.debug(f"[PER AGENT] example row 0 shape: {flat[0].shape}")
-        return _flatten_features(processed)  # (agents, feat)
+
+        logger.debug(f"[FLATTENED FINAL] shape: {flat.shape}")
+        logger.debug(f"[PER AGENT] example row 0 shape: {flat[0].shape}")
+
+        return flat  # (agents, feat)
 
     return jax.jit(jax.vmap(_process_single))
