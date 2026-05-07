@@ -37,3 +37,5 @@ uv run scripts/simulate.py \
 
 Videos and evaluation metadata are stored in timestamped folders alongside the model:
 `runs/your_run/final_model_evaluations/eval_<timestamp>/simulation.mp4`
+
+For batch evaluation and cross-model comparison, see the **[Evaluation Guide](./evaluation.md)**.
