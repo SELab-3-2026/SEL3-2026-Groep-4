@@ -129,18 +129,21 @@ def _step_once(
     logger11.debug(f"[_step_once] value: {value.shape}")
     logger11.debug(f"[_step_once] mean: {mean.shape}")
     logger11.debug(f"[_step_once] std: {std.shape}")
-    
+
     key, reset_key = jax.random.split(key)
     reset_rngs = jax.random.split(reset_key, num_envs)
 
     # ---- ENV STEP ----
     key, reset_key = jax.random.split(key)
     reset_rngs = jax.random.split(reset_key, num_envs)
-    
-    episode_stats, env_state, (next_obs, reward, next_done) = env_step_fn(
-        episode_stats, env_state, flat_clipped_action, reset_rngs,
+
+    episode_stats, env_state, (next_obs, reward, next_done, terminated, truncated) = env_step_fn(
+        episode_stats,
+        env_state,
+        flat_clipped_action,
+        reset_rngs,
     )
-    
+
     terminated_any = terminated_any | terminated
     truncated_any = truncated_any | truncated
 
