@@ -11,6 +11,3 @@ checkpoint_frequency: 100
 upload_final_model: false
 upload_checkpoints: false
 hf_entity: ""
-evaluate_checkpoints: false
-eval_max_steps: 5000
-eval_seed: 0

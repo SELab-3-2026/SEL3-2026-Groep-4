@@ -263,6 +263,7 @@ class PPOTrainer:
         self.ppo = cfg.ppo
         self.experiment = cfg.experiment
         self.logging_cfg = cfg.logging
+        self.evaluation_cfg = cfg.evaluation
         self.env = env
         self.run_dir = run_dir
         self.run_name = run_name
@@ -710,11 +711,22 @@ class PPOTrainer:
         return csv_path
 
     def _evaluate_checkpoint(self, iteration: int, *, trained_timesteps: int) -> None:
-        if not self.logging_cfg.evaluate_checkpoints:
+        if not self.evaluation_cfg.evaluate_checkpoints:
             return
 
-        max_steps = int(self.logging_cfg.eval_max_steps)
-        seed = int(self.logging_cfg.eval_seed)
+        max_steps = int(self.evaluation_cfg.eval_max_steps)
+        seed = int(self.evaluation_cfg.eval_seed)
+
+        if max_steps <= 0:
+            self.logger.warning("[EVAL]: eval_max_steps must be > 0; skipping evaluation")
+            return
+
+        if not self.logging_cfg.save_checkpoints or self.logging_cfg.checkpoint_frequency <= 0:
+            self.logger.warning(
+                "[EVAL]: evaluate_checkpoints is enabled but checkpoint saving is disabled; "
+                "skipping evaluation"
+            )
+            return
 
         # Run evaluation best-effort; never fail training because evaluation failed.
         try:
