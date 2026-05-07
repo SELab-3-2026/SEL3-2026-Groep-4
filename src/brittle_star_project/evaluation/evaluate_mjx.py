@@ -58,11 +58,6 @@ def build_eval_rollout_fn(
 ) -> Callable:
     """Build and JIT-compile a single-episode MJX evaluation rollout.
 
-    The returned function has the signature::
-
-        eval_fn(params: dict, seed: int, max_steps: int)
-            -> (steps, reached_target, eval_return, final_xy_dist, initial_xy_dist)
-
     All outputs are JAX arrays. Convert to Python scalars before logging.
 
     Args:
@@ -141,13 +136,13 @@ def evaluate_checkpoint_mjx(
     """Run one deterministic evaluation episode and return typed metrics.
 
     Args:
-        eval_fn: A JIT-compiled function as returned by :func:`build_eval_rollout_fn`.
+        eval_fn: A JIT-compiled function as returned by `build_eval_rollout_fn`.
         params: Agent parameter dict (e.g. ``agent_state.params``).
         seed: Random seed for environment reset (controls target placement).
         max_steps: Maximum number of control steps before the episode is cut off.
 
     Returns:
-        A :class:`CheckpointEvalResult` with all JAX arrays converted to
+        A `CheckpointEvalResult` with all JAX arrays converted to
         plain Python scalars.
     """
     steps, reached, eval_return, final_xy_dist, initial_xy_dist = eval_fn(params, seed, max_steps)
@@ -223,7 +218,7 @@ def append_checkpoint_eval_row(
         run_dir: Root directory of the training run (Hydra's output dir).
         iteration: Training iteration number, used as the checkpoint identifier.
         trained_timesteps: Total environment steps taken at this checkpoint.
-        result: Evaluation result as returned by :func:`evaluate_checkpoint_mjx`.
+        result: Evaluation result as returned by `evaluate_checkpoint_mjx`.
 
     Returns:
         Absolute path to the CSV file (useful for W&B sync).
