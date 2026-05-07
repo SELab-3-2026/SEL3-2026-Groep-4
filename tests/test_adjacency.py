@@ -30,9 +30,13 @@ def test_ring():
     assert_symmetric(adj)
 
     # each node should connect to itself + 2 neighbors
-    for i in range(5):
-        assert adj[i, i] == 1
-        assert jnp.sum(adj[i]) == 3
+    for node in range(5):
+        assert adj[node, node] == 1
+        assert jnp.sum(adj[node]) == 3
+        neighbor1 = (node - 1) % 5
+        neighbor2 = (node + 1) % 5
+        assert adj[neighbor1, node] == 1
+        assert adj[node, neighbor2] == 1  # Symmetrical
 
 
 def test_segment_structure():
