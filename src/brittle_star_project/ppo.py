@@ -190,7 +190,7 @@ def ppo_loss(
     return loss, (pg_loss, v_loss, entropy_loss, jax.lax.stop_gradient(approx_kl))
 
 
-def identity(hidden):
+def identity(_, hidden):
     """
     Used for seamless jax integration,
     avoids having branching inside jitted function,
