@@ -25,7 +25,7 @@ def evaluate_policy(
 
     Args:
         env: Initialised CPU environment (MJC backend).
-        policy_path: Path to the ``.cleanrl_model`` weights file.
+        policy_path: Path to the `.cleanrl_model` weights file.
         seed: Random seed for environment reset.
         max_steps: Maximum number of control steps.
 

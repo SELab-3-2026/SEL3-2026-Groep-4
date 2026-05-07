@@ -9,12 +9,9 @@ eval_seed: 0
 # Cross-model comparison settings
 # We use 10 episodes to get a more robust average for the final poster results.
 comparison_base_seed: 0
-comparison_num_episodes: 10
-comparison_output_csv: "metrics/poster_comparison.csv"
+comparison_num_episodes: 2
+comparison_output_csv: "runs/evaluation/comparison.csv"
 
 # Paths to the .cleanrl_model files to be compared (relative to workspace root).
-# These are placeholders; replace with actual trained model paths for the poster.
 comparison_models:
-  - "experiments/poster/centralized.cleanrl_model"
-  - "experiments/poster/decentralized.cleanrl_model"
-  - "experiments/poster/decentralized_amputated.cleanrl_model"
+  - "runs/input-space-2-arms/2026-05-02/08-14-58/final_model.flax"

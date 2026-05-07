@@ -12,7 +12,7 @@ The key functions are:
 - `evaluate_checkpoint_mjx` — runs that function for a given set of parameters and returns a typed
   `CheckpointEvalResult`.
 - `append_checkpoint_eval_row` — persists the result to the run's
-  ``metrics/checkpoint_evaluation.csv``, migrating old schemas automatically.
+  `metrics/checkpoint_evaluation.csv`, migrating old schemas automatically.
 """
 
 from __future__ import annotations
@@ -61,17 +61,17 @@ def build_eval_rollout_fn(
     All outputs are JAX arrays. Convert to Python scalars before logging.
 
     Args:
-        env: The training environment wrapper. Must expose ``env.raw`` with
-            ``reset`` and ``step`` methods compatible with ``jax.vmap``.
+        env: The training environment wrapper. Must expose `env.raw` with
+            `reset` and `step` methods compatible with `jax.vmap`.
         obs_processor: Observation normalisation / padding callable, as
-            returned by ``create_obs_processor``.
-        sensor_apply: The sensor network's ``apply`` method (JIT-compiled).
-        actor_apply: The actor network's ``apply`` method (JIT-compiled).
-        action_low: Per-joint action lower bound (JAX array, shape ``(action_dim,)``).
-        action_high: Per-joint action upper bound (JAX array, shape ``(action_dim,)``).
+            returned by `create_obs_processor`.
+        sensor_apply: The sensor network's `apply` method (JIT-compiled).
+        actor_apply: The actor network's `apply` method (JIT-compiled).
+        action_low: Per-joint action lower bound (JAX array, shape `(action_dim,)`).
+        action_high: Per-joint action upper bound (JAX array, shape `(action_dim,)`).
         reward_fn: Shaped reward function with signature
-            ``reward_fn(env_state, next_env_state) -> jnp.ndarray``.
-            Typically the module-level ``reward_fn`` from ``PPOTrainer``.
+            `reward_fn(env_state, next_env_state) -> jnp.ndarray`.
+            Typically the module-level `reward_fn` from `PPOTrainer`.
 
     Returns:
         A JIT-compiled callable that runs one deterministic evaluation episode.
@@ -209,9 +209,9 @@ def append_checkpoint_eval_row(
     trained_timesteps: int,
     result: CheckpointEvalResult,
 ) -> Path:
-    """Append one evaluation row to ``<run_dir>/metrics/checkpoint_evaluation.csv``.
+    """Append one evaluation row to `<run_dir>/metrics/checkpoint_evaluation.csv`.
 
-    Creates the file (including the ``metrics/`` directory) if it does not yet
+    Creates the file (including the `metrics/` directory) if it does not yet
     exist. Migrates the file to the current schema if the header has changed.
 
     Args:
