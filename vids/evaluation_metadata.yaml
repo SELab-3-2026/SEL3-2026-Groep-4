@@ -1,0 +1,9 @@
+timestamp: '2026-05-07T20:43:29.612567'
+morphology_override: null
+seed: 1
+max_steps: 10000
+result:
+  return: 0.40030128204863225
+  length: 6705
+  reached_target: true
+  final_xy_dist: 0.19969871795136748
