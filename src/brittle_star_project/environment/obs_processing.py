@@ -102,61 +102,47 @@ def create_obs_processor(
         return normalized
 
     def _split_to_agents(obs: dict, morph_mode) -> dict:
+        # TODO: cleanup + MORE testing (works for centralized 5 arms + damaged arms)
         output = {}
         num_agents = needed_copies  # IMPORTANT: number of MLPs
         for key, arr in obs.items():
-            if key not in ordered_keys or arr.size == 0:
+            if arr.size == 0:
                 continue
-
-            logger.debug(f"[INPUT] {key}: {arr.shape}")
 
             if arr.ndim == 0:
                 arr = arr.reshape(1)
 
-            # -------- CENTRALIZED --------
-            if morph_mode == MorphMode.CENTRALIZED:
-                output[key] = arr.reshape(1, -1)
-                # TODO: padding for centralized
-                continue
-
-            # -------- SEGMENTS --------
             if key in _SEGMENT_SCALED_KEYS:
                 per_agent = []
-
-                for i, agent_id in enumerate(agent_indices):
+                for i, _ in enumerate(agent_indices):
                     idx = segment_indices[i]
-                    taken = jnp.take(arr, idx, axis=0)  # (segs, ...)
-                    logger.debug(f"WHY {taken.shape}")
-
-                    # pad to 4 (segments per arm?)
+                    taken = jnp.take(arr, idx, axis=0)
                     pad_len = 4 - taken.shape[0]
-                    padded = jnp.pad(taken, [(0, pad_len)] + [(0, 0)] * (taken.ndim - 1))
+                    padded = jnp.pad(taken, [(9, pad_len)] + [(0, 0)] * (taken.ndim - 1))
 
                     per_agent.append(padded.reshape(-1))
-
-                out = jnp.stack(per_agent)
-
-            # -------- JOINTS --------
+                arr = jnp.stack(per_agent)
             elif key in _JOINT_SCALED_KEYS:
                 per_agent = []
-
                 for i, _ in enumerate(agent_indices):
                     idx = joint_indices[i]
-                    taken = jnp.take(arr, idx, axis=0)  # (joint_n, ...)
-                    # pad to 8
+                    taken = jnp.take(arr, idx, axis=0)
                     pad_len = 8 - taken.shape[0]
-
                     padded = jnp.pad(taken, [(0, pad_len)] + [(0, 0)] * (taken.ndim - 1))
+
                     per_agent.append(padded.reshape(-1))
-
-                out = jnp.stack(per_agent)
-
-            # -------- GLOBAL --------
+                arr = jnp.stack(per_agent)
             else:
-                out = jnp.repeat(arr[None, :], num_agents, axis=0)
+                arr = jnp.repeat(arr[None, :], num_agents, axis=0)
 
-            logger.debug(f"[OUTPUT] {key}: {out.shape}")
-            output[key] = out
+            if morph_mode == MorphMode.CENTRALIZED:
+                output[key] = arr.reshape(1, -1)
+            elif key in _JOINT_SCALED_KEYS:
+                output[key] = arr.reshape(num_agents, -1)
+            elif key in _SEGMENT_SCALED_KEYS:
+                output[key] = arr[:, None]
+            else:
+                output[key] = arr
 
         return output
 
