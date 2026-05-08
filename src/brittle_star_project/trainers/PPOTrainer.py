@@ -277,7 +277,6 @@ def apply_shared(net, params, x):
     return jax.vmap(lambda xi: net.apply(params, xi))(x_flattened)
 
 
-# TODO: update to work with extra dimension + message passing
 def _rollout_jit(
     agent_state,
     episode_stats,
