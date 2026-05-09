@@ -1,0 +1,8 @@
+# Default Evaluation Configuration
+# Settings used for checkpoint evaluation during training.
+
+evaluate_checkpoints: false
+# Max number of control steps during evaluation rollout.
+eval_max_steps: 5000
+# Seed for deterministic evaluation reset.
+eval_seed: 0

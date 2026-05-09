@@ -2,6 +2,7 @@ from hydra.core.config_store import ConfigStore
 
 from experiment_logger.config_logger import LoggingConfig
 from brittle_star_project.configs.config_experiment import ExperimentConfig
+from brittle_star_project.configs.config_evaluation import EvaluationConfig
 from brittle_star_project.configs.config_ppo import PPOConfig
 from brittle_star_project.configs.config_architecture import (
     CentralizedConfig,
@@ -32,6 +33,7 @@ def register_configs() -> None:
     # Sub-config groups — each group corresponds to a configs/ subdirectory.
     cs.store(group="experiment", name="base_experiment", node=ExperimentConfig)
     cs.store(group="logging", name="base_logging", node=LoggingConfig)
+    cs.store(group="evaluation", name="base_evaluation", node=EvaluationConfig)
     cs.store(group="ppo", name="base_ppo", node=PPOConfig)
 
     # Architecture variants — swap via CLI: architecture=decentralized
