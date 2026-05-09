@@ -30,8 +30,8 @@ from brittle_star_project.MLPs.mlps import (
     MessagePasser,
     OneDenseLayerMLP,
     Storage,
-    build_adjacency,
 )
+from brittle_star_project.MLPs.adjancency_builder import build_adjacency
 from brittle_star_project.ppo import PPO
 from brittle_star_project.environment import MorphMode
 from brittle_star_project.utils import logged_jit
@@ -901,8 +901,11 @@ class PPOTrainer:
                 self._eval_fn = build_eval_rollout_fn(
                     env=self.env,
                     obs_processor=self.obs_processor,
-                    sensor_apply=self.sensor.apply,
-                    actor_apply=self.actor.apply,
+                    sensor_apply=lambda p, x: apply_per_node(self.sensor, p, x),
+                    actor_apply=lambda p, x: apply_per_node(self.actor, p, x),
+                    message_passer_apply=(
+                        None if self.message_passer is None else self.message_passer.apply
+                    ),
                     action_low=self._action_low,
                     action_high=self._action_high,
                     reward_fn=reward_fn,
