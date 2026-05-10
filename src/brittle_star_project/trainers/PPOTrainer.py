@@ -18,18 +18,27 @@ from brittle_star_project.configs.main_config import BrittleStarConfig
 from brittle_star_project.dataclasses import EpisodeStatistics
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from brittle_star_project.environment.obs_processing import create_obs_processor
-from brittle_star_project.MLPs import (
+from brittle_star_project.evaluation.evaluate_mjx import (
+    append_checkpoint_eval_row,
+    build_eval_rollout_fn,
+    evaluate_checkpoint_mjx,
+)
+from brittle_star_project.MLPs.mlps import (
     Actor,
     AgentParams,
     GenericDenseLayersWithActivation,
     MessagePasser,
     OneDenseLayerMLP,
     Storage,
-    build_adjacency,
 )
+from brittle_star_project.MLPs.adjancency_builder import build_adjacency
 from brittle_star_project.ppo import PPO
 from brittle_star_project.environment import MorphMode
 from brittle_star_project.utils import logged_jit
+
+from brittle_star_project.environment.env_types import Backend
+
+# TODO: clip scaled reward?
 
 
 @logged_jit
@@ -176,8 +185,13 @@ def _step_once(
     ), storage
 
 
-def _reward_fn(env_state, next_env_state):
-    # if delta distance positive ==> brittle star walking away from target
+def reward_fn(env_state, next_env_state):
+    """Shaped reward used during training and checkpoint evaluation.
+
+    Public so that ``evaluation.evaluate_mjx`` can import it and produce
+    metrics that are directly comparable to training-time returns.
+    """
+    # Positive delta_distance means the brittle star is moving *away* from target.
     delta_distance = (
         next_env_state.observations["xy_distance_to_target"]
         - env_state.observations["xy_distance_to_target"]
@@ -204,7 +218,7 @@ def _step_env_wrapped(
 ):
     next_env_state_pre_reset = env_step_fn(env_state, action)
 
-    reward = _reward_fn(env_state, next_env_state_pre_reset)
+    reward = reward_fn(env_state, next_env_state_pre_reset)
     terminated = next_env_state_pre_reset.terminated
     truncated = next_env_state_pre_reset.truncated
     done = terminated | truncated
@@ -416,6 +430,7 @@ class PPOTrainer:
         self.ppo = cfg.ppo
         self.experiment = cfg.experiment
         self.logging_cfg = cfg.logging
+        self.evaluation_cfg = cfg.evaluation
         self.env = env
         self.run_dir = run_dir
         self.run_name = run_name
@@ -464,6 +479,8 @@ class PPOTrainer:
 
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
         action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
+        self._action_low = action_low
+        self._action_high = action_high
 
         self._rollout_jit = logged_jit(
             partial(
@@ -526,6 +543,8 @@ class PPOTrainer:
         self.episode_stats = self._init_episode_stats()
 
         self._init_random()
+        # Lazily-built JIT-compiled MJX eval rollout, created on first evaluation.
+        self._eval_fn = None
 
     def _init_random(self):
         self.logger.info(f"[RANDOM]: Setting random seed to {self.experiment.seed}")
@@ -849,6 +868,65 @@ class PPOTrainer:
             params=self.agent_state.params, step=iteration, metadata=asdict(self.cfg)
         )
 
+    def _evaluate_checkpoint(self, iteration: int, *, trained_timesteps: int) -> None:
+        """Evaluate the current checkpoint and persist metrics to CSV.
+
+        Delegates all evaluation logic to `evaluation.evaluate_mjx`.
+        Best-effort: a failure here must never abort training.
+        """
+        if not self.evaluation_cfg.evaluate_checkpoints:
+            return
+
+        max_steps = int(self.evaluation_cfg.eval_max_steps)
+        seed = int(self.evaluation_cfg.eval_seed)
+
+        if max_steps <= 0:
+            self.logger.warning("[EVAL]: eval_max_steps must be > 0; skipping evaluation")
+            return
+
+        if not self.logging_cfg.save_checkpoints or self.logging_cfg.checkpoint_frequency <= 0:
+            self.logger.warning(
+                "[EVAL]: evaluate_checkpoints is enabled but checkpoint saving is disabled; "
+                "skipping evaluation"
+            )
+            return
+
+        try:
+            if self._eval_fn is None:
+                if getattr(self.env, "backend", None) != Backend.MJX:
+                    self.logger.warning(
+                        f"[EVAL]: Training env backend is {self.env.backend}; "
+                        "MJX evaluation may be unavailable/slow."
+                    )
+                self._eval_fn = build_eval_rollout_fn(
+                    env=self.env,
+                    obs_processor=self.obs_processor,
+                    sensor_apply=lambda p, x: apply_per_node(self.sensor, p, x),
+                    actor_apply=lambda p, x: apply_per_node(self.actor, p, x),
+                    message_passer_apply=(
+                        None if self.message_passer is None else self.message_passer.apply
+                    ),
+                    action_low=self._action_low,
+                    action_high=self._action_high,
+                    reward_fn=reward_fn,
+                )
+
+            result = evaluate_checkpoint_mjx(
+                self._eval_fn,
+                self.agent_state.params,
+                seed=seed,
+                max_steps=max_steps,
+            )
+            csv_path = append_checkpoint_eval_row(
+                self.run_dir,
+                iteration=iteration,
+                trained_timesteps=int(trained_timesteps),
+                result=result,
+            )
+            self.logger.sync_file(csv_path)
+        except Exception as e:
+            self.logger.warning(f"[EVAL]: Checkpoint evaluation failed: {e}")
+
     def train(self):
         """
         Train the PPO agent for a specified number of iterations.
@@ -905,6 +983,7 @@ class PPOTrainer:
             if self.logging_cfg.save_checkpoints and self.logging_cfg.checkpoint_frequency > 0:
                 if iteration % self.logging_cfg.checkpoint_frequency == 0:
                     self._save_checkpoint(iteration)
+                    self._evaluate_checkpoint(iteration, trained_timesteps=global_step)
 
             if getattr(self.cfg.experiment, "debug_sanity", False):
                 self.logger.info("\n[SANITY CHECK] Successfully completed 1 epoch")

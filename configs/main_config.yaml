@@ -6,6 +6,7 @@ defaults:
   - brittle_star_config
   - experiment: base
   - logging: default
+  - evaluation: default
   - ppo: default
   - architecture: centralized
   - morphology: 5_arms_full
