@@ -477,6 +477,8 @@ class PPOTrainer:
             agent_indices=self.agent_indices,
         )
 
+        self.logger.debug(f"needed copies = {self.needed_copies}")
+
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
         action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
         self._action_low = action_low

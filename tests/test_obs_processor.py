@@ -25,6 +25,7 @@ JOINTS_PER_SEG = 2  # from _build_joint_indices: segs * 2
 
 SEGS_HEALTHY = [4, 4, 4, 4, 4]
 SEGS_DAMAGED = [4, 4, 4, 4, 0]  # arm 4 fully disabled
+SEGS_DAMAGED_2 = [4, 0, 4, 2, 4]  # arm 3 fully disabled
 AGENT_INDICES = [0, 1, 2, 3, 4]
 
 FEAT_PER_AGENT = 1 + 8 + 8 + 8 + 2 + 13  # = 40
@@ -73,7 +74,7 @@ def test_centralized_no_damage():
     global_state = proc(obs)
 
     # shape test
-    assert global_state.shape == (1, 1, FEAT_PER_AGENT * NUM_ARMS)
+    assert global_state.shape == (1, 1, 188)
 
     # TODO: more?
 
@@ -85,7 +86,17 @@ def test_centralized_damaged_1_arm():
     global_state = proc(obs)
 
     # shape test
-    assert global_state.shape == (1, 1, FEAT_PER_AGENT * NUM_ARMS)
+    assert global_state.shape == (1, 1, 188)
+
+
+def test_centralized_damaged_2_arms():
+    proc = make_processor(MorphMode.CENTRALIZED, 1, SEGS_DAMAGED_2)
+    obs = make_obs(SEGS_DAMAGED_2)
+    obs = batch_obs(obs)
+    global_state = proc(obs)
+
+    # shape test
+    assert global_state.shape == (1, 1, 188)
 
 
 def test_decentralized_fully_connected_no_damage():

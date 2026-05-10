@@ -102,9 +102,12 @@ def create_obs_processor(
         return normalized
 
     def _split_to_agents(obs: dict, morph_mode) -> dict:
-        # TODO: cleanup + MORE testing (works for centralized 5 arms + damaged arms)
         output = {}
         num_agents = needed_copies  # IMPORTANT: number of MLPs
+
+        segs_per_arm = 4
+        joints_per_segment = 2
+        joints_per_arm = segs_per_arm * joints_per_segment
         for key, arr in obs.items():
             if arr.size == 0:
                 continue
@@ -117,7 +120,7 @@ def create_obs_processor(
                 for i, _ in enumerate(agent_indices):
                     idx = segment_indices[i]
                     taken = jnp.take(arr, idx, axis=0)
-                    pad_len = 4 - taken.shape[0]
+                    pad_len = segs_per_arm - taken.shape[0]
                     padded = jnp.pad(taken, [(9, pad_len)] + [(0, 0)] * (taken.ndim - 1))
 
                     per_agent.append(padded.reshape(-1))
@@ -127,7 +130,7 @@ def create_obs_processor(
                 for i, _ in enumerate(agent_indices):
                     idx = joint_indices[i]
                     taken = jnp.take(arr, idx, axis=0)
-                    pad_len = 8 - taken.shape[0]
+                    pad_len = joints_per_arm - taken.shape[0]
                     padded = jnp.pad(taken, [(0, pad_len)] + [(0, 0)] * (taken.ndim - 1))
 
                     per_agent.append(padded.reshape(-1))

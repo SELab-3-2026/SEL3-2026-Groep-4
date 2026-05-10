@@ -36,9 +36,9 @@ def test_centralized_forward_pass_with_padding():
     )
     global_state = obs_processor(amputated_obs)
 
-    # 40 + 40 + 20 = 100 dimensions
-    assert global_state.shape == (batch_size, 1, 100), (
-        f"Expected global state shape (2, 100), got {global_state.shape}"
+    # 40 + 40 + 20 + padding = 145 dimensions
+    assert global_state.shape == (batch_size, 1, 145), (
+        f"Expected global state shape (2, 1, 145), got {global_state.shape}"
     )
 
     # 4. Initialize dummy networks (40 actuators for the max morphology output)
