@@ -55,11 +55,11 @@ def batch_obs(obs: dict):
     return jax.tree_util.tree_map(lambda x: x[None, :], obs)
 
 
-def make_processor(morph_mode: MorphMode, segments_per_arm: list[int]):
+def make_processor(morph_mode: MorphMode, needed_copies: int, segments_per_arm: list[int]):
     return create_obs_processor(
         bounds_dict=obs_bounds,
         num_arms=NUM_ARMS,
-        needed_copies=NUM_ARMS,
+        needed_copies=needed_copies,
         morph_mode=morph_mode,
         segments_per_arm=segments_per_arm,
         agent_indices=AGENT_INDICES,
@@ -67,7 +67,7 @@ def make_processor(morph_mode: MorphMode, segments_per_arm: list[int]):
 
 
 def test_centralized_no_damage():
-    proc = make_processor(MorphMode.CENTRALIZED, SEGS_HEALTHY)
+    proc = make_processor(MorphMode.CENTRALIZED, 1, SEGS_HEALTHY)
     obs = make_obs(SEGS_HEALTHY)
     obs = batch_obs(obs)
     global_state = proc(obs)
@@ -75,14 +75,34 @@ def test_centralized_no_damage():
     # shape test
     assert global_state.shape == (1, 1, FEAT_PER_AGENT * NUM_ARMS)
 
+    # TODO: more?
+
 
 def test_centralized_damaged_1_arm():
-    pass
+    proc = make_processor(MorphMode.CENTRALIZED, 1, SEGS_DAMAGED)
+    obs = make_obs(SEGS_DAMAGED)
+    obs = batch_obs(obs)
+    global_state = proc(obs)
+
+    # shape test
+    assert global_state.shape == (1, 1, FEAT_PER_AGENT * NUM_ARMS)
 
 
 def test_decentralized_fully_connected_no_damage():
-    pass
+    proc = make_processor(MorphMode.FULLY_CONNECTED, NUM_ARMS, SEGS_HEALTHY)
+    obs = make_obs(SEGS_HEALTHY)
+    obs = batch_obs(obs)
+    global_state = proc(obs)
+
+    # shape test
+    assert global_state.shape == (1, NUM_ARMS, FEAT_PER_AGENT)
 
 
 def test_decentralized_fully_connected_damaged_1_arm():
-    pass
+    proc = make_processor(MorphMode.FULLY_CONNECTED, NUM_ARMS, SEGS_DAMAGED)
+    obs = make_obs(SEGS_DAMAGED)
+    obs = batch_obs(obs)
+    global_state = proc(obs)
+
+    # shape test
+    assert global_state.shape == (1, NUM_ARMS, FEAT_PER_AGENT)
