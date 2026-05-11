@@ -135,9 +135,7 @@ def main(dict_cfg: DictConfig) -> None:
     trained_action_dim = raw_env.action_space.shape[0] // needed_copies
 
     # 7. Load policy
-    message_passing_steps = (
-        metadata.get("architecture", {}) or {}
-    ).get("message_passing_steps")
+    message_passing_steps = (metadata.get("architecture", {}) or {}).get("message_passing_steps")
     if message_passing_steps is None:
         message_passing_steps = 4
     message_passing_steps = int(message_passing_steps)

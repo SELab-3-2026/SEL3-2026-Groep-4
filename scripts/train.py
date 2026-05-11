@@ -8,7 +8,6 @@ from brittle_star_project.configs.register_configs import register_configs
 from brittle_star_project.trainers.PPOTrainer import PPOTrainer
 from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleStarJaxEnvWrapper
 from experiment_logger import init_logger, get_logger
-import logging
 
 
 def make_env(cfg: BrittleStarConfig) -> BrittleStarJaxEnvWrapper:
