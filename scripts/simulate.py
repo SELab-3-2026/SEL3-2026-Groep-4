@@ -34,6 +34,7 @@ from brittle_star_project.evaluation.video import (
     create_evaluation_dir,
     save_evaluation_metadata,
 )
+from brittle_star_project.MLPs.adjancency_builder import build_adjacency
 
 
 @hydra.main(config_path="../configs", config_name="main_config", version_base="1.3")
@@ -134,8 +135,23 @@ def main(dict_cfg: DictConfig) -> None:
     trained_action_dim = raw_env.action_space.shape[0] // needed_copies
 
     # 7. Load policy
+    message_passing_steps = (
+        metadata.get("architecture", {}) or {}
+    ).get("message_passing_steps")
+    if message_passing_steps is None:
+        message_passing_steps = 4
+    message_passing_steps = int(message_passing_steps)
+
+    adj_matrix = None
+    if env_morphology.morph_mode != MorphMode.CENTRALIZED:
+        adj_matrix = build_adjacency(env_morphology.segments_per_arm, env_morphology.morph_mode)
+
     policy = PolicyAgent.from_checkpoint(
-        model_path, action_dim=trained_action_dim, obs_processor=obs_processor
+        model_path,
+        action_dim=trained_action_dim,
+        obs_processor=obs_processor,
+        message_passing_steps=message_passing_steps,
+        adj_matrix=adj_matrix,
     )
 
     # Convert the JAX boolean mask to a numpy array for easy indexing

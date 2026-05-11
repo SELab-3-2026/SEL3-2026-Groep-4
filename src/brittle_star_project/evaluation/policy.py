@@ -24,10 +24,17 @@ class PolicyAgent:
         *,
         sensor_params: Any,
         actor_params: Any,
+        message_passer_params: Any | None = None,
+        message_passing_steps: int | None = None,
+        adj_matrix: Any | None = None,
         action_dim: int,
         obs_processor: Any,
     ) -> None:
-        from brittle_star_project.MLPs.mlps import Actor, GenericDenseLayersWithActivation
+        from brittle_star_project.MLPs.mlps import (
+            Actor,
+            GenericDenseLayersWithActivation,
+            MessagePasser,
+        )
 
         # Infer layer sizes from params
         try:
@@ -54,11 +61,31 @@ class PolicyAgent:
 
         self._sensor = GenericDenseLayersWithActivation(layer_sizes=layer_sizes)
         self._actor = Actor(action_dim=action_dim)
+
+        self._message_passer = None
+        if message_passer_params is not None and not (
+            isinstance(message_passer_params, dict) and len(message_passer_params) == 0
+        ):
+            if message_passing_steps is None or adj_matrix is None:
+                raise ValueError(
+                    "Checkpoint contains message_passer_params but PolicyAgent was not given "
+                    "message_passing_steps and adj_matrix. Pass these when constructing the agent "
+                    "so decentralized evaluation matches training."
+                )
+
+            hidden_dim = int(layer_sizes[-1])
+            self._message_passer = MessagePasser(
+                hidden_dim=hidden_dim,
+                num_propagation_steps=int(message_passing_steps),
+                adj_matrix=jnp.asarray(adj_matrix),
+            )
+            self._message_passer.apply = jax.jit(self._message_passer.apply)
         self._sensor.apply = jax.jit(self._sensor.apply)
         self._actor.apply = jax.jit(self._actor.apply)
         self._params = {
             "sensor_params": sensor_params,
             "actor_params": actor_params,
+            "message_passer_params": message_passer_params,
         }
         self._obs_processor = obs_processor
 
@@ -68,6 +95,9 @@ class PolicyAgent:
         *,
         sensor_params: Any,
         actor_params: Any,
+        message_passer_params: Any | None = None,
+        message_passing_steps: int | None = None,
+        adj_matrix: Any | None = None,
         action_dim: int,
         obs_processor: Any,
     ) -> "PolicyAgent":
@@ -75,14 +105,24 @@ class PolicyAgent:
         return cls(
             sensor_params=sensor_params,
             actor_params=actor_params,
+            message_passer_params=message_passer_params,
+            message_passing_steps=message_passing_steps,
+            adj_matrix=adj_matrix,
             action_dim=action_dim,
             obs_processor=obs_processor,
         )
 
-    def set_params(self, *, sensor_params: Any, actor_params: Any) -> None:
+    def set_params(
+        self,
+        *,
+        sensor_params: Any,
+        actor_params: Any,
+        message_passer_params: Any | None = None,
+    ) -> None:
         """Update parameters for evaluation without rebuilding the model."""
         self._params["sensor_params"] = sensor_params
         self._params["actor_params"] = actor_params
+        self._params["message_passer_params"] = message_passer_params
 
     @classmethod
     def from_checkpoint(
@@ -91,6 +131,8 @@ class PolicyAgent:
         *,
         action_dim: int,
         obs_processor: Any,
+        message_passing_steps: int | None = None,
+        adj_matrix: Any | None = None,
     ) -> "PolicyAgent":
         """Load params from .flax and construct the agent."""
         params = load_params(model_path)
@@ -98,6 +140,9 @@ class PolicyAgent:
         return cls(
             sensor_params=params["sensor_params"],
             actor_params=params["actor_params"],
+            message_passer_params=params.get("message_passer_params"),
+            message_passing_steps=message_passing_steps,
+            adj_matrix=adj_matrix,
             action_dim=action_dim,
             obs_processor=obs_processor,
         )
@@ -117,10 +162,16 @@ class PolicyAgent:
         batched_obs = jax.tree.map(lambda x: jnp.asarray(x)[None, ...], observations)
         obs = self._obs_processor(batched_obs)
 
-        # TODO: message passing
         hidden = self._apply_per_node(self._sensor, self._params["sensor_params"], obs)
 
-        # hidden = jax.vmap(...)
+        if self._message_passer is not None:
+            mp_params = self._params.get("message_passer_params")
+            if mp_params is None or (isinstance(mp_params, dict) and len(mp_params) == 0):
+                raise ValueError(
+                    "PolicyAgent has a message passer but message_passer_params are missing/empty."
+                )
+            hidden = jax.vmap(lambda x: self._message_passer.apply(mp_params, x))(hidden)
+
         mean, _log_std = self._apply_per_node(self._actor, self._params["actor_params"], hidden)
 
         return np.asarray(mean, dtype=np.float32).ravel()
