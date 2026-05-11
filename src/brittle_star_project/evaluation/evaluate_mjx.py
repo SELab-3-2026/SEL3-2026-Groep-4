@@ -52,6 +52,7 @@ def build_eval_rollout_fn(
     obs_processor: Callable,
     sensor_apply: Callable,
     actor_apply: Callable,
+    message_passer_apply: Callable | None = None,
     action_low: jnp.ndarray,
     action_high: jnp.ndarray,
     reward_fn: Callable,
@@ -67,6 +68,9 @@ def build_eval_rollout_fn(
             returned by ``create_obs_processor``.
         sensor_apply: The sensor network's ``apply`` method (JIT-compiled).
         actor_apply: The actor network's ``apply`` method (JIT-compiled).
+        message_passer_apply: Optional message-passing module apply method.
+            When provided, it is applied between the sensor and actor, using
+            ``params["message_passer_params"]``.
         action_low: Per-joint action lower bound (JAX array, shape ``(action_dim,)``).
         action_high: Per-joint action upper bound (JAX array, shape ``(action_dim,)``).
         reward_fn: Shaped reward function with signature
@@ -101,10 +105,14 @@ def build_eval_rollout_fn(
 
             obs = obs_processor(state.observations)
             hidden = sensor_apply(params["sensor_params"], obs)
+            if message_passer_apply is not None:
+                mp_params = params["message_passer_params"]
+                hidden = jax.vmap(lambda x: message_passer_apply(mp_params, x))(hidden)
             mean, _log_std = actor_apply(params["actor_params"], hidden)
 
             # Deterministic action: use the actor mean, no exploration noise.
-            action = jnp.clip(mean, action_low, action_high)
+            flat_mean = mean.reshape(mean.shape[0], -1)
+            action = jnp.clip(flat_mean, action_low, action_high)
             next_state = step_1(state=state, action=action)
 
             shaped_reward = reward_fn(state, next_state)
