@@ -25,6 +25,10 @@ class EvaluationConfig:
     comparison_models: list[str] = field(default_factory=list)
     # Path where the comparison results CSV will be saved (relative to workspace root).
     comparison_output_csv: str = "metrics/model_comparison.csv"
+    # Morphology override YAML paths for cross-morphology comparison.
+    # Each path points to a file in configs/morphology/ (e.g., "configs/morphology/3_arms.yaml").
+    # When empty, each model is evaluated only on its training morphology.
+    comparison_morphologies: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.evaluate_checkpoints and self.eval_max_steps <= 0:

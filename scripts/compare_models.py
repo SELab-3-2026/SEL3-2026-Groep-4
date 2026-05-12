@@ -25,20 +25,23 @@ import time
 from pathlib import Path
 
 import hydra
-import numpy as np
 from omegaconf import DictConfig, OmegaConf
 
-from brittle_star_project import Backend, BrittleStarEnv, BrittleStarEnvFactory
 from brittle_star_project.configs.main_config import BrittleStarConfig
 from brittle_star_project.configs.register_configs import register_configs
-from brittle_star_project.environment.obs_processing import create_obs_processor
-from brittle_star_project.environment.padded_obs_wrapper import compute_padding_masks
+from brittle_star_project.evaluation import build_eval_env
 from brittle_star_project.evaluation.checkpoint import load_metadata, metadata_to_configs
-from brittle_star_project.evaluation.policy import PolicyAgent
 from brittle_star_project.evaluation.rollout import rollout_headless
 
 _FIELDNAMES = [
     "model_path",
+    "architecture",
+    "arm_0",
+    "arm_1",
+    "arm_2",
+    "arm_3",
+    "arm_4",
+    "num_active_arms",
     "seed",
     "reached_target",
     "episode_length",
@@ -100,7 +103,6 @@ def main(dict_cfg: DictConfig) -> None:
             model_path = Path(hydra.utils.to_absolute_path(model_path_str))
             logger.info(f"Evaluating model: {model_path.name}")
 
-            # --- Load sidecar metadata + reconstruct configs ---
             try:
                 metadata = load_metadata(model_path)
             except FileNotFoundError as e:
@@ -109,80 +111,52 @@ def main(dict_cfg: DictConfig) -> None:
 
             training = metadata_to_configs(metadata)
 
-            # --- Build padding masks and obs_processor ---
-            padding_masks = compute_padding_masks(
-                segments_per_arm=training.morphology.segments_per_arm,
-                reference_segments_per_arm=training.morphology.segments_per_arm,
-            )
-            obs_processor = create_obs_processor(
-                bounds_dict=training.obs_bounds.to_bounds_dict(),
-                padding_masks=padding_masks,
-            )
+            # Determine morphologies to evaluate
+            # If comparison_morphologies is empty, use the model's training morphology
+            morphologies = [None]
+            if eval_cfg.comparison_morphologies:
+                morphologies = [
+                    Path(hydra.utils.to_absolute_path(m)) for m in eval_cfg.comparison_morphologies
+                ]
 
-            # --- Build the CPU environment from training config ---
-            factory = BrittleStarEnvFactory()
-            raw_env = factory.create_environment(
-                Backend.MJC,
-                training.morphology,
-                training.arena,
-                training.environment,
-            )
-            env = BrittleStarEnv(
-                raw_env,
-                backend=Backend.MJC,
-                config=training.environment,
-                morphology_config=training.morphology,
-            )
+            for morph_path in morphologies:
+                morph_label = morph_path.name if morph_path else "training"
+                logger.info(f"  Morphology: {morph_label}")
 
-            trained_action_dim = sum(training.morphology.segments_per_arm) * 2
-            action_mask = np.asarray(padding_masks["mask_2x"])
-            action_space = getattr(raw_env, "action_space", None)
-            action_low = (
-                None
-                if action_space is None
-                else np.asarray(action_space.low, dtype=np.float32).ravel()
-            )
-            action_high = (
-                None
-                if action_space is None
-                else np.asarray(action_space.high, dtype=np.float32).ravel()
-            )
-
-            policy = PolicyAgent.from_checkpoint(
-                model_path,
-                action_dim=trained_action_dim,
-                obs_processor=obs_processor,
-            )
-
-            # --- Run episodes ---
-            for seed in seeds:
-                t0 = time.time()
-                result = rollout_headless(
-                    env=env,
-                    policy=policy,
-                    seed=seed,
-                    max_steps=max_steps,
-                    action_low=action_low,
-                    action_high=action_high,
-                    action_mask=action_mask,
-                )
-                elapsed = time.time() - t0
-
-                velocity = _approx_max_velocity(result)
-
-                logger.debug(
-                    f"seed={seed:3d} | "
-                    f"reached={str(result.reached_target):<5} | "
-                    f"return={result.return_:+8.3f} | "
-                    f"steps={result.length:4d} | "
-                    f"final_dist="
-                    f"{'n/a' if result.final_xy_dist is None else f'{result.final_xy_dist:.3f}'} | "
-                    f"({elapsed:.1f}s)"
+                bundle = build_eval_env(
+                    model_path=model_path,
+                    training=training,
+                    metadata=metadata,
+                    morphology_override_path=morph_path,
                 )
 
-                writer.writerow(
-                    {
+                for seed in seeds:
+                    t0 = time.time()
+                    result = rollout_headless(
+                        env=bundle.env,
+                        policy=bundle.policy,
+                        seed=seed,
+                        max_steps=max_steps,
+                        action_low=bundle.action_low,
+                        action_high=bundle.action_high,
+                        action_mask=bundle.action_mask,
+                    )
+                    elapsed = time.time() - t0
+
+                    velocity = _approx_max_velocity(result)
+
+                    logger.debug(
+                        f"    seed={seed:3d} | "
+                        f"reached={str(result.reached_target):<5} | "
+                        f"return={result.return_:+8.3f} | "
+                        f"steps={result.length:4d} | "
+                        f"({elapsed:.1f}s)"
+                    )
+
+                    row = {
                         "model_path": model_path_str,
+                        "architecture": bundle.architecture,
+                        "num_active_arms": bundle.num_active_arms,
                         "seed": seed,
                         "reached_target": result.reached_target,
                         "episode_length": result.length,
@@ -191,10 +165,14 @@ def main(dict_cfg: DictConfig) -> None:
                         "final_xy_dist": result.final_xy_dist,
                         "approx_max_velocity": velocity,
                     }
-                )
-                csv_file.flush()
+                    # Add per-arm segments
+                    for i, segs in enumerate(bundle.segments_per_arm):
+                        row[f"arm_{i}"] = segs
 
-            env.close()
+                    writer.writerow(row)
+                    csv_file.flush()
+
+                bundle.env.close()
 
     logger.info(f"Done. Results saved to {output_path}")
 
