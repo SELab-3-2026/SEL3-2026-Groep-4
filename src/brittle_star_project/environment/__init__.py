@@ -1,4 +1,4 @@
-from .env_config import ArenaConfig, EnvConfig, MorphologyConfig
+from .env_config import ArenaConfig, EnvConfig, MorphologyConfig, MorphMode
 from .env_types import Backend, Task
 from .env_wrapper import BrittleStarEnv
 from .factory import BrittleStarEnvFactory
@@ -13,6 +13,7 @@ __all__ = [
     "Task",
     "BrittleStarEnv",
     "BrittleStarEnvFactory",
+    "MorphMode",
     "create_obs_processor",
     "compute_padding_masks",
 ]
