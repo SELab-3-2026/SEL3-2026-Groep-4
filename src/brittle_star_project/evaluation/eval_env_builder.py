@@ -61,30 +61,32 @@ def build_eval_env(
         reference_segments_per_arm=training.morphology.segments_per_arm,
     )
 
-    segs_per_arm = jnp.array(env_morphology.segments_per_arm)
+    training_segs_per_arm = jnp.array(training.morphology.segments_per_arm)
 
     needed_copies = 0
     agent_indices = [0, 1, 2, 3, 4]
-    match env_morphology.morph_mode:
+    match training.morphology.morph_mode:
         case MorphMode.CENTRALIZED:
             needed_copies = 1
         case MorphMode.FULLY_CONNECTED | MorphMode.RING:
-            agent_mask = segs_per_arm > 0
-            agent_indices = jnp.where(agent_mask)[0]
-            needed_copies = jnp.where(segs_per_arm > 0, 1, 0).sum().item()
+            agent_mask = training_segs_per_arm > 0
+            agent_indices = jnp.where(agent_mask)[0].tolist()
+            needed_copies = jnp.where(training_segs_per_arm > 0, 1, 0).sum().item()
         case MorphMode.SEGMENT:
-            agent_mask = segs_per_arm > 0
-            agent_indices = jnp.where(agent_mask)[0]
-            needed_copies = (segs_per_arm.sum() + jnp.where(segs_per_arm > 0, 1, 0).sum()).item()
+            agent_mask = training_segs_per_arm > 0
+            agent_indices = jnp.where(agent_mask)[0].tolist()
+            needed_copies = (
+                training_segs_per_arm.sum() + jnp.where(training_segs_per_arm > 0, 1, 0).sum()
+            ).item()
 
-    num_arms = jnp.where(segs_per_arm > 0, 1, 0).sum().item()
+    num_arms_training = jnp.where(training_segs_per_arm > 0, 1, 0).sum().item()
 
     obs_processor = create_obs_processor(
         bounds_dict=training.obs_bounds.to_bounds_dict(),
         padding_masks=padding_masks,
         needed_copies=needed_copies,
-        num_arms=num_arms,
-        morph_mode=env_morphology.morph_mode,
+        num_arms=num_arms_training,
+        morph_mode=training.morphology.morph_mode,
         segments_per_arm=env_morphology.segments_per_arm,
         agent_indices=agent_indices,
     )
@@ -106,7 +108,8 @@ def build_eval_env(
     )
 
     # Calculate the action dimension the model was trained with
-    trained_action_dim = raw_env.action_space.shape[0] // needed_copies
+    training_total_actions = sum(training.morphology.segments_per_arm) * 2
+    trained_action_dim = training_total_actions // needed_copies
 
     # 4. Load policy
     message_passing_steps = (metadata.get("architecture", {}) or {}).get("message_passing_steps")
@@ -115,8 +118,32 @@ def build_eval_env(
     message_passing_steps = int(message_passing_steps)
 
     adj_matrix = None
-    if env_morphology.morph_mode != MorphMode.CENTRALIZED:
-        adj_matrix = build_adjacency(env_morphology.segments_per_arm, env_morphology.morph_mode)
+    if training.morphology.morph_mode != MorphMode.CENTRALIZED:
+        adj_matrix = build_adjacency(
+            training.morphology.segments_per_arm, training.morphology.morph_mode
+        )
+
+        override_segs = env_morphology.segments_per_arm
+        if training.morphology.morph_mode in (MorphMode.FULLY_CONNECTED, MorphMode.RING):
+            for i, segs in enumerate(override_segs):
+                if segs == 0 and i < adj_matrix.shape[0]:
+                    adj_matrix = adj_matrix.at[i, :].set(0)
+                    adj_matrix = adj_matrix.at[:, i].set(0)
+        elif training.morphology.morph_mode == MorphMode.SEGMENT:
+            for i, segs in enumerate(override_segs):
+                if segs == 0 and i < num_arms_training:
+                    adj_matrix = adj_matrix.at[i, :].set(0)
+                    adj_matrix = adj_matrix.at[:, i].set(0)
+
+            idx = 0
+            for arm_idx, seg_count in enumerate(training.morphology.segments_per_arm):
+                if override_segs[arm_idx] == 0:
+                    for i in range(seg_count):
+                        seg_node = num_arms_training + idx + i
+                        if seg_node < adj_matrix.shape[0]:
+                            adj_matrix = adj_matrix.at[seg_node, :].set(0)
+                            adj_matrix = adj_matrix.at[:, seg_node].set(0)
+                idx += seg_count
 
     policy = PolicyAgent.from_checkpoint(
         model_path,
@@ -144,6 +171,6 @@ def build_eval_env(
         action_high=action_high,
         action_mask=action_mask,
         segments_per_arm=env_morphology.segments_per_arm,
-        num_active_arms=num_arms,
+        num_active_arms=sum(1 for s in env_morphology.segments_per_arm if s > 0),
         architecture=env_morphology.morph_mode.name,
     )
