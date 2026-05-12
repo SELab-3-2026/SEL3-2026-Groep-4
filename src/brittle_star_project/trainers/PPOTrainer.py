@@ -23,6 +23,7 @@ from brittle_star_project.evaluation.evaluate_mjx import (
     build_eval_rollout_fn,
     evaluate_checkpoint_mjx,
 )
+from brittle_star_project.MLPs.routing import apply_per_node
 from brittle_star_project.MLPs.mlps import (
     Actor,
     AgentParams,
@@ -71,7 +72,7 @@ def _get_action_and_value_noise(
     action_high,
 ):
     # (B, n_nodes, feat)
-    hidden = apply_per_node(sensor, agent_state.params["sensor_params"], next_obs)
+    hidden = apply_per_node(sensor.apply, agent_state.params["sensor_params"], next_obs)
 
     if message_passer is not None:
         params = agent_state.params["message_passer_params"]
@@ -82,7 +83,7 @@ def _get_action_and_value_noise(
         feature_extractor, agent_state.params["feature_extractor_params"], next_obs
     )
 
-    mean, log_std = apply_per_node(actor, agent_state.params["actor_params"], hidden)
+    mean, log_std = apply_per_node(actor.apply, agent_state.params["actor_params"], hidden)
     log_std = jnp.clip(log_std, -5, 2)
     key, subkey = jax.random.split(key)
     noise = jax.random.normal(subkey, shape=mean.shape)
@@ -270,17 +271,6 @@ def _step_env_wrapped(
         next_env_state,
         (obs_processor(next_env_state.observations), reward, done, terminated, truncated),
     )
-
-
-def apply_per_node(net, params, x):
-    # params: (nodes, ...)
-    # x: (batch, nodes, feat)
-
-    def apply_single_node(p, x_node):
-        # x_node: (batch, feat)
-        return jax.vmap(lambda xi: net.apply(p, xi))(x_node)
-
-    return jax.vmap(apply_single_node, in_axes=(0, 1), out_axes=1)(params, x)
 
 
 def apply_shared(net, params, x):
@@ -516,10 +506,10 @@ class PPOTrainer:
         )
 
         def apply_sensor(p, x):
-            return apply_per_node(self.sensor, p, x)
+            return apply_per_node(self.sensor.apply, p, x)
 
         def apply_actor(p, x):
-            return apply_per_node(self.actor, p, x)
+            return apply_per_node(self.actor.apply, p, x)
 
         def apply_critic(p, x):
             return apply_shared(self.critic, p, x)
@@ -903,8 +893,8 @@ class PPOTrainer:
                 self._eval_fn = build_eval_rollout_fn(
                     env=self.env,
                     obs_processor=self.obs_processor,
-                    sensor_apply=lambda p, x: apply_per_node(self.sensor, p, x),
-                    actor_apply=lambda p, x: apply_per_node(self.actor, p, x),
+                    sensor_apply=lambda p, x: apply_per_node(self.sensor.apply, p, x),
+                    actor_apply=lambda p, x: apply_per_node(self.actor.apply, p, x),
                     message_passer_apply=(
                         None if self.message_passer is None else self.message_passer.apply
                     ),

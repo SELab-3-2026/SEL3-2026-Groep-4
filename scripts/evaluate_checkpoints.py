@@ -26,7 +26,7 @@ from brittle_star_project.MLPs.mlps import (
 )
 from brittle_star_project.MLPs.adjancency_builder import build_adjacency
 from brittle_star_project.environment import MorphMode
-from brittle_star_project.trainers.PPOTrainer import apply_per_node
+from brittle_star_project.MLPs.routing import apply_per_node
 import logging
 import re
 from pathlib import Path
@@ -219,8 +219,8 @@ def main(dict_cfg: DictConfig) -> None:
     eval_fn = build_eval_rollout_fn(
         env=env,
         obs_processor=obs_processor,
-        sensor_apply=lambda p, x: apply_per_node(sensor, p, x),
-        actor_apply=lambda p, x: apply_per_node(actor, p, x),
+        sensor_apply=lambda p, x: apply_per_node(sensor.apply, p, x),
+        actor_apply=lambda p, x: apply_per_node(actor.apply, p, x),
         message_passer_apply=(None if message_passer is None else message_passer.apply),
         action_low=action_low,
         action_high=action_high,
