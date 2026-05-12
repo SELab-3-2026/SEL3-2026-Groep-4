@@ -2,9 +2,9 @@
 # Lower timestep count for quick iterations/testing.
 
 learning_rate: 0.0005
-total_timesteps: 65536
-num_envs: 512
-num_steps: 128
+total_timesteps: 1024
+num_envs: 32
+num_steps: 32
 anneal_lr: true
 gamma: 0.99
 gae_lambda: 0.95

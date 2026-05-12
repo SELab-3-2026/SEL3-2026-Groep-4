@@ -3,13 +3,14 @@ import random
 import time
 from dataclasses import asdict, dataclass
 from functools import partial
+from typing import Any, Optional
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
+import flax.linen as nn
 from flax.training.train_state import TrainState
-from typing import Any
 
 from experiment_logger import get_logger
 
@@ -26,24 +27,21 @@ from brittle_star_project.MLPs.mlps import (
     Actor,
     AgentParams,
     GenericDenseLayersWithActivation,
+    MessagePasser,
     OneDenseLayerMLP,
     Storage,
 )
+from brittle_star_project.MLPs.adjancency_builder import build_adjacency
 from brittle_star_project.ppo import PPO
+from brittle_star_project.environment import MorphMode
+from brittle_star_project.utils import logged_jit
 
 from brittle_star_project.environment.env_types import Backend
 
 # TODO: clip scaled reward?
 
 
-@jax.jit
-def _get_xy_distance_to_target(obs_dict: dict) -> jnp.ndarray:
-    """Extract xy_distance_to_target for all environments."""
-    # obs_dict is a dict of arrays with leading batch dimension (num_envs, ...)
-    return obs_dict["xy_distance_to_target"].squeeze(-1)  # shape: (num_envs,)
-
-
-@jax.jit
+@logged_jit
 def _clip_action(action: jnp.ndarray, low: jnp.ndarray, high: jnp.ndarray) -> jnp.ndarray:
     return jnp.clip(action, low, high)
 
@@ -54,39 +52,54 @@ def _compute_explained_variance(values: jnp.ndarray, returns: jnp.ndarray) -> fl
     return float(explained_var)
 
 
-@jax.jit
+@logged_jit
 def _linear_schedule(count, minibatch_count, update_epochs, num_iterations, learning_rate):
     frac = 1.0 - (count // (minibatch_count * update_epochs)) / num_iterations
     return learning_rate * frac
 
 
 def _get_action_and_value_noise(
-    sensor: GenericDenseLayersWithActivation,
-    feature_extractor: GenericDenseLayersWithActivation,
-    actor: Actor,
-    critic: OneDenseLayerMLP,
+    sensor: nn.Module,
+    feature_extractor: nn.Module,
+    actor: nn.Module,
+    critic: nn.Module,
+    message_passer: Optional[nn.Module],
     agent_state: TrainState,
     next_obs: jnp.ndarray,
-    key: jax.random.PRNGKey,
+    key,
     action_low,
     action_high,
 ):
-    hidden = sensor.apply(agent_state.params["sensor_params"], next_obs)
-    hidden_critic = feature_extractor.apply(
-        agent_state.params["feature_extractor_params"], next_obs
+    # (B, n_nodes, feat)
+    hidden = apply_per_node(sensor, agent_state.params["sensor_params"], next_obs)
+
+    if message_passer is not None:
+        params = agent_state.params["message_passer_params"]
+        # (n_nodes, feat) --> let each node talk with its neighbours ==> vmap over B dimension
+        hidden = jax.vmap(lambda x: message_passer.apply(params, x))(hidden)
+
+    hidden_critic = apply_shared(
+        feature_extractor, agent_state.params["feature_extractor_params"], next_obs
     )
 
-    mean, log_std = actor.apply(agent_state.params["actor_params"], hidden)
+    mean, log_std = apply_per_node(actor, agent_state.params["actor_params"], hidden)
     log_std = jnp.clip(log_std, -5, 2)
     key, subkey = jax.random.split(key)
     noise = jax.random.normal(subkey, shape=mean.shape)
     std = jnp.exp(log_std)
-    raw_action = mean + noise * std
-    clipped_action = _clip_action(raw_action, action_low, action_high)
-    logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
-    value = critic.apply(agent_state.params["critic_params"], hidden_critic)
 
-    return clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
+    raw_action = mean + noise * std
+    flat_action = raw_action.reshape(
+        raw_action.shape[0], -1
+    )  # concat the per agent, keep the envs dim (batch, agent * action)
+    flat_clipped_action = _clip_action(flat_action, action_low, action_high)
+
+    logprob = -0.5 * (((raw_action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(
+        axis=(-2, -1)
+    )
+    value = apply_shared(critic, agent_state.params["critic_params"], hidden_critic)
+
+    return flat_clipped_action, raw_action, logprob, value.squeeze(-1), mean, std, key
 
 
 def _step_once(
@@ -94,30 +107,58 @@ def _step_once(
     _,
     env_step_fn,
     num_envs: int,
-    sensor: GenericDenseLayersWithActivation,
-    feature_extractor: GenericDenseLayersWithActivation,
-    actor: Actor,
-    critic: OneDenseLayerMLP,
+    sensor: nn.Module,
+    feature_extractor: nn.Module,
+    actor: nn.Module,
+    critic: nn.Module,
+    message_passer: Optional[nn.Module],
     action_low,
     action_high,
 ):
     agent_state, episode_stats, obs, done, key, env_state, terminated_any, truncated_any = carry
-    clipped_action, raw_action, logprob, value, mean, std, key = _get_action_and_value_noise(
-        sensor, feature_extractor, actor, critic, agent_state, obs, key, action_low, action_high
+    flat_clipped_action, raw_action, logprob, value, mean, std, key = _get_action_and_value_noise(
+        sensor,
+        feature_extractor,
+        actor,
+        critic,
+        message_passer,
+        agent_state,
+        obs,
+        key,
+        action_low,
+        action_high,
     )
+    logger = get_logger()
 
+    logger.debug(f"[_step_once] raw_action: {raw_action.shape}")
+    logger.debug(f"[_step_once] clipped_action: {flat_clipped_action.shape}")
+
+    # Supporting signals (often where mismatch originates)
+    logger.debug(f"[_step_once] logprob: {logprob.shape}")
+    logger.debug(f"[_step_once] value: {value.shape}")
+    logger.debug(f"[_step_once] mean: {mean.shape}")
+    logger.debug(f"[_step_once] std: {std.shape}")
+
+    key, reset_key = jax.random.split(key)
+    reset_rngs = jax.random.split(reset_key, num_envs)
+
+    # ---- ENV STEP ----
     key, reset_key = jax.random.split(key)
     reset_rngs = jax.random.split(reset_key, num_envs)
 
     episode_stats, env_state, (next_obs, reward, next_done, terminated, truncated) = env_step_fn(
         episode_stats,
         env_state,
-        clipped_action,
+        flat_clipped_action,
         reset_rngs,
     )
 
     terminated_any = terminated_any | terminated
     truncated_any = truncated_any | truncated
+
+    logger.debug(f"[_step_once] next_obs: {next_obs.shape}")
+    logger.debug(f"[_step_once] reward: {reward.shape}")
+    logger.debug(f"[_step_once] next_done: {next_done.shape}")
 
     storage = Storage(
         obs=obs,
@@ -231,6 +272,25 @@ def _step_env_wrapped(
     )
 
 
+def apply_per_node(net, params, x):
+    # params: (nodes, ...)
+    # x: (batch, nodes, feat)
+
+    def apply_single_node(p, x_node):
+        # x_node: (batch, feat)
+        return jax.vmap(lambda xi: net.apply(p, xi))(x_node)
+
+    return jax.vmap(apply_single_node, in_axes=(0, 1), out_axes=1)(params, x)
+
+
+def apply_shared(net, params, x):
+    # x: (batch, nodes, feat)
+    # If the critic expects a single vector per environment:
+    batch_size = x.shape[0]
+    x_flattened = x.reshape(batch_size, -1)
+    return jax.vmap(lambda xi: net.apply(params, xi))(x_flattened)
+
+
 def _rollout_jit(
     agent_state,
     episode_stats,
@@ -241,10 +301,11 @@ def _rollout_jit(
     max_steps,
     step_env_fn,
     num_envs: int,
-    sensor: GenericDenseLayersWithActivation,
-    feature_extractor: GenericDenseLayersWithActivation,
-    actor: Actor,
-    critic: OneDenseLayerMLP,
+    sensor: nn.Module,
+    feature_extractor: nn.Module,
+    actor: nn.Module,
+    critic: nn.Module,
+    message_passer: Optional[nn.Module],
     action_low,
     action_high,
 ):
@@ -270,6 +331,7 @@ def _rollout_jit(
             feature_extractor=feature_extractor,
             actor=actor,
             critic=critic,
+            message_passer=message_passer,
             env_step_fn=step_env_fn,
             num_envs=num_envs,
             action_low=action_low,
@@ -321,9 +383,10 @@ def _compute_gae_jit(
     feature_extractor,
     critic,
 ):
-    next_value = critic.apply(
+    next_value = apply_shared(
+        critic,
         agent_state.params["critic_params"],
-        feature_extractor.apply(agent_state.params["feature_extractor_params"], next_obs),
+        apply_shared(feature_extractor, agent_state.params["feature_extractor_params"], next_obs),
     ).squeeze(-1)
 
     advantages = jnp.zeros((num_envs,))
@@ -357,7 +420,11 @@ class TrainingMeasurements:
 
 class PPOTrainer:
     def __init__(
-        self, cfg: BrittleStarConfig, env: BrittleStarJaxEnvWrapper, run_dir: str, run_name: str
+        self,
+        cfg: BrittleStarConfig,
+        env: BrittleStarJaxEnvWrapper,
+        run_dir: str,
+        run_name: str,
     ):
         self.cfg = cfg
         self.ppo = cfg.ppo
@@ -375,24 +442,49 @@ class PPOTrainer:
 
         self.key = jax.random.PRNGKey(self.experiment.seed)
 
+        self.morph_mode = self.cfg.morphology.morph_mode
+
+        self.segments_per_arm = jnp.asarray(self.cfg.morphology.segments_per_arm, dtype=jnp.int32)
+        self.num_segments = self.segments_per_arm.sum().item()
+        self.num_arms = jnp.where(self.segments_per_arm > 0, 1, 0).sum().item()
+
+        self.logger.info(f"[INIT]: Used morphology mode {self.morph_mode}")
+        self.adj = build_adjacency(cfg.morphology.segments_per_arm, self.morph_mode)
+
+        (
+            self.sensor,
+            self.message_passer,
+            self.actor,
+            self.feature_extractor,
+            self.critic,
+            self.needed_copies,
+            self.agent_indices,
+        ) = self._init_agent()
+
+        self.sensor.apply = logged_jit(self.sensor.apply)
+        self.feature_extractor.apply = logged_jit(self.feature_extractor.apply)
+        self.actor.apply = logged_jit(self.actor.apply)
+        self.critic.apply = logged_jit(self.critic.apply)
+
         # Build the centralized observation processor: derive -> normalize -> pad -> flatten.
         self.obs_processor = create_obs_processor(
             bounds_dict=self.cfg.obs_bounds.to_bounds_dict(),
+            needed_copies=self.needed_copies,
+            num_arms=self.num_arms,
+            morph_mode=self.morph_mode,
             padding_masks=self.env.padding_masks,
+            segments_per_arm=self.segments_per_arm,
+            agent_indices=self.agent_indices,
         )
 
-        self.sensor, self.feature_extractor, self.actor, self.critic = self._init_agent()
-        self.sensor.apply = jax.jit(self.sensor.apply)
-        self.feature_extractor.apply = jax.jit(self.feature_extractor.apply)
-        self.actor.apply = jax.jit(self.actor.apply)
-        self.critic.apply = jax.jit(self.critic.apply)
+        self.logger.debug(f"needed copies = {self.needed_copies}")
 
         action_low = jnp.asarray(self.env.single_action_space.low, dtype=jnp.float32)
         action_high = jnp.asarray(self.env.single_action_space.high, dtype=jnp.float32)
         self._action_low = action_low
         self._action_high = action_high
 
-        self._rollout_jit = jax.jit(
+        self._rollout_jit = logged_jit(
             partial(
                 _rollout_jit,
                 max_steps=self.ppo.num_steps,
@@ -407,11 +499,12 @@ class PPOTrainer:
                 feature_extractor=self.feature_extractor,
                 actor=self.actor,
                 critic=self.critic,
+                message_passer=self.message_passer,
                 action_low=action_low,
                 action_high=action_high,
             )
         )
-        self._compute_gae_jit = jax.jit(
+        self._compute_gae_jit = logged_jit(
             partial(
                 _compute_gae_jit,
                 num_envs=self.ppo.num_envs,
@@ -422,7 +515,30 @@ class PPOTrainer:
             )
         )
 
-        self._ppo = PPO(self.ppo, self.sensor, self.actor, self.critic, self.feature_extractor)
+        def apply_sensor(p, x):
+            return apply_per_node(self.sensor, p, x)
+
+        def apply_actor(p, x):
+            return apply_per_node(self.actor, p, x)
+
+        def apply_critic(p, x):
+            return apply_shared(self.critic, p, x)
+
+        def apply_feature(p, x):
+            return apply_shared(self.feature_extractor, p, x)
+
+        def apply_message_passer(p, x):
+            assert self.message_passer is not None
+            return jax.vmap(lambda x_in: self.message_passer.apply(p, x_in))(x)
+
+        self._ppo = PPO(
+            self.ppo,
+            apply_sensor,
+            apply_actor,
+            apply_critic,
+            apply_feature,
+            apply_message_passer if self.message_passer is not None else None,
+        )
 
         self.agent_state = self._init_agent_state()
 
@@ -440,33 +556,136 @@ class PPOTrainer:
 
     def _init_agent(self):
         self.logger.info("[AGENT]: Initializing agent...")
+        agent_indices = [0, 1, 2, 3, 4]
+        match self.morph_mode:
+            case MorphMode.CENTRALIZED:
+                needed_copies = 1
+            case MorphMode.FULLY_CONNECTED | MorphMode.RING:
+                agent_mask = self.segments_per_arm > 0
+                agent_indices = jnp.where(agent_mask)[0]
+                needed_copies = jnp.where(self.segments_per_arm > 0, 1, 0).sum().item()
+            case MorphMode.SEGMENT:
+                agent_mask = self.segments_per_arm > 0
+                agent_indices = jnp.where(agent_mask)[0]
+                needed_copies = (
+                    self.segments_per_arm.sum() + jnp.where(self.segments_per_arm > 0, 1, 0).sum()
+                ).item()
 
+        # scale actor output with size of model --> more models ==> less actions needed per model
+        actor = Actor(action_dim=self.env.single_action_space.shape[0] // needed_copies)
         sensor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
+        message_passer: Optional[nn.Module] = (
+            MessagePasser(
+                hidden_dim=300,
+                num_propagation_steps=self.cfg.architecture.message_passing_steps or 4,
+                adj_matrix=self.adj,
+            )
+            if self.morph_mode != MorphMode.CENTRALIZED
+            else None
+        )
+
         feature_extractor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
-        actor = Actor(action_dim=self.env.single_action_space.shape[0])
         critic = OneDenseLayerMLP()
-        return sensor, feature_extractor, actor, critic
+        return (
+            sensor,
+            message_passer,
+            actor,
+            feature_extractor,
+            critic,
+            needed_copies,
+            agent_indices,
+        )
 
     def _init_agent_state(self) -> TrainState:
         self.logger.info("[AGENT STATE]: Initializing agent state...")
 
-        self.key, sensor_key, actor_key, critic_key, feature_extractor_key = jax.random.split(
-            self.key, 5
+        self.key, sensor_key, actor_key, critic_key, feature_extractor_key, message_passer_key = (
+            jax.random.split(self.key, 6)
         )
 
         dummy_reset = self.env.reset(seed=0)
+
+        for k, v in dummy_reset.observations.items():
+            self.logger.debug(k, v.shape)
+
         sample_obs = self.obs_processor(dummy_reset.observations)[0]  # take first env
-        sensor_params = self.sensor.init(sensor_key, sample_obs)
-        feature_extractor_params = self.feature_extractor.init(feature_extractor_key, sample_obs)
-        actor_params = self.actor.init(actor_key, self.sensor.apply(sensor_params, sample_obs))
-        critic_params = self.critic.init(
-            critic_key, self.feature_extractor.apply(feature_extractor_params, sample_obs)
+
+        self.logger.debug(f"[_init_agent_state] sample_obs: {sample_obs.shape}")
+        self.obs_mean = jnp.zeros((sample_obs.shape[-1],))
+        self.obs_var = jnp.ones((sample_obs.shape[-1],))
+        self.obs_count = 1e-4
+        self.logger.debug(f"[_init_agent_state] obs_mean: {self.obs_mean.shape}")
+        self.logger.debug(f"[_init_agent_state] obs_var: {self.obs_var.shape}")
+
+        self.logger.debug(f"[_init_agent_state]: Needed copies: {self.needed_copies}")
+        sensor_keys = jax.random.split(sensor_key, self.needed_copies)
+        actor_keys = jax.random.split(actor_key, self.needed_copies)
+
+        # (needed_copies, X)
+        sensor_params = jax.vmap(lambda k: self.sensor.init(k, sample_obs))(sensor_keys)
+        self.logger.debug(
+            f"[_init_agent_state] sensor_params: {jax.tree.map(lambda x: x.shape, sensor_params)}"
+        )
+
+        single_sensor_param = jax.tree.map(lambda x: x[0], sensor_params)
+        self.logger.debug(
+            f"[_init_agent_state] single_sensor_param: {
+                jax.tree.map(lambda x: x.shape, single_sensor_param)
+            }"
+        )
+
+        sensor_params_sample = self.sensor.apply(single_sensor_param, sample_obs)
+        self.logger.debug(
+            f"[_init_agent_state] sensor_params_sample shape: {sensor_params_sample.shape}"
+        )
+
+        actor_params = jax.vmap(lambda k: self.actor.init(k, sensor_params_sample))(actor_keys)
+        self.logger.debug(
+            f"[_init_agent_state] actor_params: {jax.tree.map(lambda x: x.shape, actor_params)}"
+        )
+
+        message_passer_params = {}
+        if self.morph_mode != MorphMode.CENTRALIZED:
+            assert self.message_passer is not None, "decentralized modes require a message passer"
+
+            message_passer_params = self.message_passer.init(
+                message_passer_key,
+                self.sensor.apply(single_sensor_param, sample_obs),
+            )
+            self.logger.debug(
+                f"[_init_agent_state] message_passer_params: {
+                    jax.tree.map(lambda x: x.shape, message_passer_params)
+                }"
+            )
+
+        flat_obs = sample_obs.reshape(-1)  # BECAUSE 1 centralized critic
+        self.logger.debug(f"[_init_agent_state] flat_obs: {flat_obs.shape}")
+
+        feature_extractor_params = self.feature_extractor.init(feature_extractor_key, flat_obs)
+        self.logger.debug(
+            f"[_init_agent_state] feature_extractor_params: {
+                jax.tree.map(lambda x: x.shape, feature_extractor_params)
+            }"
+        )
+
+        critic_input = self.feature_extractor.apply(feature_extractor_params, flat_obs)
+        self.logger.debug(f"[_init_agent_state] critic_input: {critic_input.shape}")
+
+        critic_params = self.critic.init(critic_key, critic_input)
+        self.logger.debug(
+            f"[_init_agent_state] critic_params: {jax.tree.map(lambda x: x.shape, critic_params)}"
         )
 
         return TrainState.create(
             apply_fn=None,
             params=asdict(
-                AgentParams(sensor_params, actor_params, critic_params, feature_extractor_params)
+                AgentParams(
+                    sensor_params,
+                    actor_params,
+                    critic_params,
+                    feature_extractor_params,
+                    message_passer_params,
+                )
             ),
             tx=optax.chain(
                 optax.clip_by_global_norm(self.ppo.max_grad_norm),
@@ -569,7 +788,7 @@ class PPOTrainer:
     def _step(self, env_state, next_obs, next_done, iteration: int) -> tuple:
         if iteration == 1:
             self.logger.log_non_interactive(f"Starting first rollout (JIT): {time.ctime()}")
-
+        self.logger.debug(f"[_step] next_obs (in): {next_obs.shape}")
         (
             self.agent_state,
             self.episode_stats,
@@ -581,12 +800,12 @@ class PPOTrainer:
             terminated_any,
             truncated_any,
         ) = self._rollout(env_state, next_obs, next_done)
-
+        self.logger.debug(f"[_step] next_obs (post-rollout): {next_obs.shape}")
         if iteration == 1:
             self.logger.log_non_interactive(f"First rollout completed: {time.ctime()}")
 
         storage = self._compute_gae(storage, next_obs, next_done)
-
+        self.logger.debug(f"[_step] storage.obs (post-gae): {storage.obs.shape}")
         if iteration == 1:
             self.logger.log_non_interactive(f"Starting first PPO update (JIT): {time.ctime()}")
 
@@ -684,8 +903,11 @@ class PPOTrainer:
                 self._eval_fn = build_eval_rollout_fn(
                     env=self.env,
                     obs_processor=self.obs_processor,
-                    sensor_apply=self.sensor.apply,
-                    actor_apply=self.actor.apply,
+                    sensor_apply=lambda p, x: apply_per_node(self.sensor, p, x),
+                    actor_apply=lambda p, x: apply_per_node(self.actor, p, x),
+                    message_passer_apply=(
+                        None if self.message_passer is None else self.message_passer.apply
+                    ),
                     action_low=self._action_low,
                     action_high=self._action_high,
                     reward_fn=reward_fn,
@@ -718,7 +940,10 @@ class PPOTrainer:
         self.logger.log_non_interactive(f"Initial reset started: {time.ctime()}")
 
         env_state = self.env.reset(seed=self.experiment.seed)
+
         next_obs = self.obs_processor(env_state.observations)
+        self.logger.debug(f"[train] next_obs: {next_obs.shape}")
+
         next_done = jnp.zeros(self.ppo.num_envs, dtype=jnp.bool_)
 
         self.logger.log_non_interactive(f"Initial reset completed: {time.ctime()}")

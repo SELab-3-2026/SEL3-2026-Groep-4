@@ -1,14 +1,27 @@
 from functools import partial
 
-import flax
 import jax
 import jax.numpy as jnp
+from jax import debug
+from flax.core import FrozenDict
+from experiment_logger import get_logger
+from brittle_star_project.utils import logged_jit
+
+logger = get_logger()
 
 
 # Chose to use a class as it seemed the easiest way to integrate the CleanRL code style
 # with our need to seperate concerns
 class PPO:
-    def __init__(self, args, sensor, actor, critic, feature_extractor, message_passer=None):
+    def __init__(
+        self,
+        args,
+        sensor_apply,
+        actor_apply,
+        critic_apply,
+        feature_extractor_apply,
+        message_passer=None,
+    ):
         self.args = args
 
         if not message_passer:
@@ -18,10 +31,10 @@ class PPO:
             partial(
                 ppo_loss,
                 args=args,
-                sensor_apply=sensor.apply,
-                actor_apply=actor.apply,
-                critic_apply=critic.apply,
-                feature_extractor_apply=feature_extractor.apply,
+                sensor_apply=sensor_apply,
+                actor_apply=actor_apply,
+                critic_apply=critic_apply,
+                feature_extractor_apply=feature_extractor_apply,
                 message_passer=message_passer,
             ),
             has_aux=True,
@@ -29,8 +42,14 @@ class PPO:
 
     # This PPO class should be initialized only once,
     # or this function will need to recompile
-    @partial(jax.jit, static_argnums=0)
+    @partial(logged_jit, static_argnums=0)
     def update_ppo(self, agent_state, storage, key):
+        debug.callback(logger.debug, f"[PPO] storage.obs shape: {storage.obs.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.actions shape: {storage.actions.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.logprobs shape: {storage.logprobs.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.advantages shape: {storage.advantages.shape}")
+        debug.callback(logger.debug, f"[PPO] storage.returns shape: {storage.returns.shape}")
+
         args = self.args
         ppo_loss_grad_fn = self.ppo_loss_grad_fn
 
@@ -49,6 +68,16 @@ class PPO:
             shuffled_storage = jax.tree.map(convert_data, flatten_storage)
 
             def update_minibatch(agent_state, minibatch):
+                debug.callback(logger.debug, f"[PPO] minibatch.obs: {minibatch.obs.shape}")
+                debug.callback(logger.debug, f"[PPO] minibatch.actions: {minibatch.actions.shape}")
+                debug.callback(
+                    logger.debug, f"[PPO] minibatch.logprobs: {minibatch.logprobs.shape}"
+                )
+                debug.callback(
+                    logger.debug, f"[PPO] minibatch.advantages: {minibatch.advantages.shape}"
+                )
+                debug.callback(logger.debug, f"[PPO] minibatch.returns: {minibatch.returns.shape}")
+
                 (loss, (pg_loss, v_loss, entropy_loss, approx_kl)), grads = ppo_loss_grad_fn(
                     agent_state.params,
                     minibatch.obs,
@@ -58,19 +87,12 @@ class PPO:
                     minibatch.returns,
                 )
                 agent_state = agent_state.apply_gradients(grads=grads)
-                return agent_state, (
-                    loss,
-                    pg_loss,
-                    v_loss,
-                    entropy_loss,
-                    approx_kl,
-                    grads,
-                )
+                return agent_state, (loss, pg_loss, v_loss, entropy_loss, approx_kl)
 
             agent_state, metrics = jax.lax.scan(update_minibatch, agent_state, shuffled_storage)
             return (agent_state, key), metrics
 
-        (agent_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl, grads) = jax.lax.scan(
+        (agent_state, key), (loss, pg_loss, v_loss, entropy_loss, approx_kl) = jax.lax.scan(
             update_epoch, (agent_state, key), (), length=args.update_epochs
         )
         return agent_state, loss, pg_loss, v_loss, entropy_loss, approx_kl, key
@@ -84,27 +106,45 @@ that are now not in the same scope
 """
 
 
-@partial(jax.jit, static_argnums=(0, 1, 2, 3, 4))
+@partial(logged_jit, static_argnums=(0, 1, 2, 3, 4))
 def get_action_and_value(
     sensor_apply,
     actor_apply,
     message_passer,
     critic_apply,
     feature_extractor_apply,
-    params: flax.core.FrozenDict,
+    params: FrozenDict,
     x: jnp.ndarray,
     action: jnp.ndarray,
 ):
     hidden_sensor = sensor_apply(params["sensor_params"], x)
     hidden_critic = feature_extractor_apply(params["feature_extractor_params"], x)
-    hidden_sensor = message_passer(hidden_sensor)
+
+    # only apply message passing in decentralized context
+    if message_passer is not None:
+        hidden_sensor = message_passer(params["message_passer_params"], hidden_sensor)
+
+    debug.callback(logger.debug, f"[SHAPE] hidden_sensor: {hidden_sensor.shape}")
+    debug.callback(logger.debug, f"[SHAPE] hidden_critic: {hidden_critic.shape}")
+
     mean, log_std = actor_apply(params["actor_params"], hidden_sensor)
+
+    debug.callback(logger.debug, f"[SHAPE] mean: {mean.shape}")
+    debug.callback(logger.debug, f"[SHAPE] log_std: {log_std.shape}")
+    debug.callback(logger.debug, f"[SHAPE] action: {action.shape}")
+
     log_std = jnp.clip(log_std, -5, 2)
     std = jnp.exp(log_std)
 
-    logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi)).sum(-1)
-    entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(-1)
+    logprob = -0.5 * (((action - mean) / std) ** 2 + 2 * log_std + jnp.log(2 * jnp.pi))
+    debug.callback(logger.debug, f"[SHAPE] logprob pre-sum: {logprob.shape}")
+
+    logprob = logprob.sum(axis=(-2, -1))
+    debug.callback(logger.debug, f"[SHAPE] logprob final: {logprob.shape}")
+
+    entropy = (0.5 + 0.5 * jnp.log(2 * jnp.pi) + log_std).sum(axis=(-2, -1))
     value = critic_apply(params["critic_params"], hidden_critic).squeeze(-1)
+    debug.callback(logger.debug, f"[SHAPE] value: {value.shape}")
 
     return logprob, entropy, value
 
@@ -150,7 +190,7 @@ def ppo_loss(
     return loss, (pg_loss, v_loss, entropy_loss, jax.lax.stop_gradient(approx_kl))
 
 
-def identity(hidden):
+def identity(_, hidden):
     """
     Used for seamless jax integration,
     avoids having branching inside jitted function,

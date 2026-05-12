@@ -1,0 +1,6 @@
+# 2 Arms Morphology Configuration
+
+segments_per_arm: [4, 0, 4, 0, 0]
+use_p_control: true
+use_torque_control: false
+morph_mode: FULLY_CONNECTED

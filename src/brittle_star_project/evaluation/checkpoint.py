@@ -4,6 +4,8 @@ import yaml
 from dataclasses import dataclass
 from pathlib import Path
 
+from collections.abc import Mapping
+
 import flax
 from omegaconf import OmegaConf
 
@@ -32,15 +34,19 @@ def load_params(path: Path) -> dict:
 
     sensor_params = None
     actor_params = None
+    message_passer_params = None
 
     # Extract params from restored checkpoint
-    if isinstance(restored, dict):
+    if isinstance(restored, Mapping):
         params_sub = restored.get("params", {})
         sensor_params = restored.get("sensor_params") or params_sub.get("sensor_params")
         actor_params = restored.get("actor_params") or params_sub.get("actor_params")
+        message_passer_params = restored.get("message_passer_params") or params_sub.get(
+            "message_passer_params"
+        )
     elif isinstance(restored, (list, tuple)) and len(restored) >= 2:
         params_part = restored[1]
-        if isinstance(params_part, dict):
+        if isinstance(params_part, Mapping):
             sensor_params = params_part.get("0", params_part.get(0))
             actor_params = params_part.get("1", params_part.get(1))
         elif isinstance(params_part, (list, tuple)) and len(params_part) >= 2:
@@ -53,6 +59,7 @@ def load_params(path: Path) -> dict:
     return {
         "sensor_params": sensor_params,
         "actor_params": actor_params,
+        "message_passer_params": message_passer_params,
     }
 
 

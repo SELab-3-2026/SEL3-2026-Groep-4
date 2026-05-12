@@ -1,0 +1,6 @@
+# Testing chicken dinner 4 but further distance.
+
+exp_name: "long2arm"
+seed: 123
+torch_deterministic: true
+cuda: true
