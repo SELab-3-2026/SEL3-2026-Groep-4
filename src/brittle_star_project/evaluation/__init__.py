@@ -11,6 +11,7 @@ from .evaluate import evaluate_policy
 from .policy import PolicyAgent, ControlPolicy
 from .rollout import rollout_headless, rollout_viewer, EpisodeResult
 from .video import record_episode, create_evaluation_dir, save_evaluation_metadata
+from .eval_env_builder import EvalEnvBundle, build_eval_env
 
 __all__ = [
     # checkpoint loading
@@ -36,4 +37,7 @@ __all__ = [
     "record_episode",
     "create_evaluation_dir",
     "save_evaluation_metadata",
+    # env builder
+    "EvalEnvBundle",
+    "build_eval_env",
 ]
