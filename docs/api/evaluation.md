@@ -1,6 +1,6 @@
 # Checkpoint & Model Evaluation
 
-This guide covers how to evaluate trained brittle star models, both during training and as a post-training analysis step.
+This guide covers how to evaluate trained brittle star models, with a focus on measuring defect tolerance (amputations) across different controller architectures.
 
 ## Checkpoint Evaluation (During Training)
 
@@ -15,33 +15,42 @@ python scripts/train.py evaluation.evaluate_checkpoints=true evaluation.eval_max
 
 Results are saved to `runs/<run_dir>/metrics/checkpoint_evaluation.csv` and synced to Weights & Biases if enabled.
 
-## Cross-Model Comparison
+## Cross-Model & Defect Tolerance Analysis
 
-To compare different architectures or runs, use `scripts/compare_models.py`.
+To measure how well different controllers handle damage (amputations), use `scripts/compare_models.py`. This script performs a grid search over models x morphologies.
 
-1. Create or update a YAML file in `configs/evaluation/`.
-2. Run the Comparison:
+1. Create or update a YAML file in `configs/evaluation`.
+2. Run the benchmark:
 
 ```bash
 python scripts/compare_models.py evaluation=poster
 ```
 
-The script will run the specified number of episodes for each model and produce a single CSV with return and velocity metrics.
+The script will evaluate every combination of model and morphology for the specified number of episodes.
 
-## Post-hoc Checkpoint Evaluation
+The results are saved to a CSV (default: `metrics/model_comparison.csv`).
 
-If you didn't enable evaluation during training, or want to re-run it with different settings, use `scripts/evaluate_checkpoints.py`.
+### CSV Schema
+
+| Column                | Description                                                  |
+|-----------------------|--------------------------------------------------------------|
+| `model_path`          | Path to the trained weights.                                 |
+| `architecture`        | The `morph_mode` of the model (e.g., `CENTRALIZED`, `RING`). |
+| `arm_0` ... `arm_4`   | Number of segments in each arm slot (0 = amputated).         |
+| `num_active_arms`     | Total number of arms with segments > 0.                      |
+| `seed`                | The episode seed.                                            |
+| `eval_return`         | Accumulated shaped reward.                                   |
+| `approx_max_velocity` | Average velocity: `(initial_dist - final_dist) / steps`.     |
+| `reached_target`      | Whether the robot finished within the success radius.        |
+
+## Post-hoc Checkpoint Scanning
+
+If you need to re-evaluate every saved checkpoint in a run (e.g., to generate a learning curve with different metrics):
 
 ```bash
 python scripts/evaluate_checkpoints.py \
     simulation.model_path=runs/<run_id>/final_model.flax \
-    evaluation.eval_seed=42
+    evaluation.eval_max_steps=2000
 ```
 
-This script scans the `checkpoints/` directory and evaluates every `.flax` file it finds.
-
-## Metrics Explained
-
-- **`eval_return`**: The accumulated shaped reward using the `reward_fn` defined in `PPOTrainer`.
-- **`approx_max_velocity`**: Calculated as `(initial_dist - final_dist) / total_steps`. Note that this is an average velocity over the episode.
-- **`reached_target`**: Boolean indicating if the robot reached the target within the max steps.
+This script scans the `checkpoints/` directory of the specified run and evaluates every `.flax` file it finds using the model's training morphology.
