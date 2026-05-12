@@ -103,6 +103,8 @@ def main(dict_cfg: DictConfig) -> None:
     obs_processor = create_obs_processor(
         bounds_dict=training.obs_bounds.to_bounds_dict(),
         padding_masks=padding_masks,
+        num_arms=5,
+        needed_copies=5,
     )
 
     env = BrittleStarJaxEnvWrapper(
