@@ -36,12 +36,14 @@ def test_centralized_forward_pass_with_padding():
     )
     global_state = obs_processor(amputated_obs)
 
-    # 40 + 40 + 20 + padding = 145 dimensions
-    assert global_state.shape == (batch_size, 1, 145), (
-        f"Expected global state shape (2, 1, 145), got {global_state.shape}"
+    # joint_position: 5 arms × 8 joints (padded) = 40
+    # joint_velocity:  5 arms × 8 joints (padded) = 40
+    # segment_contact: 5 arms × 4 segs  (padded) = 20
+    # Total = 100 (no disk or direction keys supplied)
+    assert global_state.shape == (batch_size, 1, 100), (
+        f"Expected global state shape (2, 1, 100), got {global_state.shape}"
     )
 
-    # 4. Initialize dummy networks (40 actuators for the max morphology output)
     actor = Actor(action_dim=40)
     critic = OneDenseLayerMLP()  # Acts as the centralized critic
 

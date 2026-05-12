@@ -7,17 +7,14 @@ from brittle_star_project.environment.env_config import MorphMode, ObservationBo
 
 obs_bounds = ObservationBoundsConfig().to_bounds_dict()
 
-"""
-Test for obs_processor.
-
-Centralized: 40 features per agent:
-    disk_z_tilt              → scalar → reshaped to (1,)  → 1 feat
-    joint_actuator_force     → 8 joints padded to 8       → 8 feat
-    joint_position           → 8 joints padded to 8       → 8 feat
-    joint_velocity           → 8 joints padded to 8       → 8 feat
-    robot_direction_to_target→ (x, y)                     → 2 feat
-    segment_contact          → 4 segs, pre-padded by 9    → 13 feat (9 leading + 4)
-"""
+# Features per decentralized agent (one arm's data):
+#   disk_z_tilt              → scalar                    → 1 feat
+#   joint_actuator_force     → 4 segs × 2 joints         → 8 feat
+#   joint_position           → 4 segs × 2 joints         → 8 feat
+#   joint_velocity           → 4 segs × 2 joints         → 8 feat
+#   robot_direction_to_target→ (x, y)                    → 2 feat
+#   segment_contact          → 4 segs                    → 4 feat
+# Total per agent: 1+8+8+8+2+4 = 31
 
 NUM_ARMS = 5
 SEGS_PER_ARM = 4  # healthy segments per arm
@@ -28,7 +25,17 @@ SEGS_DAMAGED = [4, 4, 4, 4, 0]  # arm 4 fully disabled
 SEGS_DAMAGED_2 = [4, 0, 4, 2, 4]  # arm 3 fully disabled
 AGENT_INDICES = [0, 1, 2, 3, 4]
 
-FEAT_PER_AGENT = 1 + 8 + 8 + 8 + 2 + 13  # = 40
+FEAT_PER_AGENT = 1 + 8 + 8 + 8 + 2 + 4  # = 31
+
+# Centralized flattening (needed_copies=1, one copy of global features):
+#   disk_z_tilt              → repeated once              →  1 feat
+#   joint_actuator_force     → 5 arms × 8 joints          → 40 feat
+#   joint_position           → 5 arms × 8 joints          → 40 feat
+#   joint_velocity           → 5 arms × 8 joints          → 40 feat
+#   robot_direction_to_target→ repeated once              →  2 feat
+#   segment_contact          → 5 arms × 4 segs            → 20 feat
+# Total: 1+40+40+40+2+20 = 143
+FEAT_CENTRALIZED = 1 + 40 + 40 + 40 + 2 + 20  # = 143
 
 
 def make_obs(segs_per_arm: list[int]) -> dict:
@@ -73,10 +80,8 @@ def test_centralized_no_damage():
     obs = batch_obs(obs)
     global_state = proc(obs)
 
-    # shape test
-    assert global_state.shape == (1, 1, 188)
-
-    # TODO: more?
+    # Centralized: 5 agents flattened into 1 → shape (1, 1, 155)
+    assert global_state.shape == (1, 1, FEAT_CENTRALIZED)
 
 
 def test_centralized_damaged_1_arm():
@@ -86,7 +91,7 @@ def test_centralized_damaged_1_arm():
     global_state = proc(obs)
 
     # shape test
-    assert global_state.shape == (1, 1, 188)
+    assert global_state.shape == (1, 1, FEAT_CENTRALIZED)
 
 
 def test_centralized_damaged_2_arms():
@@ -96,7 +101,7 @@ def test_centralized_damaged_2_arms():
     global_state = proc(obs)
 
     # shape test
-    assert global_state.shape == (1, 1, 188)
+    assert global_state.shape == (1, 1, FEAT_CENTRALIZED)
 
 
 def test_decentralized_fully_connected_no_damage():
