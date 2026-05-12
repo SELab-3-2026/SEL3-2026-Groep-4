@@ -58,11 +58,15 @@ def main(dict_cfg: DictConfig) -> None:
     seed = int(cfg.experiment.seed)
 
     # 4-7. Build evaluation environment and policy
+    override_path = None
+    if sim_cfg.morphology_override is not None:
+        override_path = Path(hydra.utils.to_absolute_path(sim_cfg.morphology_override))
+
     bundle = build_eval_env(
         model_path=model_path,
         training=training,
         metadata=metadata,
-        morphology_override_path=sim_cfg.morphology_override,
+        morphology_override_path=override_path,
     )
 
     env = bundle.env
