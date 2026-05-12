@@ -109,6 +109,7 @@ def create_obs_processor(
         joints_per_segment = 2
         joints_per_arm = segs_per_arm * joints_per_segment
         for key, arr in obs.items():
+            arr = jnp.asarray(arr)
             if arr.size == 0:
                 continue
 
@@ -121,7 +122,7 @@ def create_obs_processor(
                     idx = segment_indices[i]
                     taken = jnp.take(arr, idx, axis=0)
                     pad_len = segs_per_arm - taken.shape[0]
-                    padded = jnp.pad(taken, [(9, pad_len)] + [(0, 0)] * (taken.ndim - 1))
+                    padded = jnp.pad(taken, [(0, pad_len)] + [(0, 0)] * (taken.ndim - 1))
 
                     per_agent.append(padded.reshape(-1))
                 arr = jnp.stack(per_agent)
@@ -159,7 +160,7 @@ def create_obs_processor(
         """
         values = []
 
-        for key in ordered_keys:
+        for key in sorted(ordered_keys):
             if key not in obs:
                 continue
 
