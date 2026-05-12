@@ -19,7 +19,14 @@ all `*.flax` checkpoints under `checkpoints/`, and evaluates them in order.
 """
 
 from __future__ import annotations
-
+from brittle_star_project.MLPs.mlps import (
+    Actor,
+    GenericDenseLayersWithActivation,
+    MessagePasser,
+)
+from brittle_star_project.MLPs.adjancency_builder import build_adjacency
+from brittle_star_project.environment import MorphMode
+from brittle_star_project.trainers.PPOTrainer import apply_per_node
 import logging
 import re
 from pathlib import Path
@@ -27,6 +34,8 @@ from pathlib import Path
 import hydra
 import jax
 import numpy as np
+import jax.numpy as jnp
+
 from omegaconf import DictConfig, OmegaConf
 
 from brittle_star_project.configs.main_config import BrittleStarConfig
@@ -100,11 +109,48 @@ def main(dict_cfg: DictConfig) -> None:
         segments_per_arm=training.morphology.segments_per_arm,
         reference_segments_per_arm=training.morphology.segments_per_arm,
     )
+
+    morph_mode = training.morphology.morph_mode
+
+    segments_per_arm = jnp.asarray(
+        training.morphology.segments_per_arm,
+        dtype=jnp.int32,
+    )
+
+    num_arms = (
+        jnp.where(
+            segments_per_arm > 0,
+            1,
+            0,
+        )
+        .sum()
+        .item()
+    )
+
+    match morph_mode:
+        case MorphMode.CENTRALIZED:
+            needed_copies = 1
+            agent_indices = [0, 1, 2, 3, 4]
+
+        case MorphMode.FULLY_CONNECTED | MorphMode.RING:
+            agent_mask = segments_per_arm > 0
+            agent_indices = jnp.where(agent_mask)[0]
+            needed_copies = num_arms
+
+        case MorphMode.SEGMENT:
+            agent_mask = segments_per_arm > 0
+            agent_indices = jnp.where(agent_mask)[0]
+
+            needed_copies = (segments_per_arm.sum() + num_arms).item()
+
     obs_processor = create_obs_processor(
         bounds_dict=training.obs_bounds.to_bounds_dict(),
         padding_masks=padding_masks,
-        num_arms=5,
-        needed_copies=5,
+        num_arms=num_arms,
+        needed_copies=needed_copies,
+        morph_mode=morph_mode,
+        segments_per_arm=segments_per_arm,
+        agent_indices=agent_indices,
     )
 
     env = BrittleStarJaxEnvWrapper(
@@ -116,8 +162,6 @@ def main(dict_cfg: DictConfig) -> None:
 
     action_low = np.asarray(env.single_action_space.low, dtype=np.float32)
     action_high = np.asarray(env.single_action_space.high, dtype=np.float32)
-
-    from brittle_star_project.MLPs.mlps import Actor, GenericDenseLayersWithActivation
 
     sensor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
     actor = Actor(action_dim=env.single_action_space.shape[0])
@@ -134,6 +178,54 @@ def main(dict_cfg: DictConfig) -> None:
         reward_fn=reward_fn,
     )
 
+    morph_mode = training.morphology.morph_mode
+
+    segments_per_arm = jnp.asarray(
+        training.morphology.segments_per_arm,
+        dtype=jnp.int32,
+    )
+
+    match morph_mode:
+        case MorphMode.CENTRALIZED:
+            needed_copies = 1
+
+        case MorphMode.FULLY_CONNECTED | MorphMode.RING:
+            needed_copies = jnp.where(segments_per_arm > 0, 1, 0).sum().item()
+
+        case MorphMode.SEGMENT:
+            needed_copies = (
+                segments_per_arm.sum() + jnp.where(segments_per_arm > 0, 1, 0).sum()
+            ).item()
+
+    adj = build_adjacency(
+        training.morphology.segments_per_arm,
+        morph_mode,
+    )
+
+    sensor = GenericDenseLayersWithActivation(layer_sizes=[300, 300, 300])
+
+    actor = Actor(action_dim=env.single_action_space.shape[0] // needed_copies)
+
+    message_passer = (
+        MessagePasser(
+            hidden_dim=300,
+            num_propagation_steps=4,
+            adj_matrix=adj,
+        )
+        if morph_mode != MorphMode.CENTRALIZED
+        else None
+    )
+
+    eval_fn = build_eval_rollout_fn(
+        env=env,
+        obs_processor=obs_processor,
+        sensor_apply=lambda p, x: apply_per_node(sensor, p, x),
+        actor_apply=lambda p, x: apply_per_node(actor, p, x),
+        message_passer_apply=(None if message_passer is None else message_passer.apply),
+        action_low=action_low,
+        action_high=action_high,
+        reward_fn=reward_fn,
+    )
     seed = int(eval_cfg.eval_seed)
     max_steps = int(eval_cfg.eval_max_steps)
 
