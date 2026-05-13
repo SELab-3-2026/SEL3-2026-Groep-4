@@ -25,6 +25,8 @@ import numpy as np
 import pandas as pd
 from enum import Enum
 
+from plot_config import COLORS, apply_style, create_common_parser, LEGEND_KWARGS
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -177,7 +179,9 @@ def _add_bar_labels(bars, max_val: float):
         )
 
 
-def plot_grouped_convergence_chart(results_df: pd.DataFrame, output_filename: str):
+def plot_grouped_convergence_chart(
+    results_df: pd.DataFrame, output_filename: str, output_dir: str, **kwargs
+):
     """
     Saves a grouped horizontal bar chart comparing Reward and Velocity convergence timesteps
     across all architectures.
@@ -190,7 +194,7 @@ def plot_grouped_convergence_chart(results_df: pd.DataFrame, output_filename: st
         ["Reward_Convergence_Timestep", "Velocity_Convergence_Timestep"]
     ].values.max()
 
-    _, ax = plt.subplots(figsize=(12, 8))
+    fig, ax = plt.subplots(figsize=kwargs.get("figsize", (12, 8)))
 
     bars_reward = ax.barh(
         y_pos + bar_height / 2,
@@ -208,13 +212,16 @@ def plot_grouped_convergence_chart(results_df: pd.DataFrame, output_filename: st
     )
 
     title_suffix = " (DUMMY DATA)" if USING_DUMMY_DATA else ""
-    ax.set_title(f"Comparison of Training Convergence Timesteps{title_suffix}", fontsize=20, pad=20)
+    if kwargs.get("show_titles", True):
+        ax.set_title(
+            f"Comparison of Training Convergence Timesteps{title_suffix}", fontsize=20, pad=20
+        )
     ax.set_xlabel("Timesteps to Convergence (95% of peak)", fontsize=16)
     ax.set_ylabel("Architecture", fontsize=16)
     ax.set_yticks(y_pos)
     ax.set_yticklabels(architectures, fontsize=14)
     ax.tick_params(axis="x", labelsize=14)
-    ax.legend(fontsize=12, loc="lower right")
+    ax.legend(**LEGEND_KWARGS, ncol=2)
     ax.set_xlim(left=0)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -223,18 +230,25 @@ def plot_grouped_convergence_chart(results_df: pd.DataFrame, output_filename: st
     _add_bar_labels(bars_velocity, max_val)
 
     plt.tight_layout()
-    plt.savefig(output_filename, format="png", dpi=300, bbox_inches="tight")
+    os.makedirs(output_dir, exist_ok=True)
+    base_path = os.path.join(output_dir, os.path.splitext(output_filename)[0])
+    plt.savefig(f"{base_path}.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"{base_path}.svg", format="svg", bbox_inches="tight")
     plt.close()
 
 
-def plot_metric_curves(df: pd.DataFrame, metric_col: str, title: str, output_filename: str):
+def plot_metric_curves(
+    df: pd.DataFrame, metric_col: str, title: str, output_filename: str, output_dir: str, **kwargs
+):
     """
     Saves a line plot of the given metric over training timesteps for every architecture.
     """
-    _, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=kwargs.get("figsize", (12, 7)))
 
     for arch in df[Columns.ARCH].unique():
         arch_data = df[df[Columns.ARCH] == arch].sort_values(Columns.TIMESTEPS)
+        color_key = arch.split()[0].upper() if isinstance(arch, str) else "UNKNOWN"
+        color = COLORS.get(color_key, "#888888")
         ax.plot(
             arch_data[Columns.TIMESTEPS],
             arch_data[metric_col],
@@ -242,30 +256,47 @@ def plot_metric_curves(df: pd.DataFrame, metric_col: str, title: str, output_fil
             marker="o",
             markersize=4,
             alpha=0.8,
+            color=color,
         )
 
     title_suffix = " (DUMMY DATA)" if USING_DUMMY_DATA else ""
-    ax.set_title(f"{title}{title_suffix}", fontsize=18, pad=20)
+    if kwargs.get("show_titles", True):
+        ax.set_title(f"{title}{title_suffix}", fontsize=18, pad=20)
     ax.set_xlabel("Training Timesteps", fontsize=14)
     ax.set_ylabel(metric_col.replace("_", " ").title(), fontsize=14)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize=10)
+    ax.legend(**LEGEND_KWARGS, ncol=len(df[Columns.ARCH].unique()))
     ax.grid(True, linestyle="--", alpha=0.6)
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
 
     plt.tight_layout()
-    plt.savefig(output_filename, format="png", dpi=300, bbox_inches="tight")
+    os.makedirs(output_dir, exist_ok=True)
+    base_path = os.path.join(output_dir, os.path.splitext(output_filename)[0])
+    plt.savefig(f"{base_path}.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"{base_path}.svg", format="svg", bbox_inches="tight")
     plt.close()
 
 
-def plot_results(df: pd.DataFrame, results: pd.DataFrame):
+def plot_results(df: pd.DataFrame, results: pd.DataFrame, output_dir: str, **kwargs):
     """Generates and saves all analysis plots."""
-    plot_grouped_convergence_chart(results, output_filename="convergence_comparison.png")
-    plot_metric_curves(
-        df, Columns.REWARD, "Training Progress: Accumulated Reward", "progress_reward_curves.png"
+    plot_grouped_convergence_chart(
+        results, output_filename="convergence_comparison.png", output_dir=output_dir, **kwargs
     )
     plot_metric_curves(
-        df, Columns.VELOCITY, "Training Progress: Velocity", "progress_velocity_curves.png"
+        df,
+        Columns.REWARD,
+        "Training Progress: Accumulated Reward",
+        "progress_reward_curves.png",
+        output_dir=output_dir,
+        **kwargs,
+    )
+    plot_metric_curves(
+        df,
+        Columns.VELOCITY,
+        "Training Progress: Velocity",
+        "progress_velocity_curves.png",
+        output_dir=output_dir,
+        **kwargs,
     )
 
 
@@ -280,7 +311,7 @@ def obtain_data() -> pd.DataFrame:
     return load_metrics(FILE_MAPPING)
 
 
-def run_analysis():
+def run_analysis(output_dir: str, **kwargs):
     """Orchestrates data loading, convergence analysis, and plot generation."""
     df = obtain_data()
     if df.empty:
@@ -288,9 +319,17 @@ def run_analysis():
         return
 
     results = analyze_convergence(df)
-    plot_results(df, results)
+    plot_results(df, results, output_dir, **kwargs)
     logger.info("Analysis complete. Plots saved to disk.")
 
 
 if __name__ == "__main__":
-    run_analysis()
+    parser = create_common_parser(description="Analyze training convergence.")
+    args = parser.parse_args()
+
+    apply_style(font_size=args.font_size)
+    run_analysis(
+        output_dir=args.output_dir,
+        show_titles=args.show_titles,
+        figsize=(args.fig_width, args.fig_height),
+    )
