@@ -7,6 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from brittle_star_project.MLPs.routing import apply_per_node
 from brittle_star_project.evaluation.checkpoint import load_params
 
 
@@ -147,22 +148,12 @@ class PolicyAgent:
             obs_processor=obs_processor,
         )
 
-    def _apply_per_node(self, net, params, x):
-        # params: (nodes, ...)
-        # x: (batch, nodes, feat)
-
-        def apply_single_node(p, x_node):
-            # x_node: (batch, feat)
-            return jax.vmap(lambda xi: net.apply(p, xi))(x_node)
-
-        return jax.vmap(apply_single_node, in_axes=(0, 1), out_axes=1)(params, x)
-
     def act(self, *, observations: dict[str, Any]) -> np.ndarray:
         """Return deterministic action (actor mean, no exploration noise)."""
         batched_obs = jax.tree.map(lambda x: jnp.asarray(x)[None, ...], observations)
         obs = self._obs_processor(batched_obs)
 
-        hidden = self._apply_per_node(self._sensor, self._params["sensor_params"], obs)
+        hidden = apply_per_node(self._sensor.apply, self._params["sensor_params"], obs)
 
         if self._message_passer is not None:
             mp_params = self._params.get("message_passer_params")
@@ -172,6 +163,6 @@ class PolicyAgent:
                 )
             hidden = jax.vmap(lambda x: self._message_passer.apply(mp_params, x))(hidden)
 
-        mean, _log_std = self._apply_per_node(self._actor, self._params["actor_params"], hidden)
+        mean, _log_std = apply_per_node(self._actor.apply, self._params["actor_params"], hidden)
 
         return np.asarray(mean, dtype=np.float32).ravel()

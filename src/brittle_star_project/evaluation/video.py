@@ -97,10 +97,10 @@ def record_episode(
     data = state.mj_data
 
     renderer = mujoco.Renderer(model, width=width, height=height)
-
     ep_return = 0.0
     observations = _get_observations(state)
     prev_dist = _get_xy_distance_to_target(observations) if observations else None
+    initial_dist = prev_dist
     reached_target = _target_reached(state=state)
 
     frames = []
@@ -145,4 +145,5 @@ def record_episode(
         length=steps,
         reached_target=reached_target,
         final_xy_dist=final_dist,
+        initial_target_distance=initial_dist,
     )

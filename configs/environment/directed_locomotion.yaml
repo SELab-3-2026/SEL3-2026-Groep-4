@@ -2,11 +2,11 @@
 # Baseline task setting.
 
 task: DIRECTED_LOCOMOTION
-simulation_time: 5000.0
+simulation_time: 100000.0
 num_physics_steps_per_control_step: 10
 time_scale: 2
 camera_ids: [0, 1]
 render_size: [480, 640]
 joint_randomization_noise_scale: 0.0
-target_distance: 0.6
+target_distance: 3.0
 light_perlin_noise_scale: 0

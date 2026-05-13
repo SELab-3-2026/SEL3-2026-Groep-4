@@ -1,0 +1,74 @@
+# Custom Main Configuration
+#
+# Use with:
+#   uv run python scripts/train.py --config-name main_config_custom
+#
+# This keeps the project defaults intact while giving you a single custom
+# training entrypoint you can edit freely.
+
+defaults:
+  - brittle_star_config
+  - experiment: base
+  - logging: default
+  - evaluation: default
+  - ppo: default
+  - architecture: decentralized
+  - morphology: 5_arms_full
+  - arena: default
+  - environment: directed_locomotion
+  - simulation: default
+  - _self_
+
+architecture:
+  topology_type: "ring"
+
+morphology:
+  morph_mode: RING
+
+experiment:
+  exp_name: "final-models/ring/"
+  seed: 42
+  torch_deterministic: true
+  cuda: true
+
+logging:
+  track: true
+  save_model: true
+  save_checkpoints: true
+  upload_final_model: true
+  upload_checkpoints: true
+  checkpoint_frequency: 20
+  wandb_project_name: "final-models"
+
+evaluation:
+  evaluate_checkpoints: true
+  eval_max_steps: 2000
+  eval_seed: 0
+
+ppo:
+  learning_rate: 0.0001
+  total_timesteps: 16384000
+  num_envs: 128
+  num_steps: 64
+  anneal_lr: true
+  gamma: 0.99
+  gae_lambda: 0.95
+  num_minibatches: 32
+  update_epochs: 4
+  norm_adv: true
+  clip_coef: 0.2
+  clip_vloss: true
+  ent_coef: 0.001
+  vf_coef: 1.0
+  max_grad_norm: 0.5
+  target_kl: 0.02
+
+environment:
+  simulation_time: 100000.0
+  target_distance: 3.0
+
+hydra:
+  job:
+    chdir: true
+  run:
+    dir: ${experiment.base_run_dir}/${experiment.exp_name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
