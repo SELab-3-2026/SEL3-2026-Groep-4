@@ -25,6 +25,44 @@ def create_evaluation_dir(model_path: Path) -> Path:
     return eval_dir
 
 
+def _ensure_offscreen_size(model, width: int, height: int) -> None:
+    vis_global = getattr(getattr(model, "vis", None), "global_", None)
+    if vis_global is None:
+        return
+    vis_global.offwidth = int(max(width, vis_global.offwidth))
+    vis_global.offheight = int(max(height, vis_global.offheight))
+
+
+def _apply_camera_overrides(
+    model,
+    *,
+    camera_fovy: dict[int, float] | None = None,
+    camera_xyz: tuple[dict[int, float] | None, dict[int, float] | None, dict[int, float] | None] = (None, None, None),
+) -> None:
+    if not camera_fovy and not (camera_xyz[0] or camera_xyz[1] or camera_xyz[2]):
+        return
+
+    ncam = int(getattr(model, "ncam", 0))
+    for cam_id, fovy in (camera_fovy or {}).items():
+        if cam_id < 0 or cam_id >= ncam:
+            raise ValueError(f"Camera id {cam_id} is out of range")
+        model.cam_fovy[cam_id] = float(fovy)
+
+    for cam_id, x in (camera_xyz[0] or {}).items():
+        if cam_id < 0 or cam_id >= ncam:
+            raise ValueError(f"Camera id {cam_id} is out of range")
+        model.cam_pos[cam_id][0] = float(x)
+
+    for cam_id, y in (camera_xyz[1] or {}).items():
+        if cam_id < 0 or cam_id >= ncam:
+            raise ValueError(f"Camera id {cam_id} is out of range")
+        model.cam_pos[cam_id][1] = float(y)
+
+    for cam_id, z in (camera_xyz[2] or {}).items():
+        if cam_id < 0 or cam_id >= ncam:
+            raise ValueError(f"Camera id {cam_id} is out of range")
+        model.cam_pos[cam_id][2] = float(z)
+
 def save_evaluation_metadata(
     eval_dir: Path,
     *,
@@ -66,6 +104,7 @@ def record_episode(
     fps: int = 60,
     width: int = 640,
     height: int = 480,
+    target_xy: tuple[float, float] | None = None,
 ) -> EpisodeResult:
     """Run an episode headlessly and record a video using MuJoCo's Renderer and imageio.
 
@@ -92,9 +131,11 @@ def record_episode(
             "Please install the evaluation dependencies: `uv pip install .[evaluation]`"
         ) from e
 
-    state = env.reset(seed=seed)
+    state = env.reset(seed=seed, target_position=target_xy)
     model = state.mj_model
     data = state.mj_data
+
+    _ensure_offscreen_size(model, width, height)
 
     renderer = mujoco.Renderer(model, width=width, height=height)
     ep_return = 0.0
@@ -160,6 +201,9 @@ def record_episode_multi_camera(
     output_paths: dict[int, Path],
     action_mask: np.ndarray | None = None,
     camera_ids: list[int] | None = None,
+    camera_fovy: dict[int, float] | None = None,
+    camera_xyz: tuple[dict[int, float] | None, dict[int, float] | None, dict[int, float] | None] = (None, None, None),
+    target_xy: tuple[float, float] | None = None,
     fps: int = 60,
     width: int = 640,
     height: int = 480,
@@ -186,9 +230,13 @@ def record_episode_multi_camera(
     for path in output_paths.values():
         path.parent.mkdir(parents=True, exist_ok=True)
 
-    state = env.reset(seed=seed)
+    state = env.reset(seed=seed, target_position=(target_xy[0], target_xy[1], 0.0))
     model = state.mj_model
     data = state.mj_data
+
+    _apply_camera_overrides(model, camera_fovy=camera_fovy, camera_xyz=camera_xyz)
+
+    _ensure_offscreen_size(model, width, height)
 
     renderer = mujoco.Renderer(model, width=width, height=height)
     frames = {cam_id: [] for cam_id in camera_ids}

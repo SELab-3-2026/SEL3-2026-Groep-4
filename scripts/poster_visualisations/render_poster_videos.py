@@ -40,13 +40,44 @@ def main() -> None:
     )
     parser.add_argument("--output-root", default="vids/poster")
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--max-steps", type=int, required=True)
+    parser.add_argument("--max-steps", type=int, default=2000)
     parser.add_argument("--topdown-camera", type=int, default=0)
     parser.add_argument("--follow-camera", type=int, default=1)
-    parser.add_argument("--width", type=int, default=640)
-    parser.add_argument("--height", type=int, default=480)
+    parser.add_argument("--topdown-camera-x", type=float, default=-3.0)
+    parser.add_argument("--topdown-camera-y", type=float, default=0.0)
+    parser.add_argument("--topdown-camera-z", type=float, default=None)
+    parser.add_argument("--topdown-camera-fovy", type=float, default=50.0)
+    parser.add_argument("--target-x", type=float, default=-6.0)
+    parser.add_argument("--target-y", type=float, default=0.0)
+    parser.add_argument("--width", type=int, default=1920)
+    parser.add_argument("--height", type=int, default=1088)
     parser.add_argument("--fps", type=int, default=60)
     args = parser.parse_args()
+
+    if (args.target_x is None) != (args.target_y is None):
+        raise ValueError("target-x and target-y must be provided together")
+
+    target_xy = None
+    if args.target_x is not None:
+        target_xy = (float(args.target_x), float(args.target_y))
+
+    camera_fovy = None
+    if args.topdown_camera_fovy is not None:
+        camera_fovy = {args.topdown_camera: float(args.topdown_camera_fovy)}
+
+    camera_x = None
+    if args.topdown_camera_x is not None:
+        camera_x = {args.topdown_camera: float(args.topdown_camera_x)}
+
+    camera_y = None
+    if args.topdown_camera_y is not None:
+        camera_y = {args.topdown_camera: float(args.topdown_camera_y)}
+
+    camera_z = None
+    if args.topdown_camera_z is not None:
+        camera_z = {args.topdown_camera: float(args.topdown_camera_z)}
+
+    camera_xyz = (camera_x, camera_y, camera_z)
 
     overrides = _resolve_overrides(args.morphology_override, len(args.models))
     output_root = Path(args.output_root)
@@ -83,6 +114,9 @@ def main() -> None:
             action_mask=bundle.action_mask,
             output_paths=output_paths,
             camera_ids=[args.topdown_camera, args.follow_camera],
+            camera_fovy=camera_fovy,
+            camera_xyz=camera_xyz,
+            target_xy=target_xy,
             width=args.width,
             height=args.height,
             fps=args.fps,

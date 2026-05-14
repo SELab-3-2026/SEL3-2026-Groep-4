@@ -8,4 +8,3 @@ uv run scripts/poster_visualisations/render_poster_videos.py \
   "$path"/centralized.flax \
   "$path"/fully-connected.flax \
   "$path"/ring.flax \
-  --max-steps 10000 --width 640 --height 480 --fps 60
