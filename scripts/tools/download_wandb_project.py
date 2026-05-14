@@ -7,6 +7,7 @@ import argparse
 # tune these depending on network / W&B limits
 MAX_RUN_WORKERS = 8
 MAX_FILE_WORKERS = 16
+MAX_ARTIFACT_WORKERS = 8
 
 api = wandb.Api()
 
@@ -20,19 +21,42 @@ def safe_print(*args, **kwargs):
 
 def download_file(file, run_dir):
     target = run_dir / file.name
+
     try:
         # skip existing files
         if target.exists():
-            return f"SKIP {target}"
+            return f"SKIP FILE {target}"
 
         target.parent.mkdir(parents=True, exist_ok=True)
 
         file.download(root=run_dir, replace=False)
 
-        return f"DONE {target}"
+        return f"DONE FILE {target}"
 
     except Exception as e:
-        return f"FAIL {target}: {e}"
+        return f"FAIL FILE {target}: {e}"
+
+
+def sanitize_artifact_name(name: str):
+    return name.replace(":", "_")
+
+
+def download_artifact(artifact, artifact_root):
+    try:
+        artifact_name = sanitize_artifact_name(artifact.name)
+        artifact_dir = artifact_root / artifact_name
+
+        if artifact_dir.exists() and any(artifact_dir.iterdir()):
+            return f"SKIP ARTIFACT {artifact.name}"
+
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+
+        artifact.download(root=artifact_dir)
+
+        return f"DONE ARTIFACT {artifact.name}"
+
+    except Exception as e:
+        return f"FAIL ARTIFACT {artifact.name}: {e}"
 
 
 def download_run(run, root):
@@ -41,6 +65,9 @@ def download_run(run, root):
 
     safe_print(f"\n=== {run.name} ({run.id}) ===")
 
+    # -------------------------
+    # Download regular run files
+    # -------------------------
     files = list(run.files())
 
     with ThreadPoolExecutor(max_workers=MAX_FILE_WORKERS) as executor:
@@ -49,10 +76,38 @@ def download_run(run, root):
         for future in as_completed(futures):
             safe_print(future.result())
 
-    # OPTIONAL: download artifacts too
-    # for artifact in run.logged_artifacts():
-    #     artifact_dir = run_dir / "artifacts" / artifact.name
-    #     artifact.download(root=artifact_dir)
+    # -------------------------
+    # Download logged artifacts
+    # -------------------------
+    artifact_root = run_dir / "artifacts"
+
+    try:
+        artifacts = list(run.logged_artifacts())
+        safe_print(f"Found {len(artifacts)} artifacts for {run.name}")
+
+        with ThreadPoolExecutor(max_workers=MAX_ARTIFACT_WORKERS) as executor:
+            futures = [
+                executor.submit(download_artifact, artifact, artifact_root)
+                for artifact in artifacts
+            ]
+
+            for future in as_completed(futures):
+                safe_print(future.result())
+
+    except Exception as e:
+        safe_print(f"Artifact download failed for {run.name}: {e}")
+
+    # -------------------------
+    # OPTIONAL: download used/input artifacts
+    # -------------------------
+    # try:
+    #     used_artifacts = list(run.used_artifacts())
+    #     used_root = run_dir / "used_artifacts"
+    #
+    #     for artifact in used_artifacts:
+    #         download_artifact(artifact, used_root)
+    # except Exception as e:
+    #     safe_print(f"Used artifact download failed: {e}")
 
     safe_print(f"Finished {run.name}")
 
