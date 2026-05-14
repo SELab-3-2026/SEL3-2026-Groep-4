@@ -147,3 +147,97 @@ def record_episode(
         final_xy_dist=final_dist,
         initial_target_distance=initial_dist,
     )
+
+
+def record_episode_multi_camera(
+    *,
+    env: BrittleStarEnv,
+    policy: ControlPolicy,
+    seed: int,
+    max_steps: int,
+    action_low: np.ndarray | None,
+    action_high: np.ndarray | None,
+    output_paths: dict[int, Path],
+    action_mask: np.ndarray | None = None,
+    camera_ids: list[int] | None = None,
+    fps: int = 60,
+    width: int = 640,
+    height: int = 480,
+) -> EpisodeResult:
+    """Run one episode and render multiple camera views to separate files."""
+    try:
+        import imageio
+        import mujoco
+    except ImportError as e:
+        raise ImportError(
+            "Video recording requires 'imageio' and 'mujoco'. "
+            "Please install the evaluation dependencies: `uv pip install .[evaluation]`"
+        ) from e
+
+    if camera_ids is None:
+        camera_ids = list(output_paths.keys())
+
+    for cam_id in camera_ids:
+        if cam_id not in output_paths:
+            raise ValueError(f"Missing output path for camera {cam_id}")
+
+    output_paths = {cam_id: output_paths[cam_id] for cam_id in camera_ids}
+
+    for path in output_paths.values():
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+    state = env.reset(seed=seed)
+    model = state.mj_model
+    data = state.mj_data
+
+    renderer = mujoco.Renderer(model, width=width, height=height)
+    frames = {cam_id: [] for cam_id in camera_ids}
+
+    ep_return = 0.0
+    observations = _get_observations(state)
+    prev_dist = _get_xy_distance_to_target(observations) if observations else None
+    initial_dist = prev_dist
+    reached_target = _target_reached(state=state)
+
+    steps = 0
+    for _ in range(int(max_steps)):
+        for cam_id in camera_ids:
+            renderer.update_scene(data, camera=cam_id)
+            frames[cam_id].append(renderer.render())
+
+        obs_dict = observations or {}
+        action = policy.act(observations=obs_dict)
+        if action_mask is not None:
+            action = action[action_mask]
+        action = _maybe_clip_action(action, action_low, action_high)
+
+        state = env.step(state=state, action=action)
+        steps += 1
+
+        observations = _get_observations(state)
+        cur_dist = _get_xy_distance_to_target(observations) if observations else None
+        if prev_dist is not None and cur_dist is not None:
+            ep_return += prev_dist - cur_dist
+        prev_dist = cur_dist
+
+        reached_target = _target_reached(state=state)
+        if reached_target:
+            break
+
+    for cam_id in camera_ids:
+        renderer.update_scene(data, camera=cam_id)
+        frames[cam_id].append(renderer.render())
+
+    renderer.close()
+
+    for cam_id, path in output_paths.items():
+        imageio.mimsave(str(path), frames[cam_id], fps=fps)
+
+    final_dist = _get_xy_distance_to_target(observations) if observations else None
+    return EpisodeResult(
+        return_=ep_return,
+        length=steps,
+        reached_target=reached_target,
+        final_xy_dist=final_dist,
+        initial_target_distance=initial_dist,
+    )
