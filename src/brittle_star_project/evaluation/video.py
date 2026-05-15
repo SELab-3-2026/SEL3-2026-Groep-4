@@ -239,7 +239,7 @@ def record_episode_multi_camera(
     _ensure_offscreen_size(model, width, height)
 
     renderer = mujoco.Renderer(model, width=width, height=height)
-    frames = {cam_id: [] for cam_id in camera_ids}
+    writers = {cam_id: imageio.get_writer(str(path), fps=fps) for cam_id, path in output_paths.items()}
 
     ep_return = 0.0
     observations = _get_observations(state)
@@ -248,38 +248,38 @@ def record_episode_multi_camera(
     reached_target = _target_reached(state=state)
 
     steps = 0
-    for _ in range(int(max_steps)):
+    try:
+        for _ in range(int(max_steps)):
+            for cam_id in camera_ids:
+                renderer.update_scene(data, camera=cam_id)
+                writers[cam_id].append_data(renderer.render())
+
+            obs_dict = observations or {}
+            action = policy.act(observations=obs_dict)
+            if action_mask is not None:
+                action = action[action_mask]
+            action = _maybe_clip_action(action, action_low, action_high)
+
+            state = env.step(state=state, action=action)
+            steps += 1
+
+            observations = _get_observations(state)
+            cur_dist = _get_xy_distance_to_target(observations) if observations else None
+            if prev_dist is not None and cur_dist is not None:
+                ep_return += prev_dist - cur_dist
+            prev_dist = cur_dist
+
+            reached_target = _target_reached(state=state)
+            if reached_target:
+                break
+
         for cam_id in camera_ids:
             renderer.update_scene(data, camera=cam_id)
-            frames[cam_id].append(renderer.render())
-
-        obs_dict = observations or {}
-        action = policy.act(observations=obs_dict)
-        if action_mask is not None:
-            action = action[action_mask]
-        action = _maybe_clip_action(action, action_low, action_high)
-
-        state = env.step(state=state, action=action)
-        steps += 1
-
-        observations = _get_observations(state)
-        cur_dist = _get_xy_distance_to_target(observations) if observations else None
-        if prev_dist is not None and cur_dist is not None:
-            ep_return += prev_dist - cur_dist
-        prev_dist = cur_dist
-
-        reached_target = _target_reached(state=state)
-        if reached_target:
-            break
-
-    for cam_id in camera_ids:
-        renderer.update_scene(data, camera=cam_id)
-        frames[cam_id].append(renderer.render())
-
-    renderer.close()
-
-    for cam_id, path in output_paths.items():
-        imageio.mimsave(str(path), frames[cam_id], fps=fps)
+            writers[cam_id].append_data(renderer.render())
+    finally:
+        renderer.close()
+        for writer in writers.values():
+            writer.close()
 
     final_dist = _get_xy_distance_to_target(observations) if observations else None
     return EpisodeResult(
