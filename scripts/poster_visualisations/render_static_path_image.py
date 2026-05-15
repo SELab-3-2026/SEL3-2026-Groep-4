@@ -139,6 +139,26 @@ def main() -> None:
             if int(model.geom_bodyid[g]) in robot_body_ids:
                 model.geom_rgba[g][:] = robot_rgba
 
+    # Optionally override robot color by recoloring geoms belonging to the robot's body subtree.
+    if args.robot_color is not None:
+        robot_rgba = _hex_to_rgba(args.robot_color, 1.0)
+        # Collect body IDs in the subtree rooted at `body_id` by walking parent links.
+        nbody = int(model.nbody)
+        body_parent = model.body_parentid
+        robot_body_ids = set([int(body_id)])
+        for i in range(1, nbody):
+            cur = int(i)
+            # walk up until root (0) or until we hit the robot root
+            while cur not in (-1, 0, int(body_id)):
+                cur = int(body_parent[cur])
+            if cur == int(body_id):
+                robot_body_ids.add(i)
+
+        # Recolor geoms whose body id is in the robot subtree
+        for g in range(int(model.ngeom)):
+            if int(model.geom_bodyid[g]) in robot_body_ids:
+                model.geom_rgba[g][:] = robot_rgba
+
     positions = []
     observations = _get_observations(state)
 
