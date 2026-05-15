@@ -81,7 +81,12 @@ def main() -> None:
     parser.add_argument("--width", type=int, default=2160)
     parser.add_argument("--height", type=int, default=960)
     parser.add_argument("--frame-stride", type=int, default=5)
-    parser.add_argument("--path-color", default="#50c4ba")
+    parser.add_argument("--path-color", default="#444444")
+    parser.add_argument(
+        "--robot-color",
+        default="#444444",
+        help="Hex color for brittle star robot (e.g. #ff0000)",
+    )
     args = parser.parse_args()
 
     model_path = Path(args.model)
@@ -133,6 +138,26 @@ def main() -> None:
     _ensure_offscreen_size(model, args.width, args.height)
 
     body_id = _resolve_body_id(model, args.body_name, mujoco)
+
+    # Optionally override robot color by recoloring geoms belonging to the robot's body subtree.
+    if args.robot_color is not None:
+        robot_rgba = _hex_to_rgba(args.robot_color, 1.0)
+        # Collect body IDs in the subtree rooted at `body_id` by walking parent links.
+        nbody = int(model.nbody)
+        body_parent = model.body_parentid
+        robot_body_ids = set([int(body_id)])
+        for i in range(1, nbody):
+            cur = int(i)
+            # walk up until root (0) or until we hit the robot root
+            while cur not in (-1, 0, int(body_id)):
+                cur = int(body_parent[cur])
+            if cur == int(body_id):
+                robot_body_ids.add(i)
+
+        # Recolor geoms whose body id is in the robot subtree
+        for g in range(int(model.ngeom)):
+            if int(model.geom_bodyid[g]) in robot_body_ids:
+                model.geom_rgba[g][:] = robot_rgba
 
     positions = []
     observations = _get_observations(state)
