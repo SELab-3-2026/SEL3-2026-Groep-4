@@ -14,6 +14,12 @@ _ARCH_DIR_MAP = {
     "SEGMENT": "segment",
 }
 
+ROBOT_COLOR_MAP = {
+    "CENTRALIZED": "#0D567C",  # Blue
+    "FULLY_CONNECTED": "#8C0E0F",  # Reddish
+    "RING": "#FCB304",  # Pale Yellow
+}
+
 
 def _arch_dir(name: str) -> str:
     return _ARCH_DIR_MAP.get(name, name.lower())
@@ -54,7 +60,7 @@ def main() -> None:
     parser.add_argument("--fps", type=int, default=60)
     parser.add_argument(
         "--robot-color",
-        default="#2B4162",  # ring = #888888, centralized = #2B4162, fully connected = FA9F42
+        default="#2B4162",
         help="Hex color for the brittle star robot",
     )
     args = parser.parse_args()
@@ -109,6 +115,9 @@ def main() -> None:
             args.follow_camera: out_dir / "follow.mp4",
         }
 
+        print(bundle.architecture)
+        color = ROBOT_COLOR_MAP.get(bundle.architecture, args.robot_color)
+
         result = record_episode_multi_camera(
             env=bundle.env,
             policy=bundle.policy,
@@ -122,7 +131,7 @@ def main() -> None:
             camera_fovy=camera_fovy,
             camera_xyz=camera_xyz,
             target_xy=target_xy,
-            robot_color=args.robot_color,
+            robot_color=color,
             width=args.width,
             height=args.height,
             fps=args.fps,

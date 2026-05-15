@@ -18,6 +18,12 @@ from brittle_star_project.evaluation.video import (
     hex_to_rgba,
 )
 
+ROBOT_COLOR_MAP = {
+    "CENTRALIZED": "#0D567C",  # Blue
+    "FULLY_CONNECTED": "#8C0E0F",  # Reddish
+    "RING": "#FCB304",  # Pale Yellow
+}
+
 
 def _enum_value(enum_obj, *names: str) -> int:
     for name in names:
@@ -119,9 +125,10 @@ def main() -> None:
         model, mujoco.mjtObj.mjOBJ_BODY, "BrittleStarMorphology/central_disk"
     )
 
+    robot_rgba = hex_to_rgba(ROBOT_COLOR_MAP.get(bundle.architecture, args.robot_color), 1.0)
+
     # Optionally override robot color by recoloring geoms belonging to the robot's body subtree.
     if args.robot_color is not None:
-        robot_rgba = hex_to_rgba(args.robot_color, 1.0)
         # Collect body IDs in the subtree rooted at `body_id` by walking parent links.
         nbody = int(model.nbody)
         body_parent = model.body_parentid
@@ -141,7 +148,6 @@ def main() -> None:
 
     # Optionally override robot color by recoloring geoms belonging to the robot's body subtree.
     if args.robot_color is not None:
-        robot_rgba = hex_to_rgba(args.robot_color, 1.0)
         # Collect body IDs in the subtree rooted at `body_id` by walking parent links.
         nbody = int(model.nbody)
         body_parent = model.body_parentid
@@ -187,7 +193,7 @@ def main() -> None:
 
     path_step = max(1, int(args.frame_stride)) * 3
     path_points_visible = path_points[::path_step]
-    path_rgba = hex_to_rgba(args.path_color, 0.92)
+    path_rgba = hex_to_rgba(ROBOT_COLOR_MAP.get(bundle.architecture, args.path_color), 0.92)
 
     ctx = mujoco.GLContext(args.width, args.height)
     ctx.make_current()
