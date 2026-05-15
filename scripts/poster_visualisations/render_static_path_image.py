@@ -141,7 +141,7 @@ def main() -> None:
 
     # Optionally override robot color by recoloring geoms belonging to the robot's body subtree.
     if args.robot_color is not None:
-        robot_rgba = _hex_to_rgba(args.robot_color, 1.0)
+        robot_rgba = hex_to_rgba(args.robot_color, 1.0)
         # Collect body IDs in the subtree rooted at `body_id` by walking parent links.
         nbody = int(model.nbody)
         body_parent = model.body_parentid
