@@ -40,18 +40,23 @@ def main() -> None:
     )
     parser.add_argument("--output-root", default="vids/poster")
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--max-steps", type=int, default=2000)
+    parser.add_argument("--max-steps", type=int, default=5000)
     parser.add_argument("--topdown-camera", type=int, default=0)
     parser.add_argument("--follow-camera", type=int, default=1)
     parser.add_argument("--topdown-camera-x", type=float, default=-3.0)
     parser.add_argument("--topdown-camera-y", type=float, default=0.0)
-    parser.add_argument("--topdown-camera-z", type=float, default=5.0)
+    parser.add_argument("--topdown-camera-z", type=float, default=4.5)
     parser.add_argument("--topdown-camera-fovy", type=float, default=None)
     parser.add_argument("--target-x", type=float, default=-6.0)
     parser.add_argument("--target-y", type=float, default=0.0)
     parser.add_argument("--width", type=int, default=2160)
     parser.add_argument("--height", type=int, default=960)
     parser.add_argument("--fps", type=int, default=60)
+    parser.add_argument(
+        "--robot-color",
+        default="#2B4162",  # ring = #888888, centralized = #2B4162, fully connected = FA9F42
+        help="Hex color for the brittle star robot",
+    )
     args = parser.parse_args()
 
     if (args.target_x is None) != (args.target_y is None):
@@ -117,14 +122,13 @@ def main() -> None:
             camera_fovy=camera_fovy,
             camera_xyz=camera_xyz,
             target_xy=target_xy,
+            robot_color=args.robot_color,
             width=args.width,
             height=args.height,
             fps=args.fps,
         )
 
-        final_dist = (
-            "n/a" if result.final_xy_dist is None else f"{result.final_xy_dist:.3f}"
-        )
+        final_dist = "n/a" if result.final_xy_dist is None else f"{result.final_xy_dist:.3f}"
         print(
             f"{arms_dir}/{arch_dir}: return={result.return_:.6f}, len={result.length}, "
             f"target_reached={result.reached_target}, final_xy_dist={final_dist}"

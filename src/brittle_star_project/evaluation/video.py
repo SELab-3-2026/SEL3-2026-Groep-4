@@ -37,7 +37,11 @@ def _apply_camera_overrides(
     model,
     *,
     camera_fovy: dict[int, float] | None = None,
-    camera_xyz: tuple[dict[int, float] | None, dict[int, float] | None, dict[int, float] | None] = (None, None, None),
+    camera_xyz: tuple[
+        dict[int, float] | None,
+        dict[int, float] | None,
+        dict[int, float] | None,
+    ] = (None, None, None),
 ) -> None:
     if not camera_fovy and not (camera_xyz[0] or camera_xyz[1] or camera_xyz[2]):
         return
@@ -62,6 +66,17 @@ def _apply_camera_overrides(
         if cam_id < 0 or cam_id >= ncam:
             raise ValueError(f"Camera id {cam_id} is out of range")
         model.cam_pos[cam_id][2] = float(z)
+
+
+def hex_to_rgba(hex_color: str, alpha: float) -> np.ndarray:
+    color = hex_color.lstrip("#")
+    if len(color) != 6:
+        raise ValueError(f"Expected a 6-digit hex color, got {hex_color!r}")
+    red = int(color[0:2], 16) / 255.0
+    green = int(color[2:4], 16) / 255.0
+    blue = int(color[4:6], 16) / 255.0
+    return np.asarray([red, green, blue, float(alpha)], dtype=np.float32)
+
 
 def save_evaluation_metadata(
     eval_dir: Path,
@@ -202,8 +217,13 @@ def record_episode_multi_camera(
     action_mask: np.ndarray | None = None,
     camera_ids: list[int] | None = None,
     camera_fovy: dict[int, float] | None = None,
-    camera_xyz: tuple[dict[int, float] | None, dict[int, float] | None, dict[int, float] | None] = (None, None, None),
+    camera_xyz: tuple[
+        dict[int, float] | None,
+        dict[int, float] | None,
+        dict[int, float] | None,
+    ] = (None, None, None),
     target_xy: tuple[float, float] | None = None,
+    robot_color: str | None = None,
     fps: int = 60,
     width: int = 640,
     height: int = 480,
@@ -236,10 +256,34 @@ def record_episode_multi_camera(
 
     _apply_camera_overrides(model, camera_fovy=camera_fovy, camera_xyz=camera_xyz)
 
+    if robot_color is not None:
+        robot_body_id = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_BODY, "BrittleStarMorphology/central_disk"
+        )
+        if robot_body_id < 0:
+            raise ValueError("Body 'BrittleStarMorphology/central_disk' not found in the model")
+
+        robot_rgba = hex_to_rgba(robot_color, 1.0)
+        body_parent = model.body_parentid
+        robot_body_ids = {int(robot_body_id)}
+
+        for body_id in range(1, int(model.nbody)):
+            current_body_id = int(body_id)
+            while current_body_id not in (-1, 0, int(robot_body_id)):
+                current_body_id = int(body_parent[current_body_id])
+            if current_body_id == int(robot_body_id):
+                robot_body_ids.add(body_id)
+
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) in robot_body_ids:
+                model.geom_rgba[geom_id][:] = robot_rgba
+
     _ensure_offscreen_size(model, width, height)
 
     renderer = mujoco.Renderer(model, width=width, height=height)
-    writers = {cam_id: imageio.get_writer(str(path), fps=fps) for cam_id, path in output_paths.items()}
+    writers = {
+        cam_id: imageio.get_writer(str(path), fps=fps) for cam_id, path in output_paths.items()
+    }
 
     ep_return = 0.0
     observations = _get_observations(state)

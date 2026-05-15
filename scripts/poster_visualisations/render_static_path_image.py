@@ -12,7 +12,11 @@ from brittle_star_project.evaluation.rollout import (
     _maybe_clip_action,
     _target_reached,
 )
-from brittle_star_project.evaluation.video import _apply_camera_overrides, _ensure_offscreen_size
+from brittle_star_project.evaluation.video import (
+    _apply_camera_overrides,
+    _ensure_offscreen_size,
+    hex_to_rgba,
+)
 
 
 def _enum_value(enum_obj, *names: str) -> int:
@@ -20,16 +24,6 @@ def _enum_value(enum_obj, *names: str) -> int:
         if hasattr(enum_obj, name):
             return int(getattr(enum_obj, name))
     raise AttributeError(f"Could not find any of {names!r} on {enum_obj!r}")
-
-
-def _hex_to_rgba(hex_color: str, alpha: float) -> np.ndarray:
-    color = hex_color.lstrip("#")
-    if len(color) != 6:
-        raise ValueError(f"Expected a 6-digit hex color, got {hex_color!r}")
-    red = int(color[0:2], 16) / 255.0
-    green = int(color[2:4], 16) / 255.0
-    blue = int(color[4:6], 16) / 255.0
-    return np.asarray([red, green, blue, float(alpha)], dtype=np.float32)
 
 
 def _append_sphere(scene, mujoco, center: np.ndarray, radius: float, rgba: np.ndarray) -> None:
@@ -43,24 +37,6 @@ def _append_sphere(scene, mujoco, center: np.ndarray, radius: float, rgba: np.nd
         rgba,
     )
     scene.ngeom += 1
-
-
-def _resolve_body_id(model, body_name: str, mujoco) -> int:
-    body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, body_name)
-    if body_id >= 0:
-        return body_id
-
-    for fallback_name in ("BrittleStarMorphology/central_disk", "central_disk"):
-        body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, fallback_name)
-        if body_id >= 0:
-            return body_id
-
-    for candidate_body_id in range(1, int(model.nbody)):
-        name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, candidate_body_id)
-        if name:
-            return candidate_body_id
-
-    raise ValueError(f"Body '{body_name}' not found in the model")
 
 
 def main() -> None:
@@ -139,11 +115,13 @@ def main() -> None:
     )
     _ensure_offscreen_size(model, args.width, args.height)
 
-    body_id = _resolve_body_id(model, args.body_name, mujoco)
+    body_id = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, "BrittleStarMorphology/central_disk"
+    )
 
     # Optionally override robot color by recoloring geoms belonging to the robot's body subtree.
     if args.robot_color is not None:
-        robot_rgba = _hex_to_rgba(args.robot_color, 1.0)
+        robot_rgba = hex_to_rgba(args.robot_color, 1.0)
         # Collect body IDs in the subtree rooted at `body_id` by walking parent links.
         nbody = int(model.nbody)
         body_parent = model.body_parentid
@@ -189,7 +167,7 @@ def main() -> None:
 
     path_step = max(1, int(args.frame_stride)) * 3
     path_points_visible = path_points[::path_step]
-    path_rgba = _hex_to_rgba(args.path_color, 0.92)
+    path_rgba = hex_to_rgba(args.path_color, 0.92)
 
     ctx = mujoco.GLContext(args.width, args.height)
     ctx.make_current()
