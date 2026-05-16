@@ -45,6 +45,9 @@ For detailed instructions on how to use the project, please refer to the **[API 
 3. **Simulate a trained model:**
    See [Simulation & Evaluation](docs/api/simulation.md).
 
+4. **Compare fault tolerance of models:**
+   See [Checkpoint & Model Evaluation](docs/api/evaluation.md)
+
 ## HPC
 
 See **[docs/HPC.md](docs/HPC.md)** for the full guide, including environment setup, cluster selection, interactive debugging, and job submission.
