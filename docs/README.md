@@ -19,3 +19,5 @@ If you are interested in the "how do I use it?"
 - [Tracking & Monitoring](./api/tracking.md): Setting up WandB and TensorBoard to monitor runs.
 - [Simulation](./api/simulation.md): Visualizing and evaluating models.
 - [Environment](./api/environment.md): MuJoCo environment interaction and configuration.
+- [Analysis](./api/analysis.md): Comparing checkpoints and generating plots.
+- [Evaluation](./api/evaluation.md): Evaluating checkpoints and comparing fault tolerance.
