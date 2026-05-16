@@ -14,7 +14,7 @@ from brittle_star_project.environment.BrittleStarJaxEnvWrapper import BrittleSta
 
 @pytest.mark.skipif(os.getenv("CI") == "true", reason="No OpenGL display in CI")
 def test_render_morphologies():
-    base_dir = "runs/renders"
+    base_dir = "runs/morphologies"
     os.makedirs(base_dir, exist_ok=True)
 
     # --- 1. Full 5-Arm Morphology ---
@@ -34,7 +34,7 @@ def test_render_morphologies():
     renderer_full = mujoco.Renderer(model=model_full)
     renderer_full.update_scene(data_full, camera=1)
     pixels_full = renderer_full.render()
-    image_path = os.path.join(base_dir, "full_5_arm.png")
+    image_path = os.path.join(base_dir, "5_arm.png")
     Image.fromarray(pixels_full).save(image_path)
     print(f"Generated full morphology render: {image_path}")
 

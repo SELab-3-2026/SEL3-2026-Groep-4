@@ -2,10 +2,16 @@ from dataclasses import dataclass, field
 
 from experiment_logger.config_logger import LoggingConfig
 from brittle_star_project.configs.config_experiment import ExperimentConfig
+from brittle_star_project.configs.config_evaluation import EvaluationConfig
 from brittle_star_project.configs.config_ppo import PPOConfig
 from brittle_star_project.configs.config_architecture import ArchitectureConfig
 from brittle_star_project.configs.config_simulation import SimulationSettings
-from brittle_star_project.environment.env_config import MorphologyConfig, ArenaConfig, EnvConfig
+from brittle_star_project.environment.env_config import (
+    MorphologyConfig,
+    ArenaConfig,
+    EnvConfig,
+    ObservationBoundsConfig,
+)
 
 
 @dataclass
@@ -18,6 +24,7 @@ class BrittleStarConfig:
 
     experiment: ExperimentConfig = field(default_factory=ExperimentConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    evaluation: EvaluationConfig = field(default_factory=EvaluationConfig)
     ppo: PPOConfig = field(default_factory=PPOConfig)
     # This field is polymorphic; defaults to the base class to allow subclasses
     # (CentralizedConfig, DecentralizedConfig) to be merged in via Hydra.
@@ -25,4 +32,5 @@ class BrittleStarConfig:
     morphology: MorphologyConfig = field(default_factory=MorphologyConfig)
     arena: ArenaConfig = field(default_factory=ArenaConfig)
     environment: EnvConfig = field(default_factory=EnvConfig)
+    obs_bounds: ObservationBoundsConfig = field(default_factory=ObservationBoundsConfig)
     simulation: SimulationSettings = field(default_factory=SimulationSettings)

@@ -1,0 +1,23 @@
+# @package evaluation
+# Configuration for the models used in the poster comparison.
+
+# Standard evaluation settings
+evaluate_checkpoints: false
+eval_max_steps: 5000
+eval_seed: 0
+
+# Cross-model comparison settings
+# We use 10 episodes to get a more robust average for the final poster results.
+comparison_base_seed: 0
+comparison_num_episodes: 2
+comparison_output_csv: "runs/evaluation/comparison.csv"
+
+# Paths to the .cleanrl_model files to be compared (relative to workspace root).
+comparison_models:
+  - "runs/input-space-2-arms/2026-05-02/08-14-58/final_model.flax"
+
+# Path to the morphologies to evaluate against.
+comparison_morphologies:
+  - "configs/morphology/5_arms_full.yaml"
+  - "configs/morphology/3_arms.yaml"
+  - "configs/morphology/2_arms.yaml"

@@ -13,44 +13,37 @@ To set up the UV module, you can run the following command:
 uv sync --frozen
 ```
 
-### Configuration
+## Repository Structure
 
-1. **Copy the default configuration:**
+```text
+.
+├── configs/                # Hydra configuration files (YAML)
+├── docs/                   # Comprehensive documentation and API guides
+├── runs/                   # Default output directory for Hydra and training artifacts
+├── scripts/                # High-level entrypoints for training, simulation, and evaluation
+├── src/
+│   └── brittle_star_project/ # Core library and environment logic
+│       ├── evaluation/     # Checkpoint evaluation, rollout logic, and metrics persistence
+│       └── trainers/       # Training loop implementations (e.g., PPO)
+└── tests/                  # Unit and integration tests
+```
+
+## Usage
+
+For detailed instructions on how to use the project, please refer to the **[API Documentation](docs/README.md)**.
+
+### Quick Start
+
+1. **Train a model:**
    ```bash
-   cp configs/default_ppo.yaml configs/my_experiment.yaml
+   uv run python scripts/train.py ppo.learning_rate=0.001 logging.track=true
    ```
 
-2. **Edit `configs/my_experiment.yaml`** to set your WandB credentials:
-   ```yaml
-   track: true  # Enable WandB logging
-   wandb_entity: "your-wandb-username"  # Replace with your username/team
-   wandb_project_name: "PPO-Modularity"
-   ```
+2. **Monitor progress:**
+   See [Tracking & Monitoring](docs/api/tracking.md).
 
-3. **(Optional) Login to WandB:**
-   ```bash
-   uv run wandb login
-   ```
-
-### Training
-
-example command:
-
-```bash
-uv run python scripts/train.py
-```
-
-Or use a custom config file:
-
-```bash
-uv run python scripts/train.py --config configs/my_experiment.yaml
-```
-
-Override specific parameters:
-
-```bash
-uv run python scripts/train.py --learning-rate 0.001 --num-envs 32 --track
-```
+3. **Simulate a trained model:**
+   See [Simulation & Evaluation](docs/api/simulation.md).
 
 ## HPC
 
