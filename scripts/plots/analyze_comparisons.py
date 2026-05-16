@@ -172,7 +172,7 @@ def plot_grouped_bar(
             plt.FuncFormatter(lambda x, _: f"{x:.2f}" if abs(x) < 10 else f"{x:.0f}")
         )
 
-    _add_square_placeholders(ax, x_ticks_pos, [f"{m} Arms" for m in morphologies])
+    # _add_square_placeholders(ax, x_ticks_pos, [f"{m} Arms" for m in morphologies])
 
     # Add custom legend entry for best performer
     ax.plot(

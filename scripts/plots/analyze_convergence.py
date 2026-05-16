@@ -44,11 +44,14 @@ class Columns(str, Enum):
     # ... (rest of the file remains same, just need to update plotting functions and obtain_data)
     """Column names expected in every evaluation CSV."""
 
-    CHECKPOINT = "checkpoint"
     ARCH = "architecture"
-    TIMESTEPS = "total_trained_timesteps"
-    REWARD = "accumulated_reward"
+    TIMESTEPS = "trained_timesteps"
+    REWARD = "eval_return"
     VELOCITY = "velocity"
+    EVAL_STEPS = "eval_steps"
+    FINAL_XY_DIST = "final_xy_dist"
+    INITIAL_XY_DIST = "initial_xy_dist"
+    REACHED_TARGET = "reached_target"
 
 
 # Maps architecture display names to the path of their evaluation CSV.
@@ -109,9 +112,6 @@ def load_metrics(file_mapping: dict[str, str]) -> pd.DataFrame:
     Loads one CSV per architecture, injects the architecture name as a column,
     and returns the combined DataFrame with only the required columns.
     """
-<<<<<<< Updated upstream
-    required = [Columns.TIMESTEPS, Columns.REWARD, Columns.VELOCITY]
-=======
     required = [
         Columns.CHECKPOINT,
         Columns.TIMESTEPS,
@@ -120,7 +120,6 @@ def load_metrics(file_mapping: dict[str, str]) -> pd.DataFrame:
         Columns.FINAL_XY_DIST,
         Columns.EVAL_STEPS,
     ]
->>>>>>> Stashed changes
     dfs = []
 
     for arch_name, filepath in file_mapping.items():
