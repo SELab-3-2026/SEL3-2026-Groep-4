@@ -62,7 +62,7 @@ def main() -> None:
     parser.add_argument("--target-y", type=float, default=0.0)
     parser.add_argument("--width", type=int, default=2160)
     parser.add_argument("--height", type=int, default=960)
-    parser.add_argument("--frame-stride", type=int, default=5)
+    parser.add_argument("--frame-stride", type=int, default=15)
     parser.add_argument(
         "--path-color", default="#FA9F42"
     )  # ring = #888888, centralized = #2B4162, fully connected = FA9F42
@@ -191,7 +191,7 @@ def main() -> None:
     path_points = positions_arr.copy()
     path_points[:, 2] -= 0.02
 
-    path_step = max(1, int(args.frame_stride)) * 3
+    path_step = max(1, int(args.frame_stride))
     path_points_visible = path_points[::path_step]
     path_rgba = hex_to_rgba(ROBOT_COLOR_MAP.get(bundle.architecture, args.path_color), 0.92)
 
