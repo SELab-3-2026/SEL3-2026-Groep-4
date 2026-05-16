@@ -84,7 +84,8 @@ def plot_grouped_bar(
 
     fig, ax = plt.subplots(figsize=figsize)
     bar_width = 0.35
-    x_indices = np.arange(len(morphologies))
+    group_spacing = 1.3
+    x_indices = np.arange(len(morphologies)) * group_spacing
     all_bars = {}
     all_means = []
 
@@ -118,7 +119,7 @@ def plot_grouped_bar(
         )
         all_bars[arch] = (x_pos, means, stds, bars)
 
-    for m_idx, m in enumerate(morphologies):
+    for m_idx, _ in enumerate(morphologies):
         m_means = {arch: all_bars[arch][1][m_idx] for arch in architectures}
         best_arch = (
             max(m_means, key=m_means.get) if higher_is_better else min(m_means, key=m_means.get)
@@ -144,12 +145,13 @@ def plot_grouped_bar(
 
     x_ticks_pos = (
         x_indices
+        + bar_width  # center the label in the 3 bars
         + (bar_width / 2 if len(architectures) % 2 == 0 else 0)
         - (bar_width / 2 if len(architectures) == 2 else 0)
     )
     ax.set_xticks(x_ticks_pos)
     ax.set_xticklabels([f"{m} Arms" for m in morphologies])
-    ax.tick_params(axis="x", pad=25)  # More padding for the squares
+    ax.tick_params(axis="x")  # More padding for the squares
 
     # X-axis at zero
     ax.axhline(0, color="black", linewidth=1.5)
@@ -175,17 +177,18 @@ def plot_grouped_bar(
     # _add_square_placeholders(ax, x_ticks_pos, [f"{m} Arms" for m in morphologies])
 
     # Add custom legend entry for best performer
-    ax.plot(
-        [],
-        [],
-        marker=BEST_PERFORMER_MARKER,
-        color="w",
-        markerfacecolor=BEST_PERFORMER_COLOR,
-        markersize=15,
-        label="Best Performance",
-        ls="",
-    )
-    ax.legend(**LEGEND_KWARGS, ncol=len(architectures) + 1)
+    # ax.plot(
+    #     [],
+    #     [],
+    #     marker=BEST_PERFORMER_MARKER,
+    #     color="w",
+    #     markerfacecolor=BEST_PERFORMER_COLOR,
+    #     markersize=15,
+    #     label="Best Performance",
+    #     ls="",
+    # )
+
+    ax.legend(**LEGEND_KWARGS, ncol=len(architectures))
     ax.set_facecolor("white")
     fig.patch.set_facecolor("white")
 
@@ -306,21 +309,22 @@ def plot_grouped_bar_alt(
         )
 
     # In this alt plot, placeholders might be per architecture
-    _add_square_placeholders(
-        ax, x_indices, [arch.replace("_", "\n").title() for arch in architectures]
-    )
+    # _add_square_placeholders(
+    #     ax, x_indices, [arch.replace("_", "\n").title() for arch in architectures]
+    # )
 
-    ax.plot(
-        [],
-        [],
-        marker=BEST_PERFORMER_MARKER,
-        color="w",
-        markerfacecolor=BEST_PERFORMER_COLOR,
-        markersize=15,
-        label="Best Performance",
-        ls="",
-    )
-    ax.legend(**LEGEND_KWARGS, ncol=len(morphologies) + 1)
+    # ax.plot(
+    #     [],
+    #     [],
+    #     marker=BEST_PERFORMER_MARKER,
+    #     color="w",
+    #     markerfacecolor=BEST_PERFORMER_COLOR,
+    #     markersize=15,
+    #     label="Best Performance",
+    #     ls="",
+    # )
+
+    ax.legend(**LEGEND_KWARGS, ncol=len(morphologies))
     ax.set_facecolor("white")
     fig.patch.set_facecolor("white")
 

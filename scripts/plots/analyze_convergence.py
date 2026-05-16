@@ -44,6 +44,7 @@ class Columns(str, Enum):
     # ... (rest of the file remains same, just need to update plotting functions and obtain_data)
     """Column names expected in every evaluation CSV."""
 
+    CHECKPOINT = "checkpoint"
     ARCH = "architecture"
     TIMESTEPS = "trained_timesteps"
     REWARD = "eval_return"
