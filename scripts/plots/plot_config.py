@@ -4,26 +4,24 @@ import matplotlib.pyplot as plt
 # Shared Color Palette (Colorblind friendly, high contrast)
 # Matches poster design
 COLORS = {
-    "CENTRALIZED": "#2B4162",  # Deep Slate Blue
-    "FULLY_CONNECTED": "#FA9F42",  # Vibrant Orange
-    "RING_LEVEL": "#4E937A",  # Muted Teal
-    "SEGMENT_LEVEL": "#B4436C",  # Soft Red
-    "DECENTRALIZED": "#4E937A",  # Default decentralized fallback
+    "CENTRALIZED": "#0D567C",  # Blue
+    "FULLY_CONNECTED": "#8C0E0F",  # Reddish
+    "RING_LEVEL": "#FCB305",  # Pale Yellow
 }
 
 
-def apply_style(font_size=28):
+def apply_style(font_size=36):
     """
     Applies the shared typography and aesthetic settings to Matplotlib.
     """
     plt.rcParams.update(
         {
             "font.size": font_size,
-            "axes.labelsize": font_size + 4,
-            "axes.titlesize": font_size + 8,
-            "xtick.labelsize": font_size - 4,
-            "ytick.labelsize": font_size - 4,
-            "legend.fontsize": font_size - 6,
+            "axes.labelsize": font_size,
+            "axes.titlesize": font_size,
+            "xtick.labelsize": font_size,
+            "ytick.labelsize": font_size,
+            "legend.fontsize": font_size,
             "axes.linewidth": 2,
             "axes.spines.top": False,
             "axes.spines.right": False,
