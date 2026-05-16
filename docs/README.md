@@ -1,6 +1,6 @@
 # Documentation
 
-## Design & architecture ([`/design`](./design/))
+## Design & architecture (`/design`)
 
 - [Actor/critic architecture](./design/actor-critic.md): Description of the actor-critic pipeline.
 - [Communication](./design/communication.md): Message propagation, Nerve-Net style.
@@ -9,7 +9,7 @@
 - [Learning algorithm](./design/learning_algorithm.md): RL techniques, i.e. PPO.
 - [Reward function](./design/learning_algorithm.md): Goals, fitness tracking, and reward structures.
 
-## API reference ([`/api`](./api/))
+## API reference (`/api`)
 
 - [Environment](./api/environment.md): MuJoCo environment interaction, state retrieval, and configuration.
 - [Simulate](./api/simulate.md): Simulation rendering.
