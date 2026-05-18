@@ -13,19 +13,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import hydra
-import numpy as np
 from omegaconf import DictConfig, OmegaConf
-import yaml
 
-from brittle_star_project import Backend, BrittleStarEnv, BrittleStarEnvFactory
+
 from brittle_star_project.configs.main_config import BrittleStarConfig
 from brittle_star_project.configs.register_configs import register_configs
-from brittle_star_project.environment.padded_obs_wrapper import compute_padding_masks
-from brittle_star_project.environment.obs_processing import create_obs_processor
-from brittle_star_project.environment.env_config import MorphologyConfig
 
 from brittle_star_project.evaluation.checkpoint import load_metadata, metadata_to_configs
-from brittle_star_project.evaluation.policy import PolicyAgent
+from brittle_star_project.evaluation.eval_env_builder import build_eval_env
 from brittle_star_project.evaluation.rollout import rollout_headless, rollout_viewer
 from brittle_star_project.evaluation.video import (
     record_episode,
@@ -60,68 +55,27 @@ def main(dict_cfg: DictConfig) -> None:
     # 3. Reconstruct typed configs from metadata
     training = metadata_to_configs(metadata)
 
-    # 4. Determine environment morphology
-    if sim_cfg.morphology_override is not None:
-        override_path = Path(hydra.utils.to_absolute_path(sim_cfg.morphology_override))
-        if not override_path.exists():
-            raise FileNotFoundError(f"Could not find morphology override YAML at {override_path}")
-        with open(override_path, "r") as f:
-            override_dict = yaml.safe_load(f)
-        env_morphology = OmegaConf.to_object(
-            OmegaConf.merge(OmegaConf.structured(MorphologyConfig), override_dict)
-        )
-    else:
-        env_morphology = training.morphology
-
-    # 5. Build obs_processor with TRAINING morphology padding masks always
-    padding_masks = compute_padding_masks(
-        segments_per_arm=env_morphology.segments_per_arm,
-        reference_segments_per_arm=training.morphology.segments_per_arm,
-    )
-    obs_processor = create_obs_processor(
-        bounds_dict=training.obs_bounds.to_bounds_dict(),
-        padding_masks=padding_masks,
-    )
-
-    # 6. Build environment
-    backend = Backend.MJC
     seed = int(cfg.experiment.seed)
 
-    factory = BrittleStarEnvFactory()
-    raw_env = factory.create_environment(
-        backend,
-        env_morphology,
-        training.arena,
-        training.environment,
+    # 4-7. Build evaluation environment and policy
+    override_path = None
+    if sim_cfg.morphology_override is not None:
+        override_path = Path(hydra.utils.to_absolute_path(sim_cfg.morphology_override))
+
+    bundle = build_eval_env(
+        model_path=model_path,
+        training=training,
+        metadata=metadata,
+        morphology_override_path=override_path,
     )
-    env = BrittleStarEnv(
-        raw_env,
-        backend=backend,
-        config=training.environment,
-        morphology_config=env_morphology,
-    )
+
+    env = bundle.env
+    policy = bundle.policy
+    action_low = bundle.action_low
+    action_high = bundle.action_high
+    action_mask = bundle.action_mask
 
     state0 = env.reset(seed=seed)
-
-    # Calculate the action dimension the model was trained with
-    trained_action_dim = sum(training.morphology.segments_per_arm) * 2
-
-    # 7. Load policy
-    policy = PolicyAgent.from_checkpoint(
-        model_path, action_dim=trained_action_dim, obs_processor=obs_processor
-    )
-
-    # Convert the JAX boolean mask to a numpy array for easy indexing
-    action_mask = np.asarray(padding_masks["mask_2x"])
-
-    # Match training's action clipping behavior.
-    action_space = getattr(raw_env, "action_space", None)
-    action_low = (
-        None if action_space is None else np.asarray(action_space.low, dtype=np.float32).ravel()
-    )
-    action_high = (
-        None if action_space is None else np.asarray(action_space.high, dtype=np.float32).ravel()
-    )
 
     # 8. Run simulation
     headless = bool(sim_cfg.headless)

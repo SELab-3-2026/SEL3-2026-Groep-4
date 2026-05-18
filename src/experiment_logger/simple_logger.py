@@ -71,6 +71,10 @@ class SimpleLogger:
     def save_final_model(self, params: Any, metadata: Optional[Dict[str, Any]] = None):
         print("[SAVE] Final model would be saved (SimpleLogger: No-Op)")
 
+    def sync_file(self, path: Any):
+        """No-op for SimpleLogger."""
+        pass
+
     def finish(self):
         print(f"[FINISH] SimpleLogger finished for run: {self.run_name}")
 

@@ -13,6 +13,21 @@ To set up the UV module, you can run the following command:
 uv sync --frozen
 ```
 
+## Repository Structure
+
+```text
+.
+├── configs/                # Hydra configuration files (YAML)
+├── docs/                   # Comprehensive documentation and API guides
+├── runs/                   # Default output directory for Hydra and training artifacts
+├── scripts/                # High-level entrypoints for training, simulation, and evaluation
+├── src/
+│   └── brittle_star_project/ # Core library and environment logic
+│       ├── evaluation/     # Checkpoint evaluation, rollout logic, and metrics persistence
+│       └── trainers/       # Training loop implementations (e.g., PPO)
+└── tests/                  # Unit and integration tests
+```
+
 ## Usage
 
 For detailed instructions on how to use the project, please refer to the **[API Documentation](docs/README.md)**.
@@ -29,6 +44,9 @@ For detailed instructions on how to use the project, please refer to the **[API 
 
 3. **Simulate a trained model:**
    See [Simulation & Evaluation](docs/api/simulation.md).
+
+4. **Compare fault tolerance of models:**
+   See [Checkpoint & Model Evaluation](docs/api/evaluation.md)
 
 ## HPC
 

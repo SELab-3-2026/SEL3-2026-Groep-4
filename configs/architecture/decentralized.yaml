@@ -26,7 +26,7 @@ critic:
   activation: "tanh"
 
 # Synchronous message-passing rounds per control step
-message_passing_steps: 1
+message_passing_steps: 4
 
 # Connectivity topology (e.g., ring, fully_connected)
-topology_type: "ring"
+topology_type: "fully_connected"

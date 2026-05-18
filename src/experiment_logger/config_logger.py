@@ -31,3 +31,6 @@ class LoggingConfig:
                 "Configuration Error: 'upload_checkpoints' is True, but it requires "
                 "both 'track' and 'save_checkpoints' to also be True."
             )
+
+        # NOTE: Checkpoint evaluation settings live under the project's
+        # `evaluation` config group (see brittle_star_project.configs).

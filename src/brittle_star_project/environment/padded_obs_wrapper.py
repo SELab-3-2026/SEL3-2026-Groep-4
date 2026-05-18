@@ -30,6 +30,12 @@ def compute_padding_masks(
     mask_2x = []
 
     for arm_idx, (actual, ref) in enumerate(zip(segments_per_arm, reference_segments_per_arm)):
+        if not isinstance(actual, int):
+            actual = actual.item()
+
+        if not isinstance(ref, int):
+            ref = ref.item()
+
         if not (0 <= actual <= ref):
             raise ValueError(
                 f"Invalid amputation at arm {arm_idx}: "

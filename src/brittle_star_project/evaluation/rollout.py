@@ -17,6 +17,7 @@ class EpisodeResult:
     length: int
     reached_target: bool
     final_xy_dist: float | None
+    initial_target_distance: float | None
 
 
 def _get_observations(state: Any) -> dict[str, Any] | None:
@@ -61,6 +62,7 @@ def rollout_headless(
     ep_return = 0.0
     observations = _get_observations(state)
     prev_dist = _get_xy_distance_to_target(observations) if observations else None
+    initial_target_distance = prev_dist
     reached_target = _target_reached(state=state)
 
     steps = 0
@@ -91,6 +93,7 @@ def rollout_headless(
         length=steps,
         reached_target=reached_target,
         final_xy_dist=final_dist,
+        initial_target_distance=initial_target_distance,
     )
 
 
@@ -114,18 +117,20 @@ def rollout_viewer(
 
     episode_return = 0.0
     observations = _get_observations(state)
+
     prev_dist = _get_xy_distance_to_target(observations) if observations else None
     reached_target = _target_reached(state=state)
 
     steps = 0
     with mujoco.viewer.launch_passive(model, data) as viewer:
         step_iter = range(int(max_steps)) if max_steps is not None else itertools.count()
-        for _step_idx in step_iter:
+        for _ in step_iter:
             if not viewer.is_running():
                 break
             step_start = time.time()
 
             obs_dict = observations or {}
+
             action = policy.act(observations=obs_dict)
             if action_mask is not None:
                 action = action[action_mask]

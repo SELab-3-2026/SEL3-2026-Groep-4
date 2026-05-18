@@ -38,12 +38,18 @@ To run with your custom experiment file:
 uv run python scripts/train.py experiment=my_experiment
 ```
 
-### Command-Line Overrides
-
-You can override any parameter directly from the command line using Hydra's dot notation. This is useful for quick tests:
-
 ```bash
 uv run python scripts/train.py ppo.learning_rate=0.001 ppo.num_envs=32 logging.track=true
 ```
+
+## Evaluation During Training
+
+By default, the trainer saves checkpoints but does not evaluate them. To enable automatic headless evaluation of every saved checkpoint, set `evaluation.evaluate_checkpoints=true`:
+
+```bash
+uv run python scripts/train.py evaluation.evaluate_checkpoints=true
+```
+
+For more details on evaluation metrics and comparison tools, see [Evaluation](./evaluation.md).
 
 For more details on tracking your experiments, see [Tracking & Monitoring](./tracking.md).

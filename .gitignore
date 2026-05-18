@@ -5,6 +5,7 @@ wandb/
 outputs/
 multirun/
 metrics/
+adjacency_debug.txt
 
 # Python-generated files
 __pycache__/
