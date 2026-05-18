@@ -1,0 +1,1126 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../controllers/">
+      
+      
+        <link rel="next" href="../learning_algorithm/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Input (state) and output (action) spaces - Brittle Star Project</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#input-state-and-output-action-spaces" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Brittle Star Project" class="md-header__button md-logo" aria-label="Brittle Star Project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Brittle Star Project
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Input (state) and output (action) spaces
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Brittle Star Project" class="md-nav__button md-logo" aria-label="Brittle Star Project" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Brittle Star Project
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contribution Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../DEVELOPMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../HPC/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HPC Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Api
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Api
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/analysis/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Analysis &amp; Plotting Tools
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Brittle star environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Checkpoint &amp; Model Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation &amp; Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/tracking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tracking &amp; Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/training/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Training Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../actor-critic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Actor-Critic Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../communication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Communication scheme (Message Passing)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../controllers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Levels of modularity and topology
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Input (state) and output (action) spaces
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Input (state) and output (action) spaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#normalization-and-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalization and Scaling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rationale
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations-and-alternatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations and alternatives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mujoco" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MuJoCo
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../learning_algorithm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reinforcement Learning Algorithm
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reward_function/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reward function and observation space
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#normalization-and-scaling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalization and Scaling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rationale
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations-and-alternatives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations and alternatives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mujoco" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MuJoCo
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="input-state-and-output-action-spaces">Input (state) and output (action) spaces</h1>
+<p>To effectively learn locomotion and navigation, the agent requires a well-defined observation space (inputs) and action
+space (outputs). The control models map these observations directly to physical movements.</p>
+<p><strong>Inputs (state space)</strong></p>
+<p>The observation space provides the agent with its current physical state and its navigational objective. With a
+decentralized control architecture in mind, we divide these inputs into global and local states.</p>
+<p>Global inputs, always broadcasted to all nodes:</p>
+<ul>
+<li>Vertical orientation/tilt: A single, simplified metric representing the tilt/vertical alignment of the agent's
+  central body/disk, a.k.a. the deviation from the global Z-axis. Its value is derived from the environment's raw disk
+  rotation 3D vector $[roll, pitch, yaw]$:
+  $$
+  tilt = sqrt(roll^2 + pitch^2)
+  $$</li>
+<li>Goal vector: A 2D unit vector representing the <em>egocentric</em> direction to the target. A value of $[1.0, 0.0]$
+  indicates that the target is directly in front of the agent (angle 0).</li>
+</ul>
+<p>Local inputs, routed directly to specific nodes:</p>
+<ul>
+<li>Joint positions: The current angles of all joints within the morphology.</li>
+<li>Joint velocities: The current angular velocities of the joints.</li>
+<li>Joint actuator forces: The physical forces currently exerted at each specific joint.</li>
+<li>Segment contact: These values indicate whether each physical segment of the agent is currently touching the ground.</li>
+</ul>
+<p><strong>Outputs (action space)</strong></p>
+<p>The action space defines how the agent interacts with the environment.</p>
+<ul>
+<li>Joint offsets: <em>absolute</em> target positions (offsets) for the joints, i.e. the exact angle the joint should move to.</li>
+</ul>
+<h2 id="normalization-and-scaling">Normalization and Scaling</h2>
+<p>Both the input (observation) and output (action) spaces are rescaled to the range <strong>$[-1, 1]$</strong>. </p>
+<p>For the input space, all raw physical values (angles, velocities, forces, distances) are normalized based on their
+defined physical bounds. If a value exceeds these bounds during simulation, it is clipped to the $[-1, 1]$ range.</p>
+<p>For the output space, the neural network's tanh-activated outputs (which naturally fall in $[-1, 1]$) are linearly
+mapped to the physical joint limits defined in the robot's morphology.</p>
+<h2 id="rationale">Rationale</h2>
+<p>When designing the state space, we must ask: <em>Could a human operator perform this task given only these inputs?</em></p>
+<ul>
+<li>Inclusion of Joint Velocities: Because our control models do not inherently possess memory of previous timesteps,
+  providing only the joint position is insufficient to determine the direction a limb is currently moving. By
+  explicitly including joint velocities, the agent can immediately infer momentum and movement direction without
+  needing to memorize past states.</li>
+<li>Absolute Joint Offsets: The physical Brittle Star robot relies on servo motors (if we were to build this simulated
+  robot), which are inherently position-controlled devices. (Continuous rotation servos exist, but they are less
+  commonly used for joints.) If our network outputted continuous torques (forces), a significant portion of the
+  reinforcement learning process would be wasted on learning low-level PID control dynamics (i.e., how much force to
+  apply to hold a position). Abstracting this away forces the learning algorithm to focus entirely on higher-level gait
+  generation and locomotion.</li>
+<li>Simplified vertical orientation: We drop the full 3D spatial rotation and angular velocity arrays in favor of a
+  single vertical orientation metric (tilt). For a brittle star moving accross a flat plane, this metric is sufficient
+  for the agent to sense if it is losing balance or flipping over.</li>
+<li>Force representation: We strictly retain the joint actuator forces and drop the more generic actuator force. Forces
+  that are explicitly tied to individual joints are significantly easier to route into decentralized, local limb nodes,
+  which is necessary for our message-passing architecture.</li>
+<li>Goal Vector (Distance + Angle): Providing only the scalar "distance to the goal" as an input is akin to blindfolding
+  the robot and asking it to find a target by playing "hot or cold." By providing a full vector, the agent knows
+  exactly where the target is relative to its current orientation, allowing for directed and efficient locomotion.</li>
+</ul>
+<p>The goal representation is explicitly divided into a directional vector and a scalar distance. Keeping the direction
+  as a normalized unit vector bounds the values to the $[-1, 1]$ range, which stabilizes neural network training.
+  Providing only a scalar "distance to the goal" would force the agent to learning localized searching behaviors (e.g.
+  random walks or spiraling) to deduce the direction, drastically increasing the difficulty of the learning task.</p>
+<p><strong>NOTE:</strong> We later dropped the "distance to vector", switching to only a direction as the input. Our reasoning is
+  the agent should always move towards the goal (it should not learn to stop at the goal), which allows for this
+  simplification that decreases the model input size.</p>
+<p>The environment provides a raw <code>unit_xy_direction_to_target</code> (global), which we transform into a calculated
+  <code>robot_direction_to_target</code> (egocentric) before passing it to the MLPs. This vector consists of the X and Y
+  direction, where a value of $[1.0, 0.0]$ (mapping to an angle of $0$) means the robot is facing directly towards the
+  target.
+- Contact sensors: Segment contact detects external ground interaction and is biologically vital for timing gait
+  transitions.
+- Zero-Centered Rescaling ($[-1, 1]$): Using a zero-centered range is standard best practice for continuous control
+  tasks. It provides several mathematical and physical advantages:
+  - Improved Gradient Flow: Neural networks optimize faster when inputs are zero-centered. If all inputs were positive
+    (e.g., $[0, 1]$), the gradients during backpropagation would be forced to the same sign, causing inefficient
+    "zig-zag" weight updates.
+  - Meaningful Neutral State: In robotics, $0.0$ naturally represents a resting state (zero velocity, centered
+    position, no force). In a $[-1, 1]$ system, this physical rest maps to a neutral $0.0$ signal in the network.
+    This also correctly communicaties a "neutral/dead" signal for amputated limbs that are padded with $0.0$ values.</p>
+<p>Specifically, we do not include some available inputs:</p>
+<ul>
+<li>Global position: Absolute spatial coordinates can cause the agent to overfit to a specific coordinate frame or map,
+  rather than learning general, adaptable locomotion strategies.</li>
+</ul>
+<h2 id="limitations-and-alternatives">Limitations and alternatives</h2>
+<p>Alternative state and action formulations include:</p>
+<ul>
+<li>Torque-based continuous control: In many continuous control tasks (like standard MuJoCo benchmarks), actions
+  represent continuous torques applied to joints. While this provides more granular, low-level physical control, it
+  heavily complicates training and does not align well with the physical reality of servo-driven hardware.</li>
+<li>Recurrent Neural Networks (RNNs) / Frame Stacking: Instead of explicitly passing velocities in the state space, the
+  network could infer momentum by observing a history of past states. Using RNNs or frame stacking allows the agent to
+  build an internal memory of movement. However, this significantly increases architectural complexity and training
+  time compared to explicitly providing the velocity data.</li>
+<li>Scalar Goal Distance: Giving the agent only the scalar distance to the target would force it to learn a localized
+  searching behavior (e.g., spiraling or random walks) to determine the correct direction. While biologically plausible
+  for simpler organisms following chemical gradients, it drastically increases the difficulty of the learning task.</li>
+<li><strong>$[0, 1]$ Rescaling:</strong> While some domains (like computer vision) use $[0, 1]$ scaling, it is generally avoided in
+  robotics. Scaling to $[0, 1]$ would mean that a resting joint (velocity = 0) maps to an input of $0.5$. This
+  constant positive bias forces the network to waste capacity learning to ignore or subtract this baseline signal just
+  to stand still. Furthermore, it breaks the "dead signal" interpretation of zero-padding used for amputations.</li>
+</ul>
+<h2 id="mujoco">MuJoCo</h2>
+<p>This is what the filtered input vectors look like in MuJoCo, with $J$ joints and $S$ segments:</p>
+<ul>
+<li><code>joint_position</code>: shape=(J,), dtype=float64</li>
+<li><code>joint_velocity</code>: shape=(J,), dtype=float64</li>
+<li><code>joint_actuator_force</code>: shape=(J,), dtype=float64</li>
+<li><code>segment_contact</code>: shape=(S,), dtype=float64</li>
+<li><code>robot_direction_to_target</code>: shape=(2,), dtype=float64, egocentric</li>
+<li><code>disk_z_tilt</code>: shape=(1,), dtype=float64, derived from <code>disk_rotation</code></li>
+</ul>
+<p>This brings the entire input space down to $3J + S + 4$ float64's, compared to $4J + S + 15$ float64's for the
+unfiltered inputs.</p>
+<p>For reference, these are all the inputs that are available in the MuJoCo environment:</p>
+<div class="highlight"><pre><span></span><code>obs keys: [&#39;joint_position&#39;, &#39;joint_velocity&#39;, &#39;joint_actuator_force&#39;, &#39;actuator_force&#39;, &#39;disk_position&#39;, &#39;disk_rotation&#39;, &#39;disk_linear_velocity&#39;, &#39;disk_angular_velocity&#39;, &#39;tendon_position&#39;, &#39;tendon_velocity&#39;, &#39;segment_contact&#39;, &#39;unit_xy_direction_to_target&#39;, &#39;xy_distance_to_target&#39;]
+
+raw observations dict:
+{&#39;joint_position&#39;: array([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]),
+ &#39;joint_velocity&#39;: array([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]),
+ &#39;joint_actuator_force&#39;: array([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]),
+ &#39;actuator_force&#39;: array([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]),
+ &#39;disk_position&#39;: array([0.  , 0.  , 0.11]),
+ &#39;disk_rotation&#39;: (0.0, -0.0, 0.0),
+ &#39;disk_linear_velocity&#39;: array([0., 0., 0.]),
+ &#39;disk_angular_velocity&#39;: array([0., 0., 0.]),
+ &#39;tendon_position&#39;: array([], dtype=float64),
+ &#39;tendon_velocity&#39;: array([], dtype=float64),
+ &#39;segment_contact&#39;: array([0., 0., 0., 0., 0., 0.]),
+ &#39;unit_xy_direction_to_target&#39;: array([-0.95333378, -0.30191837]),
+ &#39;xy_distance_to_target&#39;: array([3.])}
+
+(shapes)
+joint_position: shape=(12,), dtype=float64, size=12
+joint_velocity: shape=(12,), dtype=float64, size=12
+joint_actuator_force: shape=(12,), dtype=float64, size=12
+actuator_force: shape=(12,), dtype=float64, size=12
+disk_position: shape=(3,), dtype=float64, size=3
+disk_rotation: shape=(3,), dtype=float64, size=3
+disk_linear_velocity: shape=(3,), dtype=float64, size=3
+disk_angular_velocity: shape=(3,), dtype=float64, size=3
+tendon_position: shape=(0,), dtype=float64, size=0
+tendon_velocity: shape=(0,), dtype=float64, size=0
+segment_contact: shape=(6,), dtype=float64, size=6
+xy_distance_to_target: shape=(1,), dtype=float64, size=1
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
