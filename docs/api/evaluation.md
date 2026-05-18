@@ -15,7 +15,7 @@ python scripts/train.py evaluation.evaluate_checkpoints=true evaluation.eval_max
 
 Results are saved to `runs/<run_dir>/metrics/checkpoint_evaluation.csv` and synced to Weights & Biases if enabled.
 
-## Cross-Model & Defect Tolerance Analysis
+## Cross-Model & Fault Tolerance Analysis
 
 To measure how well different controllers handle damage (amputations), use `scripts/compare_models.py`. This script performs a grid search over models x morphologies.
 
