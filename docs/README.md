@@ -1,6 +1,6 @@
 # Documentation
 
-## Design & architecture ([`/design`](./design/))
+## Design & architecture (`/design`)
 
 If you are interested in the "why did you do it like this?"
 
@@ -11,7 +11,7 @@ If you are interested in the "why did you do it like this?"
 - [Learning algorithm](./design/learning_algorithm.md): RL techniques, i.e. PPO.
 - [Reward function](./design/learning_algorithm.md): Goals, fitness tracking, and reward structures.
 
-## API reference ([`/api`](./api/))
+## API reference (`/api`)
 
 If you are interested in the "how do I use it?"
 
@@ -19,3 +19,5 @@ If you are interested in the "how do I use it?"
 - [Tracking & Monitoring](./api/tracking.md): Setting up WandB and TensorBoard to monitor runs.
 - [Simulation](./api/simulation.md): Visualizing and evaluating models.
 - [Environment](./api/environment.md): MuJoCo environment interaction and configuration.
+- [Analysis](./api/analysis.md): Comparing checkpoints and generating plots.
+- [Evaluation](./api/evaluation.md): Evaluating checkpoints and comparing fault tolerance.
