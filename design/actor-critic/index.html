@@ -1136,12 +1136,12 @@ estimation (Critic).</p>
 <p><strong>Centralized Architecture (Baseline)</strong></p>
 <p>This pipeline treats the agent as a single entity and uses standard Proximal Policy Optimization (PPO).</p>
 <ul>
-<li>Centralized Actor: Composed of two chained MLPs (Sensor $\rightarrow$ Motor) passing a hidden state between them. The
+<li>Centralized Actor: Composed of two chained MLPs (Sensor <span class="arithmatex">\(\rightarrow\)</span> Motor) passing a hidden state between them. The
   centralized sensor receives the concatenated global state vector of all limbs at once and processes it into a hidden
   state. The centralized motor receives this hidden state and outputs the joint offsets for all actuators
   simultaneously. This is mathematically equivalent to using one large MLP with hidden layers, but splitting makes the
   implementation easier by allowing us to reuse the same components for the decentralized modules.</li>
-<li>Centralized Critic: Composed of two sequential MLPs (Feature Extractor $\rightarrow$ Critic). Because PPO evaluates
+<li>Centralized Critic: Composed of two sequential MLPs (Feature Extractor <span class="arithmatex">\(\rightarrow\)</span> Critic). Because PPO evaluates
   the state-value function, this network only receives the concatenated global state vector (no actions). It outputs a
   single scalar estimating the expected future reward for the entire agent.</li>
 </ul>
@@ -1172,10 +1172,10 @@ variant.</p>
 <li>Decentralized Actor, split into three distinct models:</li>
 <li>Sensor: A local model at each node. It receives its local state plus the goal vector directly, processing them into
     an initial hidden state.</li>
-<li>Propagator: Nodes synchronously compute and exchange messages with connected neighbors for $N$ steps to update
+<li>Propagator: Nodes synchronously compute and exchange messages with connected neighbors for <span class="arithmatex">\(N\)</span> steps to update
     their hidden states. See <a href="../communication/">communication.md</a> for details.</li>
 <li>Motor: A local model uses its final updated hidden state to output the joint offset strictly for its own actuator.</li>
-<li>Centralized Critic: Composed of two sequential MLPs (Feature Extractor $\rightarrow$ Critic). During training, it
+<li>Centralized Critic: Composed of two sequential MLPs (Feature Extractor <span class="arithmatex">\(\rightarrow\)</span> Critic). During training, it
   acts globally by taking the concatenated state vectors from all sensors to output a single, global state-value scalar
   evaluating the entire agent's pose.</li>
 </ul>
@@ -1217,7 +1217,7 @@ critic for all nodes at once, for the following reasons:</p>
 
     Prop -.-&gt;|"message passing"|Prop</code></pre>
 <h2 id="implementation-details-network-depth">Implementation Details (Network Depth)</h2>
-<p>Inspired by: https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/</p>
+<p>Inspired by: <a href="https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/">PPO Implementation Details</a></p>
 <p>The MLPs used in both pipelines are defined with specific hidden layer configurations to balance learning capability
 and computational cost. As of right now, though this might change as we make progress in our experiments, we use:</p>
 <ul>
@@ -1233,9 +1233,9 @@ and computational cost. As of right now, though this might change as we make pro
 by previous research to maintain learning stability.</p>
 <p><strong>References</strong></p>
 <ul>
-<li>Ha, D. (2017, October 29). A Visual Guide to Evolution Strategies. 大トロ ・ Machine Learning. https://blog.otoro.net/2017/10/29/visual-evolution-strategies/</li>
-<li>Schulman, John, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. ‘Proximal Policy Optimization Algorithms’. arXiv:1707.06347. Preprint, arXiv, 28 August 2017. https://doi.org/10.48550/arXiv.1707.06347.</li>
-<li>Wang, Tingwu, Renjie Liao, Jimmy Ba, and S. Fidler. ‘NerveNet: Learning Structured Policy with Graph Neural Networks’. Conference paper presented at International Conference on Learning Representations. 15 February 2018. https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613.</li>
+<li>Ha, D. (2017, October 29). A Visual Guide to Evolution Strategies. 大トロ ・ Machine Learning. <a href="https://blog.otoro.net/2017/10/29/visual-evolution-strategies/">https://blog.otoro.net/2017/10/29/visual-evolution-strategies/</a></li>
+<li>Schulman, John, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. ‘Proximal Policy Optimization Algorithms’. arXiv:1707.06347. Preprint, arXiv, 28 August 2017. <a href="https://doi.org/10.48550/arXiv.1707.06347">https://doi.org/10.48550/arXiv.1707.06347</a>.</li>
+<li>Wang, Tingwu, Renjie Liao, Jimmy Ba, and S. Fidler. ‘NerveNet: Learning Structured Policy with Graph Neural Networks’. Conference paper presented at International Conference on Learning Representations. 15 February 2018. <a href="https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613">https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613</a>.</li>
 </ul>
 
 
@@ -1290,6 +1290,10 @@ by previous research to maintain learning stability.</p>
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>

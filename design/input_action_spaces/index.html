@@ -1205,11 +1205,11 @@ decentralized control architecture in mind, we divide these inputs into global a
 <ul>
 <li>Vertical orientation/tilt: A single, simplified metric representing the tilt/vertical alignment of the agent's
   central body/disk, a.k.a. the deviation from the global Z-axis. Its value is derived from the environment's raw disk
-  rotation 3D vector $[roll, pitch, yaw]$:
+  rotation 3D vector <span class="arithmatex">\([roll, pitch, yaw]\)</span>:
   $$
   tilt = sqrt(roll^2 + pitch^2)
   $$</li>
-<li>Goal vector: A 2D unit vector representing the <em>egocentric</em> direction to the target. A value of $[1.0, 0.0]$
+<li>Goal vector: A 2D unit vector representing the <em>egocentric</em> direction to the target. A value of <span class="arithmatex">\([1.0, 0.0]\)</span>
   indicates that the target is directly in front of the agent (angle 0).</li>
 </ul>
 <p>Local inputs, routed directly to specific nodes:</p>
@@ -1225,10 +1225,10 @@ decentralized control architecture in mind, we divide these inputs into global a
 <li>Joint offsets: <em>absolute</em> target positions (offsets) for the joints, i.e. the exact angle the joint should move to.</li>
 </ul>
 <h2 id="normalization-and-scaling">Normalization and Scaling</h2>
-<p>Both the input (observation) and output (action) spaces are rescaled to the range <strong>$[-1, 1]$</strong>. </p>
+<p>Both the input (observation) and output (action) spaces are rescaled to the range <strong><span class="arithmatex">\([-1, 1]\)</span></strong>. </p>
 <p>For the input space, all raw physical values (angles, velocities, forces, distances) are normalized based on their
-defined physical bounds. If a value exceeds these bounds during simulation, it is clipped to the $[-1, 1]$ range.</p>
-<p>For the output space, the neural network's tanh-activated outputs (which naturally fall in $[-1, 1]$) are linearly
+defined physical bounds. If a value exceeds these bounds during simulation, it is clipped to the <span class="arithmatex">\([-1, 1]\)</span> range.</p>
+<p>For the output space, the neural network's tanh-activated outputs (which naturally fall in <span class="arithmatex">\([-1, 1]\)</span>) are linearly
 mapped to the physical joint limits defined in the robot's morphology.</p>
 <h2 id="rationale">Rationale</h2>
 <p>When designing the state space, we must ask: <em>Could a human operator perform this task given only these inputs?</em></p>
@@ -1254,7 +1254,7 @@ mapped to the physical joint limits defined in the robot's morphology.</p>
   exactly where the target is relative to its current orientation, allowing for directed and efficient locomotion.</li>
 </ul>
 <p>The goal representation is explicitly divided into a directional vector and a scalar distance. Keeping the direction
-  as a normalized unit vector bounds the values to the $[-1, 1]$ range, which stabilizes neural network training.
+  as a normalized unit vector bounds the values to the <span class="arithmatex">\([-1, 1]\)</span> range, which stabilizes neural network training.
   Providing only a scalar "distance to the goal" would force the agent to learning localized searching behaviors (e.g.
   random walks or spiraling) to deduce the direction, drastically increasing the difficulty of the learning task.</p>
 <p><strong>NOTE:</strong> We later dropped the "distance to vector", switching to only a direction as the input. Our reasoning is
@@ -1262,18 +1262,18 @@ mapped to the physical joint limits defined in the robot's morphology.</p>
   simplification that decreases the model input size.</p>
 <p>The environment provides a raw <code>unit_xy_direction_to_target</code> (global), which we transform into a calculated
   <code>robot_direction_to_target</code> (egocentric) before passing it to the MLPs. This vector consists of the X and Y
-  direction, where a value of $[1.0, 0.0]$ (mapping to an angle of $0$) means the robot is facing directly towards the
+  direction, where a value of <span class="arithmatex">\([1.0, 0.0]\)</span> (mapping to an angle of <span class="arithmatex">\(0\)</span>) means the robot is facing directly towards the
   target.
 - Contact sensors: Segment contact detects external ground interaction and is biologically vital for timing gait
   transitions.
-- Zero-Centered Rescaling ($[-1, 1]$): Using a zero-centered range is standard best practice for continuous control
+- Zero-Centered Rescaling (<span class="arithmatex">\([-1, 1]\)</span>): Using a zero-centered range is standard best practice for continuous control
   tasks. It provides several mathematical and physical advantages:
   - Improved Gradient Flow: Neural networks optimize faster when inputs are zero-centered. If all inputs were positive
-    (e.g., $[0, 1]$), the gradients during backpropagation would be forced to the same sign, causing inefficient
+    (e.g., <span class="arithmatex">\([0, 1]\)</span>), the gradients during backpropagation would be forced to the same sign, causing inefficient
     "zig-zag" weight updates.
-  - Meaningful Neutral State: In robotics, $0.0$ naturally represents a resting state (zero velocity, centered
-    position, no force). In a $[-1, 1]$ system, this physical rest maps to a neutral $0.0$ signal in the network.
-    This also correctly communicaties a "neutral/dead" signal for amputated limbs that are padded with $0.0$ values.</p>
+  - Meaningful Neutral State: In robotics, <span class="arithmatex">\(0.0\)</span> naturally represents a resting state (zero velocity, centered
+    position, no force). In a <span class="arithmatex">\([-1, 1]\)</span> system, this physical rest maps to a neutral <span class="arithmatex">\(0.0\)</span> signal in the network.
+    This also correctly communicaties a "neutral/dead" signal for amputated limbs that are padded with <span class="arithmatex">\(0.0\)</span> values.</p>
 <p>Specifically, we do not include some available inputs:</p>
 <ul>
 <li>Global position: Absolute spatial coordinates can cause the agent to overfit to a specific coordinate frame or map,
@@ -1292,13 +1292,13 @@ mapped to the physical joint limits defined in the robot's morphology.</p>
 <li>Scalar Goal Distance: Giving the agent only the scalar distance to the target would force it to learn a localized
   searching behavior (e.g., spiraling or random walks) to determine the correct direction. While biologically plausible
   for simpler organisms following chemical gradients, it drastically increases the difficulty of the learning task.</li>
-<li><strong>$[0, 1]$ Rescaling:</strong> While some domains (like computer vision) use $[0, 1]$ scaling, it is generally avoided in
-  robotics. Scaling to $[0, 1]$ would mean that a resting joint (velocity = 0) maps to an input of $0.5$. This
+<li><strong><span class="arithmatex">\([0, 1]\)</span> Rescaling:</strong> While some domains (like computer vision) use <span class="arithmatex">\([0, 1]\)</span> scaling, it is generally avoided in
+  robotics. Scaling to <span class="arithmatex">\([0, 1]\)</span> would mean that a resting joint (velocity = 0) maps to an input of <span class="arithmatex">\(0.5\)</span>. This
   constant positive bias forces the network to waste capacity learning to ignore or subtract this baseline signal just
   to stand still. Furthermore, it breaks the "dead signal" interpretation of zero-padding used for amputations.</li>
 </ul>
 <h2 id="mujoco">MuJoCo</h2>
-<p>This is what the filtered input vectors look like in MuJoCo, with $J$ joints and $S$ segments:</p>
+<p>This is what the filtered input vectors look like in MuJoCo, with <span class="arithmatex">\(J\)</span> joints and <span class="arithmatex">\(S\)</span> segments:</p>
 <ul>
 <li><code>joint_position</code>: shape=(J,), dtype=float64</li>
 <li><code>joint_velocity</code>: shape=(J,), dtype=float64</li>
@@ -1307,7 +1307,7 @@ mapped to the physical joint limits defined in the robot's morphology.</p>
 <li><code>robot_direction_to_target</code>: shape=(2,), dtype=float64, egocentric</li>
 <li><code>disk_z_tilt</code>: shape=(1,), dtype=float64, derived from <code>disk_rotation</code></li>
 </ul>
-<p>This brings the entire input space down to $3J + S + 4$ float64's, compared to $4J + S + 15$ float64's for the
+<p>This brings the entire input space down to <span class="arithmatex">\(3J + S + 4\)</span> float64's, compared to <span class="arithmatex">\(4J + S + 15\)</span> float64's for the
 unfiltered inputs.</p>
 <p>For reference, these are all the inputs that are available in the MuJoCo environment:</p>
 <div class="highlight"><pre><span></span><code>obs keys: [&#39;joint_position&#39;, &#39;joint_velocity&#39;, &#39;joint_actuator_force&#39;, &#39;actuator_force&#39;, &#39;disk_position&#39;, &#39;disk_rotation&#39;, &#39;disk_linear_velocity&#39;, &#39;disk_angular_velocity&#39;, &#39;tendon_position&#39;, &#39;tendon_velocity&#39;, &#39;segment_contact&#39;, &#39;unit_xy_direction_to_target&#39;, &#39;xy_distance_to_target&#39;]
@@ -1394,6 +1394,10 @@ xy_distance_to_target: shape=(1,), dtype=float64, size=1
     
     
       <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
       
     
   </body>
