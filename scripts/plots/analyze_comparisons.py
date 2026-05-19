@@ -173,20 +173,6 @@ def plot_grouped_bar(
             plt.FuncFormatter(lambda x, _: f"{x:.2f}" if abs(x) < 10 else f"{x:.0f}")
         )
 
-    # _add_square_placeholders(ax, x_ticks_pos, [f"{m} Arms" for m in morphologies])
-
-    # Add custom legend entry for best performer
-    # ax.plot(
-    #     [],
-    #     [],
-    #     marker=BEST_PERFORMER_MARKER,
-    #     color="w",
-    #     markerfacecolor=BEST_PERFORMER_COLOR,
-    #     markersize=15,
-    #     label="Best Performance",
-    #     ls="",
-    # )
-
     ax.legend(**LEGEND_KWARGS, ncol=len(architectures))
     ax.set_facecolor("white")
     fig.patch.set_facecolor("white")
@@ -306,22 +292,6 @@ def plot_grouped_bar_alt(
         ax.yaxis.set_major_formatter(
             plt.FuncFormatter(lambda x, _: f"{x:.2f}" if abs(x) < 10 else f"{x:.0f}")
         )
-
-    # In this alt plot, placeholders might be per architecture
-    # _add_square_placeholders(
-    #     ax, x_indices, [arch.replace("_", "\n").title() for arch in architectures]
-    # )
-
-    # ax.plot(
-    #     [],
-    #     [],
-    #     marker=BEST_PERFORMER_MARKER,
-    #     color="w",
-    #     markerfacecolor=BEST_PERFORMER_COLOR,
-    #     markersize=15,
-    #     label="Best Performance",
-    #     ls="",
-    # )
 
     ax.legend(**LEGEND_KWARGS, ncol=len(morphologies))
     ax.set_facecolor("white")
