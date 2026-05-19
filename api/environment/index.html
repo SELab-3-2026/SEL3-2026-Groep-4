@@ -1179,20 +1179,26 @@
 that creates instances of the environment/morphologies/... It uses the
 configuration classes defined in <code>env_config.py</code> to create the instances.</p>
 <h2 id="configuration">Configuration</h2>
-<p>The data classes in <code>env_config</code> have default values as stated in the tutorials.
-* MorphologyConfig: configuration for the morphology of the brittle star. Contains
-number of arms, number of segments per arm, and control mode.
-* ArenaConfig: configuration for the arena. Sets the size of the arena, whether to 
-set the ground floor to sand, attach a target and sizes of the walls.
-* EnvConfig: configuration for the environment. These set shared settings
-such as camera locations, simulation time and the task.</p>
+<p>The data classes in <code>env_config</code> have default values as stated in the tutorials.</p>
+<ul>
+<li>MorphologyConfig: configuration for the morphology of the brittle star. Contains
+number of arms, number of segments per arm, and control mode.</li>
+<li>ArenaConfig: configuration for the arena. Sets the size of the arena, whether to 
+set the ground floor to sand, attach a target and sizes of the walls.</li>
+<li>EnvConfig: configuration for the environment. These set shared settings
+such as camera locations, simulation time and the task.</li>
+</ul>
 <h2 id="backend-and-task-enums">Backend and Task enums</h2>
-<p>The Backend enum specifies either an MJC or MJX backend.
-* MJC: runs on CPU
-* MJX: uses jax on the gpu</p>
-<p>The Task enum specifies which task to use. 2 items are present:
-* DIRECTED_LOCOMOTION: move to a target location
-* LIGHT_ESCAPE: situation where the robot must move to a darker location</p>
+<p>The Backend enum specifies either an MJC or MJX backend.</p>
+<ul>
+<li>MJC: runs on CPU</li>
+<li>MJX: uses jax on the gpu</li>
+</ul>
+<p>The Task enum specifies which task to use. 2 items are present:</p>
+<ul>
+<li>DIRECTED_LOCOMOTION: move to a target location</li>
+<li>LIGHT_ESCAPE: situation where the robot must move to a darker location</li>
+</ul>
 
 
 

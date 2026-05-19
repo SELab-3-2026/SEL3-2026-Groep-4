@@ -1350,16 +1350,22 @@ bash<span class="w"> </span>scripts/hpc/install.sh
 <h3 id="verification-commands">Verification Commands</h3>
 <p>After installation, run these commands to ensure your environment is set up correctly:</p>
 <ol>
-<li><strong>Verify Quota Safety</strong>:
+<li>
+<p><strong>Verify Quota Safety</strong>:
    <div class="highlight"><pre><span></span><code>ls<span class="w"> </span>-d<span class="w"> </span>venvs<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;FAIL&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;&gt;&gt;&gt; PASS: Project root is clean.&quot;</span>
-</code></pre></div></li>
-<li><strong>Verify Library Versions (NumPy Fix)</strong>:
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Verify Library Versions (NumPy Fix)</strong>:
    <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import numpy; print(f&#39;NumPy: {numpy.__version__}&#39;)&quot;</span>
 <span class="c1"># Expected: 2.x.x (Venv version), not 1.2x (System version)</span>
-</code></pre></div></li>
-<li><strong>Verify GPU Access</strong>:
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Verify GPU Access</strong>:
    <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import torch, jax; print(f&#39;GPU: {torch.cuda.is_available()}&#39;); print(f&#39;JAX: {jax.devices()}&#39;)&quot;</span>
-</code></pre></div></li>
+</code></pre></div></p>
+</li>
 </ol>
 <h2 id="managing-dependencies">Managing Dependencies</h2>
 <p><code>env/hpc/requirements.txt</code> is auto-generated from <code>pyproject.toml</code>. To regenerate:</p>

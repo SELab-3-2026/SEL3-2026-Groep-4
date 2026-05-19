@@ -313,12 +313,12 @@
   <a href="#reproducibility-uv" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reproducibility &amp;uv
+        Reproducibility &amp; uv
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Reproducibility &amp;uv">
+    <nav class="md-nav" aria-label="Reproducibility &amp; uv">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1214,12 +1214,12 @@
   <a href="#reproducibility-uv" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reproducibility &amp;uv
+        Reproducibility &amp; uv
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Reproducibility &amp;uv">
+    <nav class="md-nav" aria-label="Reproducibility &amp; uv">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1351,7 +1351,7 @@
 
 <h1 id="development-guide">Development Guide</h1>
 <p>This guide outlines how to set up the development environment for this project, prioritizing <strong>reproducible builds</strong>, <strong>environment parity</strong>, and <strong>cross-hardware compatibility</strong>.</p>
-<h2 id="reproducibility-uv">Reproducibility &amp;uv</h2>
+<h2 id="reproducibility-uv">Reproducibility &amp; uv</h2>
 <p>This project uses <a href="https://github.com/astral-sh/uv">uv</a> to manage dependencies and virtual environments. The <code>uv.lock</code> file is the absolute source of truth for package versions and must always be committed.</p>
 <h3 id="source-of-truth">Source of Truth</h3>
 <ul>
@@ -1390,14 +1390,16 @@
 <li>The hardware-aware sync will run automatically during container creation.</li>
 </ol>
 <h2 id="local-development-alternative">Local Development (Alternative)</h2>
-<p>If you prefer not to use Docker:
-1. Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a>.
-2. Run <code>uv sync --frozen</code> (CPU) or <code>uv sync --frozen --extra cuda</code> (GPU).</p>
+<p>If you prefer not to use Docker:</p>
+<ol>
+<li>Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a>.</li>
+<li>Run <code>uv sync --frozen</code> (CPU) or <code>uv sync --frozen --extra cuda</code> (GPU).</li>
+</ol>
 <h2 id="hardware-acceleration-jax">Hardware Acceleration (JAX)</h2>
 <p>Verify your setup by running the JAX initialization test:</p>
-<p><div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_jax_init.py
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_jax_init.py
 </code></pre></div>
-In the devcontainer, this will succeed on both CPU and GPU. A <code>GpuDevice</code> is expected if a GPU is detected and the <code>cuda</code> extra was installed.</p>
+<p>In the devcontainer, this will succeed on both CPU and GPU. A <code>GpuDevice</code> is expected if a GPU is detected and the <code>cuda</code> extra was installed.</p>
 <h2 id="logging-monitoring">Logging &amp; Monitoring</h2>
 <p>This project uses a unified logging system through the <code>experiment_logger</code> package. </p>
 <ul>

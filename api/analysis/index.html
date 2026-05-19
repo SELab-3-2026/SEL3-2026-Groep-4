@@ -1410,10 +1410,12 @@
 <h1 id="analysis-plotting-tools">Analysis &amp; Plotting Tools</h1>
 <p>This guide outlines the tools available for analyzing experimental data and generating poster-quality visualizations for the Brittle Star project.</p>
 <h2 id="shared-configuration">Shared Configuration</h2>
-<p>All plotting scripts share a central configuration in <code>scripts/plots/plot_config.py</code>. This file defines:
-- <strong>Color Palette:</strong> A color-blind friendly, high-contrast palette for different architectures.
-- <strong>Typography:</strong> Consistent font sizes and styles tailored for A0 posters.
-- <strong>Markers:</strong> Shared visual indicators, such as the ★ used for best performers.</p>
+<p>All plotting scripts share a central configuration in <code>scripts/plots/plot_config.py</code>. This file defines:</p>
+<ul>
+<li><strong>Color Palette:</strong> A color-blind friendly, high-contrast palette for different architectures.</li>
+<li><strong>Typography:</strong> Consistent font sizes and styles tailored for A0 posters.</li>
+<li><strong>Markers:</strong> Shared visual indicators, such as the ★ used for best performers.</li>
+</ul>
 <h2 id="comparison-visualization">Comparison Visualization</h2>
 <p>The <code>scripts/plots/analyze_comparisons.py</code> script generates grouped bar charts comparing the performance of different architectures across various morphologies.</p>
 <h3 id="usage">Usage</h3>
@@ -1437,11 +1439,13 @@ uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </sp
 <li><code>--fig_width</code> / <code>--fig_height</code>: Physical dimensions of the plot in inches. Match these to your Figma layout to maintain exact font sizes.</li>
 </ul>
 <h3 id="outputs">Outputs</h3>
-<p>The script generates four key plots, each saved as both <code>.png</code> and <code>.svg</code>:
-1.  <strong>Forward Velocity:</strong> Grouped bar chart (cm/s).
-2.  <strong>Accumulated Reward:</strong> Mean cumulative reward.
-3.  <strong>Success Rate:</strong> Target acquisition percentage.
-4.  <strong>Distance Remaining:</strong> Navigational accuracy.</p>
+<p>The script generates four key plots, each saved as both <code>.png</code> and <code>.svg</code>:</p>
+<ol>
+<li><strong>Forward Velocity:</strong> Grouped bar chart (cm/s).</li>
+<li><strong>Accumulated Reward:</strong> Mean cumulative reward.</li>
+<li><strong>Success Rate:</strong> Target acquisition percentage.</li>
+<li><strong>Distance Remaining:</strong> Navigational accuracy.</li>
+</ol>
 <hr />
 <h2 id="convergence-analysis">Convergence Analysis</h2>
 <p>The <code>scripts/plots/analyze_convergence.py</code> script determines the convergence point of training runs.</p>
@@ -1454,18 +1458,22 @@ uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </sp
 <li><strong>CLI Arguments:</strong> Supports the same <code>--show_titles</code>, <code>--font_size</code>, and <code>--fig_width/height</code> flags as the comparison script.</li>
 </ul>
 <h3 id="outputs_1">Outputs</h3>
-<p>Generates three plots (PNG &amp; SVG):
-1. <code>convergence_comparison</code>: Grouped horizontal bar chart.
-2. <code>progress_reward_curves</code>: Line plots of reward over time.
-3. <code>progress_velocity_curves</code>: Line plots of velocity over time.</p>
+<p>Generates three plots (PNG &amp; SVG):</p>
+<ol>
+<li><code>convergence_comparison</code>: Grouped horizontal bar chart.</li>
+<li><code>progress_reward_curves</code>: Line plots of reward over time.</li>
+<li><code>progress_velocity_curves</code>: Line plots of velocity over time.</li>
+</ol>
 <hr />
 <h2 id="poster-integration-figma">Poster Integration (Figma)</h2>
 <h3 id="svg-scaling">SVG &amp; Scaling</h3>
-<p>We recommend using the <strong>SVG</strong> outputs for poster design in Figma:
-1. <strong>No Resolution Loss:</strong> SVGs are vector-based and will remain sharp at any size.
-2. <strong>Native Text:</strong> Text in the SVG imports as native text layers in Figma.
-3. <strong>Exact Font Matching:</strong> To ensure a <code>28pt</code> font in the plot matches a <code>28pt</code> font in your poster, set the <code>--fig_width</code> and <code>--fig_height</code> to match the physical dimensions of the plot box in your Figma layout.
-4. <strong>Editable:</strong> You can "Ungroup" the SVG in Figma to manually move labels, adjust colors, or tweak individual bars.</p>
+<p>We recommend using the <strong>SVG</strong> outputs for poster design in Figma:</p>
+<ol>
+<li><strong>No Resolution Loss:</strong> SVGs are vector-based and will remain sharp at any size.</li>
+<li><strong>Native Text:</strong> Text in the SVG imports as native text layers in Figma.</li>
+<li><strong>Exact Font Matching:</strong> To ensure a <code>28pt</code> font in the plot matches a <code>28pt</code> font in your poster, set the <code>--fig_width</code> and <code>--fig_height</code> to match the physical dimensions of the plot box in your Figma layout.</li>
+<li><strong>Editable:</strong> You can "Ungroup" the SVG in Figma to manually move labels, adjust colors, or tweak individual bars.</li>
+</ol>
 <h3 id="image-placeholders">Image Placeholders</h3>
 <p>The comparison charts include light-gray square placeholders below the X-axis. These are designed as guides; in Figma, you can drop your morphology renders or illustrations directly on top of these squares.</p>
 
