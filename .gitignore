@@ -523,3 +523,6 @@ Network Trash Folder
 Temporary Items
 .apdisk
 *.pdf
+
+# plot directory
+poster_plots/

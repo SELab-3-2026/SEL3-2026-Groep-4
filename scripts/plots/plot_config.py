@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 COLORS = {
     "CENTRALIZED": "#0D567C",  # Blue
     "FULLY_CONNECTED": "#8C0E0F",  # Reddish
-    "RING_LEVEL": "#E1BA6D",  # Pale Yellow
+    "RING": "#FCB305",  # Pale Yellow
 }
 
 
@@ -42,7 +42,7 @@ BEST_PERFORMER_COLOR = "#D4AF37"  # Gold
 # Centralized Legend Configuration
 LEGEND_KWARGS = {
     "loc": "upper center",
-    "bbox_to_anchor": (0.5, -0.5),
+    "bbox_to_anchor": (0.5, -0.12),
     "frameon": False,
 }
 
