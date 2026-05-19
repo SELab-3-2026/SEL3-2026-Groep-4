@@ -15,6 +15,7 @@ The project uses a modular configuration system powered by [Hydra](https://hydra
    ```
 
 2. **Edit `configs/experiment/my_experiment.yaml`** to set your experiment parameters:
+
    ```yaml
    # @package _global_
    experiment:
@@ -49,6 +50,32 @@ By default, the trainer saves checkpoints but does not evaluate them. To enable 
 ```bash
 uv run python scripts/train.py evaluation.evaluate_checkpoints=true
 ```
+
+## Reproducing Experiments
+
+To ensure scientific validity and allow other researchers to reproduce your training runs, follow these steps:
+
+1. **Lock Environment Dependencies**:
+   Always use the exact environment lockfile when running experiments. Run:
+   ```bash
+   uv sync --frozen
+   ```
+   This guarantees that the same package versions (including JAX, Flax, and MuJoCo) are used.
+
+2. **Save and Locate Configuration Metadata**:
+   Every time you start a training run, the configuration is fully resolved by Hydra and saved as a metadata YAML file:
+   - For checkpointed steps: `runs/<run_dir>/checkpoints/<prefix>_step_<step>_metadata.yaml`
+   - For the final model: `runs/<run_dir>/final_model_metadata.yaml`
+
+   This metadata file contains every active hyperparameter (e.g., learning rate, morphology configuration, PPO parameters, etc.) for that specific run.
+
+3. **Re-Run with Pinning**:
+   To reproduce a run, execute the training script with the configuration parameters specified in the metadata file, making sure to reuse the same seed:
+   ```bash
+   uv run python scripts/train.py experiment=my_experiment ppo.learning_rate=0.001 experiment.seed=42
+   ```
+
+---
 
 For more details on evaluation metrics and comparison tools, see [Evaluation](./evaluation.md).
 

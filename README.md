@@ -22,9 +22,10 @@ uv sync --frozen
 ├── runs/                   # Default output directory for Hydra and training artifacts
 ├── scripts/                # High-level entrypoints for training, simulation, and evaluation
 ├── src/
-│   └── brittle_star_project/ # Core library and environment logic
-│       ├── evaluation/     # Checkpoint evaluation, rollout logic, and metrics persistence
-│       └── trainers/       # Training loop implementations (e.g., PPO)
+│   ├── brittle_star_project/ # Core library and environment logic
+│   │   ├── evaluation/     # Checkpoint evaluation, rollout logic, and metrics persistence
+│   │   └── trainers/       # Training loop implementations (e.g., PPO)
+│   └── experiment_logger/  # Standalone logging package
 └── tests/                  # Unit and integration tests
 ```
 
