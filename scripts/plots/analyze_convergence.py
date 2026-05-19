@@ -135,6 +135,9 @@ def load_metrics(file_mapping: dict[str, str]) -> pd.DataFrame:
             continue
 
         df = df[required].copy()
+        df[Columns.VELOCITY] = (df[Columns.INITIAL_XY_DIST] - df[Columns.FINAL_XY_DIST]) / df[
+            Columns.EVAL_STEPS
+        ]
         df[Columns.ARCH] = arch_name
         df[Columns.VELOCITY] = (df[Columns.INITIAL_XY_DIST] - df[Columns.FINAL_XY_DIST]) / df[
             Columns.EVAL_STEPS
@@ -165,6 +168,8 @@ def analyze_convergence(df: pd.DataFrame) -> pd.DataFrame:
     """
     results = []
 
+    centralized_base = 0
+
     for arch in df[Columns.ARCH].unique():
         arch_data = df[df[Columns.ARCH] == arch].sort_values(Columns.TIMESTEPS)
 
@@ -191,6 +196,11 @@ def analyze_convergence(df: pd.DataFrame) -> pd.DataFrame:
                 "Velocity_Convergence_Checkpoint": velocity_checkpoint,
             }
         )
+
+        if arch == "centralized 5 arms":
+            centralized_base = reward_checkpoint
+        else:
+            print(arch, "speedup:", 1 - reward_checkpoint / centralized_base)
 
     return pd.DataFrame(results)
 

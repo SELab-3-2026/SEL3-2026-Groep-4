@@ -6,18 +6,17 @@ Rate, Distance Remaining).
 """
 
 import os
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from plot_config import (
-    COLORS,
-    apply_style,
-    BEST_PERFORMER_MARKER,
-    BEST_PERFORMER_TEXT,
     BEST_PERFORMER_COLOR,
-    create_common_parser,
+    BEST_PERFORMER_TEXT,
+    COLORS,
     LEGEND_KWARGS,
+    apply_style,
+    create_common_parser,
 )
 
 
@@ -362,8 +361,8 @@ if __name__ == "__main__":
         plot_grouped_bar(
             df=df,
             metric_col="approx_max_velocity",
-            ylabel="Max Forward Velocity (cm/s)",
-            title="Graceful Degradation: Velocity Across Morphologies",
+            ylabel="",
+            title="Maximal forward velocity (in cm/s)",
             output_filename="poster_plot_velocity.png",
             output_dir=OUTPUT_DIR,
             higher_is_better=True,
