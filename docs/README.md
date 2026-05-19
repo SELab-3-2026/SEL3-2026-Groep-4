@@ -1,5 +1,9 @@
 # Documentation
 
+Welcome to the Brittle Star project documentation. This codebase contains the implementations and research for the scientific evaluation of controller modularity in brittle-star-like robots trained using Reinforcement Learning.
+
+For the core codebase, scripts, and contribution history, visit our [GitHub Repository](https://github.com/SELab-3-2026/SEL3-2026-Groep-4).
+
 ## Design & architecture (`/design`)
 
 If you are interested in the "why did you do it like this?"

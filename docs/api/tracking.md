@@ -47,7 +47,7 @@ All runs are recorded locally in the `runs/` directory (or the directory specifi
 tensorboard --logdir runs/
 ```
 
-Access the interface at `http://localhost:6006`.
+Access the interface at [http://localhost:6006](http://localhost:6006).
 
 ### CLI Exploration Tool
 

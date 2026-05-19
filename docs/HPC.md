@@ -1,6 +1,6 @@
 # HPC Guide
 
-Full documentation: <https://docs.hpc.ugent.be/>
+Full documentation: [https://docs.hpc.ugent.be/](https://docs.hpc.ugent.be/)
 
 ## Storage Overview
 
