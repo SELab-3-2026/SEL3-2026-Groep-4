@@ -621,6 +621,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#reproducing-experiments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing Experiments
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1226,6 +1237,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#reproducing-experiments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing Experiments
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1256,14 +1278,14 @@
 </code></pre></div></p>
 </li>
 <li>
-<p><strong>Edit <code>configs/experiment/my_experiment.yaml</code></strong> to set your experiment parameters:
-   <div class="highlight"><pre><span></span><code><span class="c1"># @package _global_</span>
+<p><strong>Edit <code>configs/experiment/my_experiment.yaml</code></strong> to set your experiment parameters:</p>
+</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="c1"># @package _global_</span>
 <span class="nt">experiment</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">exp_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;my_custom_run&quot;</span>
 <span class="w">  </span><span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">42</span>
-</code></pre></div></p>
-</li>
-</ol>
+</code></pre></div>
 <h2 id="training-execution">Training Execution</h2>
 <p>To start a training run with the default settings defined in <code>configs/main_config.yaml</code>:</p>
 <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/train.py
@@ -1278,6 +1300,31 @@
 <p>By default, the trainer saves checkpoints but does not evaluate them. To enable automatic headless evaluation of every saved checkpoint, set <code>evaluation.evaluate_checkpoints=true</code>:</p>
 <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/train.py<span class="w"> </span>evaluation.evaluate_checkpoints<span class="o">=</span><span class="nb">true</span>
 </code></pre></div>
+<h2 id="reproducing-experiments">Reproducing Experiments</h2>
+<p>To ensure scientific validity and allow other researchers to reproduce your training runs, follow these steps:</p>
+<ol>
+<li>
+<p><strong>Lock Environment Dependencies</strong>:
+   Always use the exact environment lockfile when running experiments. Run:
+   <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>sync<span class="w"> </span>--frozen
+</code></pre></div>
+   This guarantees that the same package versions (including JAX, Flax, and MuJoCo) are used.</p>
+</li>
+<li>
+<p><strong>Save and Locate Configuration Metadata</strong>:
+   Every time you start a training run, the configuration is fully resolved by Hydra and saved as a metadata YAML file:</p>
+</li>
+<li>For checkpointed steps: <code>runs/&lt;run_dir&gt;/checkpoints/&lt;prefix&gt;_step_&lt;step&gt;_metadata.yaml</code></li>
+<li>For the final model: <code>runs/&lt;run_dir&gt;/final_model_metadata.yaml</code></li>
+</ol>
+<p>This metadata file contains every active hyperparameter (e.g., learning rate, morphology configuration, PPO parameters, etc.) for that specific run.</p>
+<ol>
+<li><strong>Re-Run with Pinning</strong>:
+   To reproduce a run, execute the training script with the configuration parameters specified in the metadata file, making sure to reuse the same seed:
+   <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/train.py<span class="w"> </span><span class="nv">experiment</span><span class="o">=</span>my_experiment<span class="w"> </span>ppo.learning_rate<span class="o">=</span><span class="m">0</span>.001<span class="w"> </span>experiment.seed<span class="o">=</span><span class="m">42</span>
+</code></pre></div></li>
+</ol>
+<hr />
 <p>For more details on evaluation metrics and comparison tools, see <a href="../evaluation/">Evaluation</a>.</p>
 <p>For more details on tracking your experiments, see <a href="../tracking/">Tracking &amp; Monitoring</a>.</p>
 

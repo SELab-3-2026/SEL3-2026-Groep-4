@@ -256,6 +256,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#core-requirements-guides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Requirements &amp; Guides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repository-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repository Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#design-architecture-design" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1111,6 +1133,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#core-requirements-guides" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Requirements &amp; Guides
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#repository-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repository Structure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#design-architecture-design" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1152,6 +1196,26 @@
 <h1 id="documentation">Documentation</h1>
 <p>Welcome to the Brittle Star project documentation. This codebase contains the implementations and research for the scientific evaluation of controller modularity in brittle-star-like robots trained using Reinforcement Learning.</p>
 <p>For the core codebase, scripts, and contribution history, visit our <a href="https://github.com/SELab-3-2026/SEL3-2026-Groep-4">GitHub Repository</a>.</p>
+<h2 id="core-requirements-guides">Core Requirements &amp; Guides</h2>
+<ul>
+<li><strong><a href="DEVELOPMENT/">Installation Instructions</a></strong>: Steps to set up your development environment locally or in a devcontainer using <code>uv</code>, including GPU configuration. For High-Performance Computing (HPC) setup details, see the <strong><a href="HPC/">HPC Guide</a></strong>.</li>
+<li><strong><a href="api/training/">How to Run Experiments</a></strong>: A complete guide on running training jobs, setting custom hyperparameters, and overriding config options using Hydra.</li>
+<li><strong><a href="api/training/#reproducing-experiments">Reproducing Experiments</a></strong>: Best practices for reproducing past training runs using exact seeds, dependencies, and automatic metadata logging.</li>
+<li><strong><a href="#repository-structure">Repository Structure</a></strong>: Overview of the directories and files within the codebase.</li>
+</ul>
+<h2 id="repository-structure">Repository Structure</h2>
+<div class="highlight"><pre><span></span><code>.
+├── configs/                # Hydra configuration files (YAML)
+├── docs/                   # Comprehensive documentation and API guides
+├── runs/                   # Default output directory for Hydra and training artifacts
+├── scripts/                # High-level entrypoints for training, simulation, and evaluation
+├── src/
+│   ├── brittle_star_project/ # Core library and environment logic
+│   │   ├── evaluation/     # Checkpoint evaluation, rollout logic, and metrics persistence
+│   │   └── trainers/       # Training loop implementations (e.g., PPO)
+│   └── experiment_logger/  # Standalone logging package
+└── tests/                  # Unit and integration tests
+</code></pre></div>
 <h2 id="design-architecture-design">Design &amp; architecture (<code>/design</code>)</h2>
 <p>If you are interested in the "why did you do it like this?"</p>
 <ul>
