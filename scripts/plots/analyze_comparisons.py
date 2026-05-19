@@ -182,7 +182,7 @@ def plot_grouped_bar(
         color="w",
         markerfacecolor=BEST_PERFORMER_COLOR,
         markersize=15,
-        label="Best Performance",
+        # label="Best Performance",
         ls="",
     )
     ax.legend(**LEGEND_KWARGS, ncol=len(architectures) + 1)
@@ -317,7 +317,7 @@ def plot_grouped_bar_alt(
         color="w",
         markerfacecolor=BEST_PERFORMER_COLOR,
         markersize=15,
-        label="Best Performance",
+        # label="Best Performance",
         ls="",
     )
     ax.legend(**LEGEND_KWARGS, ncol=len(morphologies) + 1)

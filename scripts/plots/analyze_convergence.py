@@ -45,19 +45,22 @@ class Columns(str, Enum):
     """Column names expected in every evaluation CSV."""
 
     ARCH = "architecture"
-    TIMESTEPS = "total_trained_timesteps"
-    REWARD = "accumulated_reward"
+    TIMESTEPS = "trained_timesteps"
+    REWARD = "eval_return"
     VELOCITY = "velocity"
+    EVAL_STEPS = "eval_steps"
+    FINAL_XY_DIST = "final_xy_dist"
+    INITIAL_XY_DIST = "initial_xy_dist"
+    REACHED_TARGET = "reached_target"
 
 
 # Maps architecture display names to the path of their evaluation CSV.
 # Update these paths once real evaluation data is available.
 FILE_MAPPING: dict[str, str] = {
-    "centralized 2 arms": "runs/dummy/dummy_centralized_2_arms.csv",
-    "centralized 5 arms": "runs/dummy/dummy_centralized_5_arms.csv",
-    "decentralized fully connected": "runs/dummy/dummy_decentralized_fully_connected.csv",
-    "decentralized ring-level": "runs/dummy/dummy_decentralized_ring-level.csv",
-    "decentralized segment-level": "runs/dummy/dummy_decentralized_segment-level.csv",
+    # "centralized 2 arms": "runs/dummy/dummy_centralized_2_arms.csv",
+    "centralized 5 arms": "runs/final-v2-centralized/checkpoint_evaluation.csv",
+    "decentralized fully connected": "runs/final-v2-fully-conn/checkpoint_evaluation.csv",
+    "decentralized ring-level": "runs/final-v2-ring/checkpoint_evaluation.csv",
 }
 
 # Architecture profiles for dummy data generation: (max_reward, max_velocity, sigmoid_speed)
@@ -108,7 +111,13 @@ def load_metrics(file_mapping: dict[str, str]) -> pd.DataFrame:
     Loads one CSV per architecture, injects the architecture name as a column,
     and returns the combined DataFrame with only the required columns.
     """
-    required = [Columns.TIMESTEPS, Columns.REWARD, Columns.VELOCITY]
+    required = [
+        Columns.TIMESTEPS,
+        Columns.REWARD,
+        Columns.INITIAL_XY_DIST,
+        Columns.FINAL_XY_DIST,
+        Columns.EVAL_STEPS,
+    ]
     dfs = []
 
     for arch_name, filepath in file_mapping.items():
@@ -125,6 +134,10 @@ def load_metrics(file_mapping: dict[str, str]) -> pd.DataFrame:
 
         df = df[required].copy()
         df[Columns.ARCH] = arch_name
+        df[Columns.VELOCITY] = (df[Columns.INITIAL_XY_DIST] - df[Columns.FINAL_XY_DIST]) / df[
+            Columns.EVAL_STEPS
+        ]
+
         dfs.append(df)
 
     return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
@@ -303,6 +316,7 @@ def plot_results(df: pd.DataFrame, results: pd.DataFrame, output_dir: str, **kwa
 def obtain_data() -> pd.DataFrame:
     """Resolves the file mapping, falling back to generated dummy CSVs if needed."""
     global USING_DUMMY_DATA
+
     if not any(os.path.exists(p) for p in FILE_MAPPING.values()):
         logger.info("No real evaluation files found. Generating dummy CSVs at expected locations.")
         generate_dummy_csvs(FILE_MAPPING)
