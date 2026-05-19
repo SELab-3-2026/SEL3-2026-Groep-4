@@ -33,6 +33,7 @@ qsub -l gpus=1 scripts/hpc/install.sh
 Our scripts are cluster-agnostic and do **not** have hardcoded GPU requirements. Instead, you must request GPUs at runtime using the `-l gpus=1` flag when submitting to a production GPU cluster.
 
 ### Debugging (Donphan)
+
 The `donphan` cluster does not support GPUs. Simply run the scripts without extra resource flags:
 ```bash
 module swap cluster/donphan
@@ -40,6 +41,7 @@ qsub scripts/hpc/train.pbs
 ```
 
 ### Production (Joltik, Accelgor, Litleo)
+
 These clusters provide GPU acceleration and **require** a GPU request at runtime:
 ```bash
 module swap cluster/joltik  # or accelgor/litleo
@@ -64,11 +66,13 @@ After installation, run these commands to ensure your environment is set up corr
    ```bash
    ls -d venvs 2>/dev/null && echo "FAIL" || echo ">>> PASS: Project root is clean."
    ```
+
 2. **Verify Library Versions (NumPy Fix)**:
    ```bash
    python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
    # Expected: 2.x.x (Venv version), not 1.2x (System version)
    ```
+
 3. **Verify GPU Access**:
    ```bash
    python -c "import torch, jax; print(f'GPU: {torch.cuda.is_available()}'); print(f'JAX: {jax.devices()}')"

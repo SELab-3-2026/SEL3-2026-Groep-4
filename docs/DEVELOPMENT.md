@@ -2,7 +2,7 @@
 
 This guide outlines how to set up the development environment for this project, prioritizing **reproducible builds**, **environment parity**, and **cross-hardware compatibility**.
 
-## Reproducibility &uv
+## Reproducibility & uv
 
 This project uses [uv](https://github.com/astral-sh/uv) to manage dependencies and virtual environments. The `uv.lock` file is the absolute source of truth for package versions and must always be committed.
 
@@ -48,6 +48,7 @@ The devcontainer provides an identical experience to local development but with 
 ## Local Development (Alternative)
 
 If you prefer not to use Docker:
+
 1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/).
 2. Run `uv sync --frozen` (CPU) or `uv sync --frozen --extra cuda` (GPU).
 
@@ -58,6 +59,7 @@ Verify your setup by running the JAX initialization test:
 ```bash
 uv run pytest tests/test_jax_init.py
 ```
+
 In the devcontainer, this will succeed on both CPU and GPU. A `GpuDevice` is expected if a GPU is detected and the `cuda` extra was installed.
 
 ## Logging & Monitoring

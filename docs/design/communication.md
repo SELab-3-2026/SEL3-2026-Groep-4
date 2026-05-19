@@ -1,6 +1,7 @@
 # Communication scheme (Message Passing)
 
 Remember our research question:
+
 > "What is the impact of different levels of controller modularity on learning speed, coordination, and fault tolerance
 > (e.g. amputations) in brittle-star-like robots trained with Reinforcement Learning?"
 
