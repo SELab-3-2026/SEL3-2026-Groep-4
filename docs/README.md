@@ -8,7 +8,7 @@ For the core codebase, scripts, and contribution history, visit our [GitHub Repo
 
 - **[Installation Instructions](./DEVELOPMENT.md)**: Steps to set up your development environment locally or in a devcontainer using `uv`, including GPU configuration. For High-Performance Computing (HPC) setup details, see the **[HPC Guide](./HPC.md)**.
 - **[How to Run Experiments](./api/training.md)**: A complete guide on running training jobs, setting custom hyperparameters, and overriding config options using Hydra.
-- **[Reproducing Experiments](./api/training.md#reproducing-experiments)**: Best practices for reproducing past training runs using exact seeds, dependencies, and automatic metadata logging.
+- **[Results & Reproduction](./reproduction.md)**: Guide on how to access our public WandB training runs table and reproduce our training and evaluation phases (determining the best checkpoint vs. comparing architectures).
 - **[Repository Structure](#repository-structure)**: Overview of the directories and files within the codebase.
 
 ## Repository Structure
