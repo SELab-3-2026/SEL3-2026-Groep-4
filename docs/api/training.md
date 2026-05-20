@@ -6,6 +6,8 @@ This guide covers how to configure and run training experiments for the Brittle 
 
 The project uses a modular configuration system powered by [Hydra](https://hydra.cc/). Instead of passing many command-line flags, you select and override configuration groups.
 
+For a detailed guide on the structure, validation, and usage of our Hydra configuration files, see the **[Brittle Star Configuration System Guide](../../configs/README.md)**.
+
 ### Creating a Custom Experiment
 
 1. **Create a new experiment file:**
@@ -15,6 +17,7 @@ The project uses a modular configuration system powered by [Hydra](https://hydra
    ```
 
 2. **Edit `configs/experiment/my_experiment.yaml`** to set your experiment parameters:
+
    ```yaml
    # @package _global_
    experiment:
@@ -50,6 +53,12 @@ By default, the trainer saves checkpoints but does not evaluate them. To enable 
 uv run python scripts/train.py evaluation.evaluate_checkpoints=true
 ```
 
-For more details on evaluation metrics and comparison tools, see [Evaluation](./evaluation.md).
+## Reproducing Experiments
+
+For detailed steps on how to reproduce training runs, locate run configuration metadata, or reproduce our experiments using Weights & Biases (WandB), see the **[Results & Reproduction Guide](./reproduction.md)**.
+
+---
+
+For more details on evaluation metrics and comparison tools, see [Checkpoint & Model Evaluation](./evaluation.md).
 
 For more details on tracking your experiments, see [Tracking & Monitoring](./tracking.md).

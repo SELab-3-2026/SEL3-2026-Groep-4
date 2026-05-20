@@ -47,7 +47,7 @@ All runs are recorded locally in the `runs/` directory (or the directory specifi
 tensorboard --logdir runs/
 ```
 
-Access the interface at `http://localhost:6006`.
+Access the interface at [http://localhost:6006](http://localhost:6006).
 
 ### CLI Exploration Tool
 
@@ -58,3 +58,7 @@ uv run python scripts/analysis/explore_tensorboard.py runs/your_run_name/
 ```
 
 See the detailed description in [`/scripts/analysis/README.md`](../../scripts/analysis/README.md).
+
+## Developer Logging API
+
+For details on the developer API of our internal logging library (how backend routing, checkpoint synchronization, and singleton initialization works), see the **[Experiment Logger API Guide](../../src/experiment_logger/README.md)**.

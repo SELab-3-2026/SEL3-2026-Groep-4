@@ -5,6 +5,7 @@ This guide outlines the tools available for analyzing experimental data and gene
 ## Shared Configuration
 
 All plotting scripts share a central configuration in `scripts/plots/plot_config.py`. This file defines:
+
 - **Color Palette:** A color-blind friendly, high-contrast palette for different architectures.
 - **Typography:** Consistent font sizes and styles tailored for A0 posters.
 - **Markers:** Shared visual indicators, such as the ★ used for best performers.
@@ -40,6 +41,7 @@ uv run python scripts/plots/analyze_comparisons.py path/to/results.csv \
 ### Outputs
 
 The script generates four key plots, each saved as both `.png` and `.svg`:
+
 1.  **Forward Velocity:** Grouped bar chart (cm/s).
 2.  **Accumulated Reward:** Mean cumulative reward.
 3.  **Success Rate:** Target acquisition percentage.
@@ -65,6 +67,7 @@ uv run python scripts/plots/analyze_convergence.py --output_dir runs/convergence
 ### Outputs
 
 Generates three plots (PNG & SVG):
+
 1. `convergence_comparison`: Grouped horizontal bar chart.
 2. `progress_reward_curves`: Line plots of reward over time.
 3. `progress_velocity_curves`: Line plots of velocity over time.
@@ -74,7 +77,9 @@ Generates three plots (PNG & SVG):
 ## Poster Integration (Figma)
 
 ### SVG & Scaling
+
 We recommend using the **SVG** outputs for poster design in Figma:
+
 1. **No Resolution Loss:** SVGs are vector-based and will remain sharp at any size.
 2. **Native Text:** Text in the SVG imports as native text layers in Figma.
 3. **Exact Font Matching:** To ensure a `28pt` font in the plot matches a `28pt` font in your poster, set the `--fig_width` and `--fig_height` to match the physical dimensions of the plot box in your Figma layout.

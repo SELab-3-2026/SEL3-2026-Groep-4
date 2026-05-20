@@ -1,6 +1,6 @@
-# Simulation & Evaluation
+# Interactive Simulation & Visualization
 
-The simulation pipeline allows you to visualize trained models and evaluate their performance under various conditions.
+The simulation pipeline allows you to visualize trained models and observe their behavior under various conditions.
 
 ## Overview
 
@@ -50,5 +50,5 @@ uv run scripts/poster_visualisations/render_poster_videos.py \
   --max-steps 10000 --width 640 --height 480 --fps 60 \
   --output-root vids/poster/
 ```
+For batch evaluation, checkpoint analysis, and cross-model architecture comparisons, see the **[Checkpoint & Model Evaluation Guide](./evaluation.md)**.
 
-For batch evaluation and cross-model comparison, see the **[Evaluation Guide](./evaluation.md)**.

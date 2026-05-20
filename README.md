@@ -22,9 +22,10 @@ uv sync --frozen
 ├── runs/                   # Default output directory for Hydra and training artifacts
 ├── scripts/                # High-level entrypoints for training, simulation, and evaluation
 ├── src/
-│   └── brittle_star_project/ # Core library and environment logic
-│       ├── evaluation/     # Checkpoint evaluation, rollout logic, and metrics persistence
-│       └── trainers/       # Training loop implementations (e.g., PPO)
+│   ├── brittle_star_project/ # Core library and environment logic
+│   │   ├── evaluation/     # Checkpoint evaluation, rollout logic, and metrics persistence
+│   │   └── trainers/       # Training loop implementations (e.g., PPO)
+│   └── experiment_logger/  # Standalone logging package
 └── tests/                  # Unit and integration tests
 ```
 
@@ -47,6 +48,10 @@ For detailed instructions on how to use the project, please refer to the **[API 
 
 4. **Compare fault tolerance of models:**
    See [Checkpoint & Model Evaluation](docs/api/evaluation.md)
+
+## Results & Reproduction
+
+See **[docs/api/reproduction.md](docs/api/reproduction.md)** to learn how to access our public [Weights & Biases (WandB) project](https://wandb.ai/SEL3-2026-Groep-4/final-models-v2?nw=96mloffsyq), retrieve specific run parameters, and run the training/evaluation reproduction workflow.
 
 ## HPC
 

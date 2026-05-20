@@ -98,13 +98,13 @@ graph TD
 
 ## Implementation Details (Network Depth)
 
-Inspired by: https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/
+Inspired by: [PPO Implementation Details](https://iclr-blog-track.github.io/2022/03/25/ppo-implementation-details/)
 
 The MLPs used in both pipelines are defined with specific hidden layer configurations to balance learning capability
 and computational cost. As of right now, though this might change as we make progress in our experiments, we use:
 
 - Input Networks (Sensors & Feature Extractors): These networks map the raw state inputs to internal hidden states.
-  They are configured as standard dense networks with 2 hidden layers of 64 nodes each (`[64, 64]`) and utilize `tanh`
+  They are configured as standard dense networks with 3 hidden layers of 300 nodes each (`[300, 300, 300]`) and utilize `tanh`
   activation functions.
 - Output Networks (Motors, Actors & Critics): The final output models are intentionally kept shallow. The Actor
   directly projects the hidden state to a continuous action distribution (`mean` and `log_std`) using a single dense
@@ -116,6 +116,6 @@ by previous research to maintain learning stability.
 
 **References**
 
-- Ha, D. (2017, October 29). A Visual Guide to Evolution Strategies. 大トロ ・ Machine Learning. https://blog.otoro.net/2017/10/29/visual-evolution-strategies/
-- Schulman, John, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. ‘Proximal Policy Optimization Algorithms’. arXiv:1707.06347. Preprint, arXiv, 28 August 2017. https://doi.org/10.48550/arXiv.1707.06347.
-- Wang, Tingwu, Renjie Liao, Jimmy Ba, and S. Fidler. ‘NerveNet: Learning Structured Policy with Graph Neural Networks’. Conference paper presented at International Conference on Learning Representations. 15 February 2018. https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613.
+- Ha, D. (2017, October 29). A Visual Guide to Evolution Strategies. 大トロ ・ Machine Learning. [https://blog.otoro.net/2017/10/29/visual-evolution-strategies/](https://blog.otoro.net/2017/10/29/visual-evolution-strategies/)
+- Schulman, John, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. ‘Proximal Policy Optimization Algorithms’. arXiv:1707.06347. Preprint, arXiv, 28 August 2017. [https://doi.org/10.48550/arXiv.1707.06347](https://doi.org/10.48550/arXiv.1707.06347).
+- Wang, Tingwu, Renjie Liao, Jimmy Ba, and S. Fidler. ‘NerveNet: Learning Structured Policy with Graph Neural Networks’. Conference paper presented at International Conference on Learning Representations. 15 February 2018. [https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613](https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613).

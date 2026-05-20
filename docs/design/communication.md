@@ -1,6 +1,7 @@
 # Communication scheme (Message Passing)
 
 Remember our research question:
+
 > "What is the impact of different levels of controller modularity on learning speed, coordination, and fault tolerance
 > (e.g. amputations) in brittle-star-like robots trained with Reinforcement Learning?"
 
@@ -39,5 +40,5 @@ extended morphologies.
 
 **References**
 
-- Wang, Tingwu, Renjie Liao, Jimmy Ba, and S. Fidler. ‘NerveNet: Learning Structured Policy with Graph Neural Networks’. Conference paper presented at International Conference on Learning Representations. 15 February 2018. https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613.
-- Huang, Wenlong, Igor Mordatch, and Deepak Pathak. ‘One Policy to Control Them All: Shared Modular Policies for Agent-Agnostic Control’. arXiv:2007.04976. Preprint, arXiv, 9 July 2020. https://doi.org/10.48550/arXiv.2007.04976.
+- Wang, Tingwu, Renjie Liao, Jimmy Ba, and S. Fidler. ‘NerveNet: Learning Structured Policy with Graph Neural Networks’. Conference paper presented at International Conference on Learning Representations. 15 February 2018. [https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613](https://www.semanticscholar.org/paper/NerveNet:-Learning-Structured-Policy-with-Graph-Wang-Liao/249408527106d7595d45dd761dd53c83e5a02613).
+- Huang, Wenlong, Igor Mordatch, and Deepak Pathak. ‘One Policy to Control Them All: Shared Modular Policies for Agent-Agnostic Control’. arXiv:2007.04976. Preprint, arXiv, 9 July 2020. [https://doi.org/10.48550/arXiv.2007.04976](https://doi.org/10.48550/arXiv.2007.04976).

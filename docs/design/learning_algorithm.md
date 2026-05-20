@@ -25,6 +25,6 @@ Alternative learning algorithms include:
 
 **References**
 
-- Fujimoto, Scott, Herke Hoof, and David Meger. ‘Addressing Function Approximation Error in Actor-Critic Methods’. Proceedings of the 35th International Conference on Machine Learning, 3 July 2018, 1587-96. https://proceedings.mlr.press/v80/fujimoto18a.html.
-- Huang, Wenlong, Igor Mordatch, and Deepak Pathak. ‘One Policy to Control Them All: Shared Modular Policies for Agent-Agnostic Control’. arXiv:2007.04976. Preprint, arXiv, 9 July 2020. https://doi.org/10.48550/arXiv.2007.04976.
-- Schulman, John, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. ‘Proximal Policy Optimization Algorithms’. arXiv:1707.06347. Preprint, arXiv, 28 August 2017. https://doi.org/10.48550/arXiv.1707.06347.
+- Fujimoto, Scott, Herke Hoof, and David Meger. ‘Addressing Function Approximation Error in Actor-Critic Methods’. Proceedings of the 35th International Conference on Machine Learning, 3 July 2018, 1587-96. [https://proceedings.mlr.press/v80/fujimoto18a.html](https://proceedings.mlr.press/v80/fujimoto18a.html).
+- Huang, Wenlong, Igor Mordatch, and Deepak Pathak. ‘One Policy to Control Them All: Shared Modular Policies for Agent-Agnostic Control’. arXiv:2007.04976. Preprint, arXiv, 9 July 2020. [https://doi.org/10.48550/arXiv.2007.04976](https://doi.org/10.48550/arXiv.2007.04976).
+- Schulman, John, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. ‘Proximal Policy Optimization Algorithms’. arXiv:1707.06347. Preprint, arXiv, 28 August 2017. [https://doi.org/10.48550/arXiv.1707.06347](https://doi.org/10.48550/arXiv.1707.06347).

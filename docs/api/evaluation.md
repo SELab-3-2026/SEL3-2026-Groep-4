@@ -54,3 +54,7 @@ python scripts/evaluate_checkpoints.py \
 ```
 
 This script scans the `checkpoints/` directory of the specified run and evaluates every `.flax` file it finds using the model's training morphology.
+
+---
+
+For a step-by-step walkthrough on using these evaluation phases to reproduce our project results, see the **[Results & Reproduction Guide](./reproduction.md)**.
