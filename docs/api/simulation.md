@@ -1,6 +1,6 @@
-# Simulation & Evaluation
+# Interactive Simulation & Visualization
 
-The simulation pipeline allows you to visualize trained models and evaluate their performance under various conditions.
+The simulation pipeline allows you to visualize trained models and observe their behavior under various conditions.
 
 ## Overview
 
@@ -38,4 +38,4 @@ uv run scripts/simulate.py \
 Videos and evaluation metadata are stored in timestamped folders alongside the model:
 `runs/your_run/final_model_evaluations/eval_<timestamp>/simulation.mp4`
 
-For batch evaluation and cross-model comparison, see the **[Evaluation Guide](./evaluation.md)**.
+For batch evaluation, checkpoint analysis, and cross-model architecture comparisons, see the **[Checkpoint & Model Evaluation Guide](./evaluation.md)**.

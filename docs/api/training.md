@@ -53,10 +53,10 @@ uv run python scripts/train.py evaluation.evaluate_checkpoints=true
 
 ## Reproducing Experiments
 
-For detailed steps on how to reproduce training runs, locate run configuration metadata, or reproduce our experiments using Weights & Biases (WandB), see the **[Results & Reproduction Guide](../reproduction.md)**.
+For detailed steps on how to reproduce training runs, locate run configuration metadata, or reproduce our experiments using Weights & Biases (WandB), see the **[Results & Reproduction Guide](./reproduction.md)**.
 
 ---
 
-For more details on evaluation metrics and comparison tools, see [Evaluation](./evaluation.md).
+For more details on evaluation metrics and comparison tools, see [Checkpoint & Model Evaluation](./evaluation.md).
 
 For more details on tracking your experiments, see [Tracking & Monitoring](./tracking.md).

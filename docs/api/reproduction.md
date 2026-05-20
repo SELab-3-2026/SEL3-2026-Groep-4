@@ -105,4 +105,4 @@ Once the best checkpoints for each architecture are identified, they are compare
    * **`reached_target`**: Navigational success rates.
    * **`arm_0` to `arm_4`**: Active segments per arm (indicating damage/amputations).
 
-This CSV can then be passed to the plotting scripts (e.g., `scripts/plots/analyze_comparisons.py`) to generate visualization plots. For details on configuration and outputs, see the **[Analysis & Plotting Guide](./api/analysis.md)**.
+This CSV can then be passed to the plotting scripts (e.g., `scripts/plots/analyze_comparisons.py`) to generate visualization plots. For details on configuration and outputs, see the **[Analysis & Plotting Guide](./analysis.md)**.

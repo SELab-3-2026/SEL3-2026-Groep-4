@@ -51,7 +51,7 @@ For detailed instructions on how to use the project, please refer to the **[API 
 
 ## Results & Reproduction
 
-See **[docs/reproduction.md](docs/reproduction.md)** to learn how to access our public [Weights & Biases (WandB) project](https://wandb.ai/SEL3-2026-Groep-4/final-models-v2?nw=96mloffsyq), retrieve specific run parameters, and run the training/evaluation reproduction workflow.
+See **[docs/api/reproduction.md](docs/api/reproduction.md)** to learn how to access our public [Weights & Biases (WandB) project](https://wandb.ai/SEL3-2026-Groep-4/final-models-v2?nw=96mloffsyq), retrieve specific run parameters, and run the training/evaluation reproduction workflow.
 
 ## HPC
 

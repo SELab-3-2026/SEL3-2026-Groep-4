@@ -2,6 +2,27 @@ site_name: Brittle Star Project
 theme:
   name: material
 
+nav:
+  - Home: README.md
+  - Design & Architecture:
+      - Actor-Critic Architecture: design/actor-critic.md
+      - Communication Scheme: design/communication.md
+      - Modularity & Topology: design/controllers.md
+      - Input & Action Spaces: design/input_action_spaces.md
+      - Reinforcement Learning Algorithm: design/learning_algorithm.md
+      - Reward Function & Observation Space: design/reward_function.md
+  - API Reference:
+      - Brittle Star Environment: api/environment.md
+      - Training Models: api/training.md
+      - Tracking & Monitoring: api/tracking.md
+      - Checkpoint & Model Evaluation: api/evaluation.md
+      - Interactive Simulation & Visualization: api/simulation.md
+      - Analysis & Plotting Tools: api/analysis.md
+      - Results & Reproduction: api/reproduction.md
+  - HPC Guide: HPC.md
+  - Contribution Guidelines: CONTRIBUTING.md
+  - Development Guide: DEVELOPMENT.md
+
 markdown_extensions:
   - pymdownx.superfences:
       custom_fences:
