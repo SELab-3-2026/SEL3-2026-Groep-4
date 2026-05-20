@@ -104,7 +104,7 @@ The MLPs used in both pipelines are defined with specific hidden layer configura
 and computational cost. As of right now, though this might change as we make progress in our experiments, we use:
 
 - Input Networks (Sensors & Feature Extractors): These networks map the raw state inputs to internal hidden states.
-  They are configured as standard dense networks with 2 hidden layers of 64 nodes each (`[64, 64]`) and utilize `tanh`
+  They are configured as standard dense networks with 3 hidden layers of 300 nodes each (`[300, 300, 300]`) and utilize `tanh`
   activation functions.
 - Output Networks (Motors, Actors & Critics): The final output models are intentionally kept shallow. The Actor
   directly projects the hidden state to a continuous action distribution (`mean` and `log_std`) using a single dense
