@@ -9,12 +9,14 @@ eval_seed: 0
 # Cross-model comparison settings
 # We use 10 episodes to get a more robust average for the final poster results.
 comparison_base_seed: 0
-comparison_num_episodes: 2
+comparison_num_episodes: 10
 comparison_output_csv: "runs/evaluation/comparison.csv"
 
 # Paths to the .cleanrl_model files to be compared (relative to workspace root).
 comparison_models:
-  - "runs/input-space-2-arms/2026-05-02/08-14-58/final_model.flax"
+  - "runs/final-v2-centralized/artifacts/12-19-01_checkpoint_v22/checkpoint_step_230.flax"
+  - "runs/final-v2-fully-conn/artifacts/14-02-00_checkpoint_v17/checkpoint_step_180.flax"
+  - "runs/final-v2-ring/artifacts/15-27-03_checkpoint_v21/checkpoint_step_220.flax"
 
 # Path to the morphologies to evaluate against.
 comparison_morphologies:

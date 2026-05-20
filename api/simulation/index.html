@@ -709,6 +709,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Video Recording">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#top-down-and-follow-cameras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-Down and Follow Cameras
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -932,6 +949,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Video Recording">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#top-down-and-follow-cameras" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top-Down and Follow Cameras
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -974,7 +1008,16 @@
 </code></pre></div>
 <p>Videos and evaluation metadata are stored in timestamped folders alongside the model:
 <code>runs/your_run/final_model_evaluations/eval_&lt;timestamp&gt;/simulation.mp4</code></p>
-<p>For batch evaluation, checkpoint analysis, and cross-model architecture comparisons, see the <strong><a href="../evaluation/">Checkpoint &amp; Model Evaluation Guide</a></strong>.</p>
+<h3 id="top-down-and-follow-cameras">Top-Down and Follow Cameras</h3>
+<p>Using the following script, you can render a top-down and follow camera view for multiple models at once:</p>
+<p><div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>scripts/poster_visualisations/render_poster_videos.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/final-models/centralized/.../final_model.flax<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/final-models/fully-connected/.../final_model.flax<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>runs/final-models/ring/.../final_model.flax<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--max-steps<span class="w"> </span><span class="m">10000</span><span class="w"> </span>--width<span class="w"> </span><span class="m">640</span><span class="w"> </span>--height<span class="w"> </span><span class="m">480</span><span class="w"> </span>--fps<span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output-root<span class="w"> </span>vids/poster/
+</code></pre></div>
+For batch evaluation, checkpoint analysis, and cross-model architecture comparisons, see the <strong><a href="../evaluation/">Checkpoint &amp; Model Evaluation Guide</a></strong>.</p>
 
 
 

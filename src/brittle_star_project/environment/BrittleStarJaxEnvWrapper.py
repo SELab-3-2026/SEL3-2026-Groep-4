@@ -65,11 +65,21 @@ class BrittleStarJaxEnvWrapper:
     def single_observation_space(self):
         return self._env.observation_space
 
-    def reset(self, seed: int = 0):
+    def reset(self, seed: int = 0, target_position: tuple[float, float] | None = None):
         self.logger.info(f"Resetting vectorized environment environments with seed {seed}")
         self._action_rng, env_rng = jax.random.split(jax.random.PRNGKey(seed), 2)
         env_rngs = jnp.array(jax.random.split(env_rng, self._num_envs))
-        state = self._vectorized_reset(rng=env_rngs)
+
+        # If a target_position is provided, pass it through to the underlying env.reset
+        if target_position is None:
+            state = jax.jit(jax.vmap(lambda rng: self._env.reset(rng=rng)))(env_rngs)
+        else:
+            tp = jnp.asarray(target_position, dtype=jnp.float32)
+            tp_batched = jnp.tile(tp[None, :], (self._num_envs, 1))
+            state = jax.jit(jax.vmap(lambda rng, t: self._env.reset(rng=rng, target_position=t)))(
+                env_rngs, tp_batched
+            )
+
         return state
 
     def sample_actions(self):

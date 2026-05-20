@@ -62,9 +62,12 @@ class BrittleStarEnv:
 
         return jax.random.PRNGKey(seed)
 
-    def reset(self, *, seed: int = 0):
+    def reset(self, *, seed: int = 0, target_position: tuple[float, float, float] | None = None):
         rng = self.make_rng(seed)
-        state = self._env.reset(rng=rng)
+        if target_position is not None:
+            state = self._env.reset(rng=rng, target_position=target_position)
+        else:
+            state = self._env.reset(rng=rng)
         return state
 
     def render(self, *, state: Any):
