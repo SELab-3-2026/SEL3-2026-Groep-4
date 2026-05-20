@@ -38,4 +38,17 @@ uv run scripts/simulate.py \
 Videos and evaluation metadata are stored in timestamped folders alongside the model:
 `runs/your_run/final_model_evaluations/eval_<timestamp>/simulation.mp4`
 
+### Top-Down and Follow Cameras
+
+Using the following script, you can render a top-down and follow camera view for multiple models at once:
+
+```bash
+uv run scripts/poster_visualisations/render_poster_videos.py \
+  runs/final-models/centralized/.../final_model.flax \
+  runs/final-models/fully-connected/.../final_model.flax \
+  runs/final-models/ring/.../final_model.flax \
+  --max-steps 10000 --width 640 --height 480 --fps 60 \
+  --output-root vids/poster/
+```
 For batch evaluation, checkpoint analysis, and cross-model architecture comparisons, see the **[Checkpoint & Model Evaluation Guide](./evaluation.md)**.
+

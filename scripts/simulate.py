@@ -107,6 +107,9 @@ def main(dict_cfg: DictConfig) -> None:
             action_mask=action_mask,
             output_path=output_path,
             camera_id=sim_cfg.camera_id,
+            width=sim_cfg.video_width,
+            height=sim_cfg.video_height,
+            fps=sim_cfg.video_fps,
         )
 
         save_evaluation_metadata(

@@ -26,7 +26,7 @@ morphology:
   morph_mode: FULLY_CONNECTED
 
 experiment:
-  exp_name: "final-models/fully-connected/"
+  exp_name: "final-models-v2/fully-connected/"
   seed: 42
   torch_deterministic: true
   cuda: true
@@ -37,8 +37,8 @@ logging:
   save_checkpoints: true
   upload_final_model: true
   upload_checkpoints: true
-  checkpoint_frequency: 20
-  wandb_project_name: "final-models"
+  checkpoint_frequency: 10
+  wandb_project_name: "final-models-v2"
 
 evaluation:
   evaluate_checkpoints: true

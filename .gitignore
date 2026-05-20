@@ -6,6 +6,7 @@ outputs/
 multirun/
 metrics/
 adjacency_debug.txt
+vids/
 
 # Python-generated files
 __pycache__/
@@ -523,3 +524,6 @@ Network Trash Folder
 Temporary Items
 .apdisk
 *.pdf
+
+# plot directory
+poster_plots/
