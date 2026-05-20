@@ -1,0 +1,26 @@
+# Default Simulation Settings
+# These values are used by scripts/simulate.py
+
+# Path to the trained model (optional)
+model_path: null
+
+# Script behavior
+headless: false
+# In headless mode this is required; in viewer mode null means "infinite".
+max_steps: null
+
+# Optional: override morphology for amputation experiments.
+# Points to a morphology config YAML file (e.g. configs/morphology/3_arms.yaml).
+# If null, the training morphology from the model's metadata is used.
+morphology_override: null
+
+# Video recording (requires [evaluation] extra)
+record_video: false
+# When null, video is saved in a per-model evaluation folder alongside the model.
+video_output_path: null
+# Camera ID to use for video recording (1 is usually the close-up camera)
+camera_id: 1
+
+# Optional override for the metadata YAML file path.
+# If null, the script looks for `<model_name>_metadata.yaml` alongside the model_path.
+metadata_path: null
