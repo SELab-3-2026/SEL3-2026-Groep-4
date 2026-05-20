@@ -978,7 +978,7 @@ critic for all nodes at once, for the following reasons:</p>
 and computational cost. As of right now, though this might change as we make progress in our experiments, we use:</p>
 <ul>
 <li>Input Networks (Sensors &amp; Feature Extractors): These networks map the raw state inputs to internal hidden states.
-  They are configured as standard dense networks with 2 hidden layers of 64 nodes each (<code>[64, 64]</code>) and utilize <code>tanh</code>
+  They are configured as standard dense networks with 3 hidden layers of 300 nodes each (<code>[300, 300, 300]</code>) and utilize <code>tanh</code>
   activation functions.</li>
 <li>Output Networks (Motors, Actors &amp; Critics): The final output models are intentionally kept shallow. The Actor
   directly projects the hidden state to a continuous action distribution (<code>mean</code> and <code>log_std</code>) using a single dense
