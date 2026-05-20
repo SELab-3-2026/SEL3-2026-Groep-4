@@ -6,6 +6,8 @@ This guide covers how to configure and run training experiments for the Brittle 
 
 The project uses a modular configuration system powered by [Hydra](https://hydra.cc/). Instead of passing many command-line flags, you select and override configuration groups.
 
+For a detailed guide on the structure, validation, and usage of our Hydra configuration files, see the **[Brittle Star Configuration System Guide](../../configs/README.md)**.
+
 ### Creating a Custom Experiment
 
 1. **Create a new experiment file:**
