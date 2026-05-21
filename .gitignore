@@ -1,3 +1,13 @@
+# Model files
+artifacts/*
+runs/*
+wandb/
+outputs/
+multirun/
+metrics/
+adjacency_debug.txt
+vids/
+
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -368,7 +378,6 @@ celerybeat.pid
 # Environments
 .env
 .venv
-env/
 venv/
 ENV/
 env.bak/
@@ -468,7 +477,6 @@ tags
 [Ll]ib
 [Ll]ib64
 [Ll]ocal
-[Ss]cripts
 pyvenv.cfg
 .venv
 pip-selfcheck.json
@@ -515,4 +523,7 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+*.pdf
 
+# plot directory
+poster_plots/

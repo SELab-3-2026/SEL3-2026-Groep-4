@@ -1,0 +1,8 @@
+# Default Arena Configuration
+# Base aquarium environment settings.
+
+size: [10.0, 5.0]
+sand_ground_color: true
+attach_target: true
+wall_height: 1.5
+wall_thickness: 0.1

@@ -1,0 +1,114 @@
+import jax
+import jax.numpy as jnp
+
+from experiment_logger import get_logger
+from .env_config import EnvConfig, MorphologyConfig, ArenaConfig
+from .env_types import Backend
+from .factory import BrittleStarEnvFactory
+from .padded_obs_wrapper import compute_padding_masks
+
+
+class BrittleStarJaxEnvWrapper:
+    def __init__(
+        self,
+        morphology: MorphologyConfig,
+        arena: ArenaConfig,
+        env_config: EnvConfig,
+        num_envs: int,
+        backend: Backend = Backend.MJX,
+    ):
+        self._morphology = morphology
+        self._arena = arena
+        self._env_config = env_config
+        self._backend = backend
+        self._num_envs = num_envs
+        self._env = BrittleStarEnvFactory.create_environment(
+            self._backend, self._morphology, self._arena, self._env_config
+        )
+
+        # Pre-compute masks for observation padding
+        self._padding_masks = compute_padding_masks(self._morphology.segments_per_arm)
+
+        self._vectorized_reset = jax.jit(jax.vmap(self._env.reset))
+        self._vectorized_step = jax.jit(jax.vmap(self._env.step))
+        self._vectorized_action_sample = jax.jit(jax.vmap(self._env.action_space.sample))
+
+        self._action_rng = None
+
+        self.logger = get_logger()
+        self.logger.info(
+            f"Initialized BrittleStarJaxEnvWrapper with {num_envs} envs on {backend.value}"
+        )
+
+    @property
+    def backend(self):
+        return self._backend
+
+    @property
+    def raw(self):
+        return self._env
+
+    @property
+    def padding_masks(self) -> dict:
+        """Pre-computed boolean masks for amputated limb padding.
+
+        Pass to create_obs_processor so the processor handles padding
+        after normalization in the correct pipeline order.
+        """
+        return self._padding_masks
+
+    @property
+    def single_action_space(self):
+        return self._env.action_space
+
+    @property
+    def single_observation_space(self):
+        return self._env.observation_space
+
+    def reset(self, seed: int = 0, target_position: tuple[float, float] | None = None):
+        self.logger.info(f"Resetting vectorized environment environments with seed {seed}")
+        self._action_rng, env_rng = jax.random.split(jax.random.PRNGKey(seed), 2)
+        env_rngs = jnp.array(jax.random.split(env_rng, self._num_envs))
+
+        # If a target_position is provided, pass it through to the underlying env.reset
+        if target_position is None:
+            state = jax.jit(jax.vmap(lambda rng: self._env.reset(rng=rng)))(env_rngs)
+        else:
+            tp = jnp.asarray(target_position, dtype=jnp.float32)
+            tp_batched = jnp.tile(tp[None, :], (self._num_envs, 1))
+            state = jax.jit(jax.vmap(lambda rng, t: self._env.reset(rng=rng, target_position=t)))(
+                env_rngs, tp_batched
+            )
+
+        return state
+
+    def sample_actions(self):
+        assert self._action_rng is not None, "Call reset() before sample_actions()"
+        self._action_rng, *sub_rngs = jnp.array(
+            jax.random.split(self._action_rng, self._num_envs + 1)
+        )
+        return self._vectorized_action_sample(rng=jnp.array(sub_rngs))
+
+    def step(self, state, action):
+        return self._vectorized_step(state=state, action=action)
+
+    def close(self):
+        self._env.close()
+
+    @staticmethod
+    def default(num_envs: int, backend: Backend = Backend.MJX) -> "BrittleStarJaxEnvWrapper":
+        morphology = MorphologyConfig()
+        arena = ArenaConfig()
+        env_config = EnvConfig()
+        return BrittleStarJaxEnvWrapper(
+            morphology, arena, env_config, num_envs=num_envs, backend=backend
+        )
+
+    def __str__(self):
+        morphology_str = str(self._morphology)
+        arena_str = str(self._arena)
+        env_config_str = str(self._env_config)
+        return (
+            f"BrittleStarJaxEnvWrapper(backend={self._backend}, num_envs={self._num_envs}, "
+            + f"morphology={morphology_str}, arena={arena_str}, env_config={env_config_str})"
+        )

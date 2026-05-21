@@ -1,0 +1,7 @@
+# Testing Experiment Configuration
+# Quick experiment for local development/testing.
+
+exp_name: "dev_test_brittle_star"
+seed: 42
+torch_deterministic: true
+cuda: true
